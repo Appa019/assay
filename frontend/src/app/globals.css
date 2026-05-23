@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+:root {
+  /* Editorial palette — warm parchment + ink, single teal accent */
+  --bg-primary: oklch(0.985 0.005 75);
+  --bg-secondary: oklch(0.955 0.008 75);
+  --bg-card: oklch(0.995 0.003 75);
+  --bg-elevated: oklch(0.975 0.006 75);
+  --text-primary: oklch(0.18 0.02 75);
+  --text-secondary: oklch(0.42 0.018 75);
+  --text-muted: oklch(0.60 0.012 75);
+  --accent: oklch(0.52 0.13 200);
+  --accent-light: oklch(0.92 0.04 200);
+  --accent-strong: oklch(0.44 0.14 200);
+  --border: oklch(0.90 0.008 75);
+  --border-strong: oklch(0.82 0.012 75);
+  --success: oklch(0.58 0.14 145);
+  --success-light: oklch(0.95 0.04 145);
+  --danger: oklch(0.55 0.18 28);
+  --danger-light: oklch(0.95 0.05 28);
+  --warning: oklch(0.72 0.15 75);
+  --warning-light: oklch(0.96 0.06 75);
+}
+
+@theme inline {
+  --color-background: var(--bg-primary);
+  --color-foreground: var(--text-primary);
+  --font-sans: var(--font-body);
+  --font-serif: var(--font-heading);
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.005em;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-heading), serif;
+  letter-spacing: -0.02em;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-color: var(--accent);
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* tabular figures for monetary values */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}

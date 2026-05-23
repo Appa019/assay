@@ -1,0 +1,53 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+frontend/.env.local
+secrets/
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Local data
+storage/*.db
+storage/*.db-journal
+storage/*.db-wal
+storage/*.bak-*
+storage/logs/
+
+# Logs
+*.log
+
+# Build
+dist/
+build/
+coverage/
+
+# Claude Code
+.claude/settings.local.json
+storage/claude_session.json
+storage/analysis_runs/
+storage/agent_workspace/
+storage/notifications_state.json

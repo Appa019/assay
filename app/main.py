@@ -1,0 +1,54 @@
+from contextlib import asynccontextmanager
+
+import structlog
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.config import settings
+from app.core.database import init_db
+from app.routers import cadence, contributions, macro, portfolio, reports
+
+logger = structlog.get_logger()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    logger.info("app_started", db=settings.sqlite_path)
+    yield
+    logger.info("app_stopped")
+
+
+app = FastAPI(
+    title="Investimentos Manual",
+    description="Manual portfolio + 3-prompt research cycle, fully local.",
+    version="0.3.0",
+    lifespan=lifespan,
+)
+
+
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+if settings.frontend_url and settings.frontend_url not in allowed_origins:
+    allowed_origins.append(settings.frontend_url)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type"],
+)
+
+app.include_router(portfolio.router)
+app.include_router(contributions.router)
+app.include_router(macro.router)
+app.include_router(cadence.router)
+app.include_router(reports.router)
+
+
+@app.get("/api/health")
+async def health_check() -> dict[str, str]:
+    return {"status": "ok", "version": "0.3.0"}

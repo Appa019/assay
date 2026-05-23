@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+"""Weekly committee review: macro + holdings performance + per-lot maturity.
+
+Self-gating: only runs if 7+ days passed since the last weekly review (so it can
+be scheduled daily and still fire "a cada 7 dias"). Saves a Report (auditable,
+consultable on aportes) and sends it to Telegram.
+
+    python scripts/weekly_review.py            # run if due
+    python scripts/weekly_review.py --force     # run now
+    python scripts/weekly_review.py --force --model haiku --effort low  # cheap test
+"""
+
+import argparse
+import asyncio
+import sys
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
+from sqlmodel import select  # noqa: E402
+
+from app.core.database import get_session, init_db  # noqa: E402
+from app.models.report import Report, ReportKind  # noqa: E402
+from app.services import analysis_runner, review_service  # noqa: E402
+
+
+def _is_due(session, interval_days: int = 7) -> bool:
+    last = session.exec(
+        select(Report)
+        .where(Report.kind == ReportKind.WEEKLY)
+        .order_by(Report.created_at.desc())
+        .limit(1)
+    ).first()
+    if last is None:
+        return True
+    age = datetime.now(UTC) - last.created_at.replace(tzinfo=UTC)
+    return age >= timedelta(days=interval_days)
+
+
+def _printer(name: str, payload: dict) -> None:
+    if name == "step_start":
+        print(f"▶ etapa {payload['step']}/{payload['total']}: {payload['title']}…")
+    elif name == "step_retry":
+        print(f"  ⏳ limite/transitório — retry {payload['attempt']} em {payload['wait_s']}s")
+    elif name == "step_done":
+        print(f"  ✔ ok (US$ {payload['cost_usd']:.2f}, {payload['duration_s']:.0f}s)")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Weekly committee review")
+    parser.add_argument("--force", action="store_true", help="Rodar mesmo se não vencido")
+    parser.add_argument("--model", default=analysis_runner.DEFAULT_MODEL)
+    parser.add_argument("--effort", default=analysis_runner.DEFAULT_EFFORT)
+    parser.add_argument("--no-telegram", action="store_true")
+    args = parser.parse_args()
+
+    init_db()
+    gen = get_session()
+    session = next(gen)
+    try:
+        if not args.force and not _is_due(session):
+            print("Revisão semanal ainda não venceu (menos de 7 dias). Use --force.")
+            return 0
+        print("Capturando macro…")
+        macro = asyncio.run(review_service.fetch_macro())
+        report = review_service.run_weekly_review(
+            session,
+            macro_ctx=macro,
+            model=args.model,
+            effort=args.effort,
+            notify=not args.no_telegram,
+            on_event=_printer,
+        )
+        print(f"\n✓ Revisão semanal salva (id {report.id}, US$ {report.cost_usd:.2f}).")
+        print("─" * 60)
+        print(report.content)
+        return 0
+    except analysis_runner.AnalysisError as exc:
+        print(f"Erro na revisão semanal: {exc}")
+        return 1
+    finally:
+        gen.close()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,61 @@
+from datetime import UTC, datetime
+from decimal import Decimal
+from enum import StrEnum
+from typing import Any
+from uuid import UUID, uuid4
+
+from sqlalchemy import JSON, Column, Text
+from sqlmodel import Field, SQLModel
+
+
+class ContributionStatus(StrEnum):
+    PENDING = "pending"
+    READY = "ready"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+
+
+class PromptKey(StrEnum):
+    MACRO = "macro"
+    RESEARCH = "research"
+    DECISION = "decision"
+
+
+def _now_utc() -> datetime:
+    return datetime.now(UTC)
+
+
+class Contribution(SQLModel, table=True):
+    __tablename__ = "contribution"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    amount_brl: Decimal = Field(decimal_places=2, max_digits=18)
+    status: ContributionStatus = Field(default=ContributionStatus.PENDING, index=True)
+
+    macro_snapshot: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
+    portfolio_snapshot: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
+
+    final_summary: str | None = Field(default=None, sa_column=Column(Text))
+    notes: str | None = Field(default=None, sa_column=Column(Text))
+
+    created_at: datetime = Field(default_factory=_now_utc, index=True)
+    completed_at: datetime | None = Field(default=None)
+
+
+class ContributionPrompt(SQLModel, table=True):
+    __tablename__ = "contribution_prompt"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    contribution_id: UUID = Field(foreign_key="contribution.id", index=True)
+
+    prompt_order: int = Field(index=True)
+    prompt_key: PromptKey = Field(index=True)
+
+    title: str = Field(max_length=200)
+    description: str = Field(sa_column=Column(Text))
+    content: str = Field(sa_column=Column(Text))
+
+    response: str | None = Field(default=None, sa_column=Column(Text))
+    responded_at: datetime | None = Field(default=None)
+
+    created_at: datetime = Field(default_factory=_now_utc)

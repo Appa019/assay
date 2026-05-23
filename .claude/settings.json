@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(pnpm run lint)",
+      "Bash(pnpm run test *)",
+      "Bash(pnpm run build)",
+      "Bash(pnpm run dev)",
+      "Bash(pnpm run type-check)",
+      "Bash(pnpm add *)",
+      "Bash(npx prettier --write *)",
+      "Bash(npx supabase *)",
+      "Bash(python *)",
+      "Bash(pip install *)",
+      "Bash(uvicorn *)",
+      "Bash(pytest *)",
+      "Bash(ruff *)",
+      "Bash(vercel *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(git switch *)",
+      "Bash(git merge *)",
+      "Bash(git stash *)",
+      "mcp__context7__*",
+      "mcp__supabase__*",
+      "mcp__vercel__*",
+      "mcp__playwright__*",
+      "mcp__github__*",
+      "mcp__sequential-thinking__*"
+    ],
+    "deny": []
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"$(git branch --show-current 2>/dev/null)\" != \"main\" ] || { echo '{\"block\": true, \"message\": \"Cannot edit directly on main branch. Create a feature branch first.\"}' >&2; exit 2; }"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo $CLAUDE_TOOL_INPUT | jq -r '.command' | grep -q '\\--no-verify' && { echo '{\"block\": true, \"message\": \"Never skip git hooks with --no-verify\"}' >&2; exit 2; } || exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FILE=\"$CLAUDE_TOOL_INPUT_FILE_PATH\"; case \"$FILE\" in *.ts|*.tsx|*.js|*.jsx|*.json|*.css) npx prettier --write \"$FILE\" 2>/dev/null ;; *.py) ruff format \"$FILE\" 2>/dev/null ;; esac; exit 0"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "You are a critical code reviewer. Do the following checks:\n\n1. Run `ruff check .` and `pnpm run lint` — report any errors\n2. Run `pnpm run type-check` if tsconfig exists — report TypeScript errors\n3. Run `pytest -x -q` if tests exist — report failures\n4. Read the memory file at ~/.claude/projects/-home-<usuario>-codigos-python-investimentos-manual/memory/project_errors.md — check if any documented errors are being repeated in the current changes\n5. If you find a NEW error or bug pattern, append it to project_errors.md with format:\n   ### [date] Error description\n   - **Cause:** what caused it\n   - **Fix:** how it was resolved\n   - **Prevention:** how to avoid in future\n\nReport 'PASS' if everything is clean, or list specific issues found. Be critical and thorough.",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}

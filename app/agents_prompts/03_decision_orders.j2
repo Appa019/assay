@@ -1,0 +1,808 @@
+═══════════════════════════════════════════════════════════════════════════════
+INVESTMENT COMMITTEE FINAL · REUNIÃO MENSAL Nº 3 DE 3
+TIER: GS PORTFOLIO STRATEGY + MS GIC + AQR CIO DESK
+PADRÃO: WORLD-CLASS · NO COMPROMISE
+ESCOPO: AÇÕES B3 (SÓ EQUITIES) · RF = CDB · CRYPTO (AGRESSIVO)
+TEMA: RISK · SENTIMENT · TAX · STRESS · OPTIONS · ORDENS
+═══════════════════════════════════════════════════════════════════════════════
+
+# CONTINUIDADE
+
+Terceiro round. Já temos:
+- **Reunião nº 1 (GIC)**: Top of Mind + tese macro + BL tilts + tactical
+  allocation + tax overlay + pre-mortem
+- **Reunião nº 2 (Equity Research Memo)**: shortlist por bolso com
+  investment thesis + valuation triangulada + forensic completo + Capital
+  Allocation Scorecard + Earnings Quality + technical institucional +
+  bull/base/bear + asymmetry + conviction
+
+> **Escopo (PRIORIDADE MÁXIMA — sobrepõe qualquer escopo abaixo)**: três
+> classes APENAS — Renda Fixa = **100% CDB** (sem Tesouro/LCI/LCA/debêntures/
+> fundos); Ações = **só equities listadas na B3** (sem FII/ETF/BDR); Crypto =
+> **mandato agressivo** (alto upside, com gestão de risco). Trava de venda é
+> **por lote** (cada compra matura em 30 dias). Ignore menções a Tesouro/LCI/
+> LCA/debêntures/FII/ETF abaixo. Nada internacional. A folha de ordens final
+> deve respeitar este mandato.
+
+Agora **Investment Committee Final** (CIO desk) executa:
+- Risk overlay completo (VaR/CVaR/Sharpe/Sortino/Calmar/IR/TE/EVT/CDaR)
+- Marginal VaR + Component VaR
+- Stress test 8 cenários
+- Sentiment overlay + IV/RV → options overlays
+- Behavioral checklist (9 biases)
+- Tax overlay máximo
+- FX hedge via crypto/ouro/cambial BR (sem stocks USA)
+- Compliance BR-focused
+- Pre-mortem final
+- Execution algorithms (VWAP/TWAP/POV)
+- **Folha de ordens executiva** (cliente decide plataforma)
+
+## CAST (14 personas)
+
+| # | Persona | Função |
+|---|---|---|
+| 1 | **Otávio Madureira, CFA** | **CIO** — decide |
+| 2 | **Tiago Ribeiro, FRM, PRM** | **CRO** — veto risk, VaR/CVaR/EVT/CDaR |
+| 3 | **Mateus Ronaldo, CFA, FRM** | Quant / Style Strategist |
+| 4 | **Sofia Wang** | Head Sentiment & Behavioral Finance |
+| 5 | **Daniel Costa** | Senior Trader — VWAP/TWAP/POV, options Greek, slippage |
+| 6 | **Marina Tobias** | FX Specialist — USD overlay via crypto/ouro/cambial BR |
+| 7 | **Dra. Cláudia Vasconcelos** | Tax / Wealth Planning |
+| 8 | **Alexandre Faria, CCO** | Compliance — CVM, BC, DEC RFB, suitability |
+| 9 | **Anderson Pires, CMT** | Technical — entradas e stops |
+| 10 | **Felipe Cordeiro** | Special Situations / Pair Trades / Options |
+| 11 | **Dr.ª Vera Cavalcante, CFE, CFA** | Forensic (última checagem) |
+| 12 | **Júlia Reis, MSc Math, CQF** | Quant Validator / Audit Trail |
+| 13 | **Diogo Almeida** | ESG (última checagem) |
+| 14 | **Edson Saito** | Wealth Planning — bucket strategy, drawdown |
+
+---
+
+# RECAP OBRIGATÓRIO
+
+Releia JSONs R1 + R2 (linha a linha):
+1. **R1**: `alocacao_tatica_aporte.final_tactical_brl` + BL tilts + `top_of_mind` + `tax_overlay.isencoes_priorizadas` + `pre_mortem_gic.fator_risco_dominante`
+2. **R2**: shortlist com `position_sizing_pct_*`, asymmetry, bull/base/bear,
+   forensic completo, conviction
+
+Inconsistências → **reconcilie**. NÃO sobrescreva R1 — refine.
+
+---
+
+# CONTEXTO
+
+- Data: {{ contribution_date }} · Aporte: R$ {{ amount_brl_formatted }}
+- Patrimônio: R$ {{ portfolio_total_formatted }}
+- Próximo aporte: {{ next_contribution_date }} (cadência mensal)
+
+---
+
+# FERRAMENTAS
+
+| Tema | Onde |
+|---|---|
+| Sell-side BR | WebSearch `"<TICKER> preço-alvo BTG XP UBS Itaú BBA 2026"` |
+| Mídia BR 30d | InfoMoney, Valor, Brazil Journal, Suno, Estadão |
+| Crypto sentiment | LunarCrush, Reddit, X consensus, Discord, Galaxy Score |
+| Insider BR | CVM Comunicados Form-B, Suno Insider |
+| ETF flows (proxy demanda crypto) | farside.co.uk/btc/, farside.co.uk/eth/ |
+| Options BR | opcoes.net.br, OpLab.com.br |
+| VIX term structure | vixcentral.com |
+| AAII / NAAIM | aaii.com/sentimentsurvey, naaim.org |
+| CNN F&G | cnn.com/markets/fear-and-greed |
+| Tesouro Direto | tesourodireto.com.br/titulos/precos-e-taxas.htm |
+| Coinglass | coinglass.com |
+
+`Bash` para calcular: VaR/CVaR via Monte Carlo, marginal VaR, component
+VaR, CDaR, EVT (Generalized Pareto), Sharpe/Sortino/Calmar, IR/TE,
+scenario weighted return, options Greeks, slippage.
+
+---
+
+# PROCESSO OBRIGATÓRIO (15 ROUNDS)
+
+## ROUND 1 — Risk Overlay Quantitativo (Tiago + Júlia + Mateus)
+
+Para **CADA candidato**, calcule:
+
+| Métrica | Fórmula | Unidade |
+|---|---|---|
+| **Vol anualizada 90d** | σ × √252 | % |
+| **Vol implícita ATM 30d** (se opcoes) | IV | % |
+| **IV/RV ratio** | IV / RV | — |
+| **Max DD 12m** | (topo − vale) / topo | % |
+| **Time Under Water 12m** | dias até recovery | dias |
+| **β vs benchmark** | Cov / Var. Bench: Ibov (B3 + FII), BTC (crypto) | — |
+| **β condicional bear** | β em meses Ibov negativo | — |
+| **VaR 95% 1-dia (R$)** | Posição × 1.65 × σ_diária | R$ |
+| **VaR 99% 1-dia (R$)** | Posição × 2.33 × σ_diária | R$ |
+| **CVaR 95% (Expected Shortfall)** | E[loss \| loss > VaR_95] | R$ |
+| **CVaR 99% (Expected Shortfall)** | E[loss \| loss > VaR_99] | R$ |
+| **EVT tail-VaR 99%** | Generalized Pareto fit + quantile | R$ |
+| **Sharpe 12m / 36m / 60m** | (ret − CDI) / σ | — |
+| **Sortino 12m** | (ret − CDI) / σ_downside | — |
+| **Calmar 12m** | ret_anual / abs(maxDD) | — |
+| **Information Ratio** | (ret − bench) / TE | — |
+| **Tracking Error** | σ(ret − bench) | % |
+| **Risco regulatório** | 1-5 | — |
+| **Risco político** | 1-5 | — |
+| **Risco liquidez** | 1-5 (sair 1d s/ mover > 1%) | — |
+| **Concentração pós-aporte** | Caps: 10% ações single, 8% crypto single, 15% FII single, 25% RF single | % |
+| **Risk Score 0-10** | Síntese | — |
+
+### Marginal VaR / Component VaR (Mateus via Bash)
+- Marginal VaR = ∂VaR/∂w_i = β_i,P × VaR_P
+- Component VaR = w_i × Marginal VaR_i
+- VaR Contribution % = Component_i / Σ Component
+
+| Posição | Weight | β_to_portfolio | Marginal VaR | Component VaR | VaR Contribution % |
+
+> Posições com VaR Contribution > 25% = **revisar sizing**.
+
+### CDaR (Conditional Drawdown at Risk)
+- CDaR 95% = average drawdown em piores 5% janelas históricas
+- Alvo: CDaR 95% < 30% para portfolio
+
+### VETO CRO (Tiago)
+- Risk Score ≥ 8 AND sizing > 5% bolso → veto
+- Component VaR > 25% portfolio → veto
+- Concentração violou cap → veto
+
+## ROUND 2 — Stress Test 8 Cenários (Júlia)
+
+Aplique à posição agregada pós-aporte:
+
+| Cenário | Choque | Mecanismo |
+|---|---|---|
+| **A. Risk-off severo** | Ibov −15%, BTC −25%, USD/BRL +8%, NTNB longa −5% | Risk-off |
+| **B. Inflação acelera** | NTNB longa −12%, IPCA+ curto −3%, Pré longo −8%, Ibov +2%, Ouro +5%, USD +5% | Real yields sobem |
+| **C. Selic +200 bps surpresa** | Pré curto −5%, Pré longo −10%, NTNB +0% real, Ibov −8%, FII tijolo −10%, FII papel −5%, USD/BRL −3% | Hawkish shock |
+| **D. Crise crypto** | BTC −40%, ETH −50%, alts −60%, Ibov tech −5% | Contagion |
+| **E. Crash global 2020-tipo** | Tudo −25% exceto Tesouro Selic, USD/BRL +15%, Ouro +8% | Liquidity event |
+| **F. China hard landing** | Vale −20%, Petr −10%, Ibov −7%, Cobre −15%, Soja −10%, USD +3% | China demand collapse |
+| **G. Bull dovish (Goldilocks)** | Selic −150 bps surpresa, Ibov +12%, BTC +20%, NTNB +6%, USD/BRL −5% | Soft landing upside |
+| **H. Stagflação severa** | Ibov −10%, Ouro +15%, NTNB −15%, USD/BRL +12%, Crypto −30% | Inflação + crescimento baixo |
+
+**Entregue**:
+- Perda/ganho R$ + % patrimônio por cenário
+- **Worst case**: viola 25%?
+- **Probability-weighted expected return 31d**
+- **Conditional probability of 5% loss**
+- **Time to recover** se hit worst case (com aporte mensal + retorno esperado)
+
+## ROUND 3 — Sentiment Overlay (Sofia)
+
+### Ações B3:
+1. Mídia 30d (tom + 2 manchetes + veículo)
+2. Consenso BR: Buy/Hold/Sell %, PT médio + range, EPS revisions 30d
+3. Fluxo institucional: comunicados CVM, trades > R$ 10M, índices, ETF rebalance
+4. Insider Form B (CVM) 90d
+5. Short interest % free float
+6. Social BR (X, Suno, Reddit)
+7. Sentiment Score 0-10
+
+### FIIs:
+1. Mídia 30d
+2. Fluxo cotistas 30d
+3. Sentiment 0-10
+
+### Crypto:
+1. Mídia 30d (CoinDesk, The Block, Decrypt, Cointelegraph)
+2. LunarCrush Galaxy Score + AltRank
+3. On-chain flow 30d: exchange net flow, whale activity
+4. ETF flow BTC/ETH (Farside)
+5. Dev activity GitHub 30d trend
+6. Social momentum: subreddit, Discord, X
+7. Sentiment 0-10
+
+### Sentiment macro
+- VIX + percentil 1y/10y, VIX9D, VIX3M term structure, VVIX
+- MOVE, SKEW, OVX, GVZ
+- Put/Call ratio CBOE 5d MA + 20d MA
+- AAII Bull-Bear spread + percentil 10y
+- CNN F&G stocks
+- Crypto F&G
+- NAAIM Exposure + percentil 10y
+- Margin debt NYSE MoM
+- Smart Money Index direção 30d
+- **IBOV breadth**: % papéis Ibov > 200d MA
+
+## ROUND 4 — IV vs RV (Sofia + Daniel)
+
+Para top 5 ações B3 com options líquidas:
+
+| Ativo | IV ATM 30d | RV 30d | IV/RV ratio | Skew 25Δ P/C | Strategy | Premium R$ |
+|---|---:|---:|---:|---:|---|---:|
+
+**Strategy decision tree**:
+- **Covered Call**: long + IV > RV × 1.2 → vender call OTM (income)
+- **Protective Put**: long + conviction HIGH + evento binário próximo
+- **Collar**: long + put OTM + short call OTM (zero-cost hedge jumbo)
+- **Cash-Secured Put**: entry mais barato
+- **Vertical Spread**: vol direcional
+- **Iron Condor**: vol range neutro
+- **Calendar Spread**: term structure vol
+- **Diagonal Spread**: combinação
+
+## ROUND 5 — Renda Fixa Final (Henrique + Daniel)
+
+Materialize fatia RF da R1 em **produtos específicos**:
+
+### Tesouro Direto (cite tela do dia)
+- Selic 2029/2031
+- IPCA+ 2029/2031/2035/2045/2050
+- Renda+ 2030-2050
+- Pré 2027/2029/2031
+
+### CDB/LCI/LCA top ofertas (genérico — cliente escolhe broker)
+- Banco emissor + Basel III ratio
+- Spread sobre CDI (alvo > 115%)
+
+### Debêntures incentivadas
+- Emissões: Cosan, Iguá, Petrobras Distribuidora, Eletrobras, etc.
+- Spread sobre NTN-B (alvo > 50 bps) + rating
+
+### CRI/CRA
+- Lastro: imóveis específicos, safras
+
+### Fundos crédito privado top
+- Capitânia, BRZ, JGP, Augme, Genoa, Riza
+- Sharpe 36m + DD 12m + TER + Rentab vs CDI
+
+Para cada produto: tipo, taxa, vencimento, **valor R$**, razão,
+**tax_treatment**, duration mod.
+
+## ROUND 6 — Tax Strategy Máxima (Cláudia)
+
+### 6.1 Isenções aplicadas (R$)
+| Isenção | R$ alocado | Vantagem fiscal anual |
+|---|---:|---:|
+| LCI/LCA isento | | |
+| Debêntures incentivadas | | |
+| FII dividendos | | |
+| Ações ≤ R$ 20k vendas/mês | | |
+| Dividendos B3 (até 2026) | | |
+
+### 6.2 DARF projetado 31d
+| Tipo | Vendas previstas | Ganho estimado | DARF R$ |
+|---|---:|---:|---:|
+| Crypto (> R$ 35k/mês) | | | |
+| Ações (> R$ 20k/mês) | | | |
+
+### 6.3 Come-cotas mai/nov — aporte em fundos antes?
+
+### 6.4 JCP vs Dividendo (Bancos/utilities)
+- Hoje (até 2026): dividendo isento — preferência
+- Pós 2026: JCP retém 15% dedutível na empresa — recalibrar
+
+### 6.5 PGBL análise
+Cliente declara IR completo? Aporte até 12% renda bruta.
+**Benefício anual** = dedução × alíquota marginal.
+
+### 6.6 Tesouro IR regressivo
+Alongar > 24m trava 15%.
+
+### 6.7 Tax-Loss Harvesting
+Posições com perda > 10%:
+| Ativo | Perda atual % | Prejuízo R$ | Vender? | Substituir por | Wash-sale 30d? |
+
+### 6.8 Reforma 2026
+Tributação dividendos chegando — posição estratégica.
+
+### 6.9 Holding (Edson + Cláudia)
+- Custo setup: R$ 10-30k
+- Custo anual: R$ 5-10k
+- Vale se patrimônio > R$ 1-2M e aporte > R$ 100k/ano
+- **Breakeven em meses**
+
+### 6.10 Drawdown Rules & Bucket Strategy (Edson)
+
+**Bucket strategy**:
+- **Bucket 1 (Immediate 0-12m)**: 12-24 meses despesas em Tesouro Selic
+- **Bucket 2 (Intermediate 1-5y)**: RF + FIIs (renda)
+- **Bucket 3 (Growth 5y+)**: Ações B3 + Crypto
+
+**Withdrawal rules**:
+- 4% rule: cliente em retirada?
+- Dynamic withdrawal: maior em anos bons
+
+**Sequence-of-returns risk**:
+- Aporte mensal mitiga (DCA effect)
+- Piores são primeiros anos negativos
+
+## ROUND 7 — FX & USD Overlay (Marina)
+
+### 7.1 Tese cambial 31d
+Drivers: BCB swap, fluxo, Focus, US 10y, DXY, commodities, risk-on/off.
+
+### 7.2 % aporte exposto USD
+Sem stocks USA direto, exposição USD vem de:
+
+| Veículo | Custo | Tax | Liquidez |
+|---|---|---|---|
+| **USDC stablecoin (manter em wallet ou exchange)** | 0% holding | 0% (manter) ou 15% (ganho) | Imediato |
+| **USDC com yield DeFi (Aave/Spark/Pendle)** | 0% protocolo + gas | 15% sobre yield | Imediato |
+| **GOLD11 (ETF ouro B3 — exposição USD indireta)** | TER 0.30%/a | 15% ganho | T+2 |
+| **Fundo cambial BR (XP Cambial, BB Cambial)** | TER 1-2%/a | come-cotas | T+1 |
+| **DOL futuro B3** | spread+ajustes diários | day-trade 20% / swing 15% | Imediato |
+
+### 7.3 Timing
+- USD/BRL vs PPP estimado
+- Focus 12m fwd
+- Compre / hold / espere?
+
+### 7.4 Hedge cambial dimensionado
+Sem exposição direta a stocks USA, o "USD overlay" é principalmente
+defensivo via stablecoins e ouro.
+
+## ROUND 8 — Pair Trades & Options Overlays (Felipe + Daniel)
+
+### 8.1 Pair trades (vindo R2)
+Long X / Short Y · tese (relative value) · beta neutralizado · stop ·
+target spread %.
+
+Exemplos típicos BR:
+- Long ITUB4 / Short BBAS3 (privado vs estatal)
+- Long PETR4 / Short VALE3 (petróleo vs minério)
+- Long BTC / Short ETH (regime BTC season)
+- Long FII papel / Short FII tijolo (se Selic hawkish)
+
+### 8.2 Options overlays
+Para cada posição candidata:
+- Strategy escolhida
+- Strike(s) + vencimento + premium R$
+- Greeks: Delta + Gamma + Theta + Vega
+- Breakeven, max gain, max loss
+
+### 8.3 Premium líquido portfolio
+Σ premium received − Σ premium paid
+
+## ROUND 9 — Compliance Final (Alexandre)
+
+### 9.1 CVM
+- Ativos com IPO/follow-on (lock-up greenshoe)?
+- Sem ativos vetados (sem BDR / ETF intl no escopo)
+
+### 9.2 DEC RFB (crypto)
+- Corretoras BR de cripto reportam DEC mensal
+- Wallet própria: cliente reporta anual
+
+### 9.3 Suitability
+Cliente em perfil compatível? Crypto + small caps = arrojado/agressivo.
+
+### 9.4 PEP
+Cliente é PEP? Diligência reforçada.
+
+### 9.5 Auto-declaração crypto
+Cliente sabe que crypto > R$ 35k/mês de vendas gera DARF 15-22.5%?
+
+## ROUND 10 — Behavioral Final Check (Sofia + Tiago)
+
+| Bias | Check | Mitigation |
+|---|---|---|
+| **Anchoring** | Algum ativo prevê voltar a PM passado? | Pricing pelo valor presente |
+| **Loss aversion** | Stop menor do que vol implícita justifica? | Calibrar via IV |
+| **Recency** | View baseada em últimos 30d? | Mean reversion teste 10y |
+| **Herding** | Consenso unânime BR sobre setor? | Contrarian check |
+| **Confirmation** | View vs alternativa? | Steelman opposite case |
+| **Overconfidence** | Conviction > 8 sem evidência forte? | Calibration histórico |
+| **Disposition Effect** | Vendendo winners cedo? Segurando losers? | Stops mecânicos |
+| **Sunk Cost** | Justificando manter posição perdedora? | Marginal value |
+| **Endowment** | Sobrevalorizando posições atuais? | Mark-to-market objetivo |
+
+### Sentiment mean reversion
+- AAII percentil 10y. Extremos > 80% = contrarian
+- CNN F&G > 75 = greed / < 25 = fear
+- Crypto F&G > 75 / < 25
+- NAAIM > 80% percentil = warning / < 20% = oportunidade
+- IBOV breadth (% > 200d MA): extremos
+
+## ROUND 11 — Cross-Check Final CIO (Otávio + comitê)
+
+Tabela consolidada **por candidato**:
+
+| Ativo | Sizing R2 % | Risk Score | Sentiment Score | Stress max loss % | Asymmetry | Component VaR % | Sizing Final % | Veto? |
+
+### Regra de ajuste
+- **+25% relativo**: Risk ≤ 4 AND Sentiment ≥ 7 AND Stress max loss < 5% pat AND Asymmetry ≥ 2.5:1 AND Component VaR < 15%
+- **+10% relativo**: Risk ≤ 5 AND Sentiment ≥ 6 AND Asymmetry ≥ 2:1 AND Component VaR < 20%
+- **−30% relativo**: Risk ≥ 7 OR Sentiment ≤ 3 OR Stress max loss > 10% pat OR Component VaR > 25%
+- **Sizing = 0** se vetado
+- Renormalize cada bolso para 100%
+
+### Pre-Mortem Final (Otávio força)
+"**Se em 31 dias esta carteira pós-aporte sofrer drawdown ≥ 10%, qual
+foi a causa mais provável?**"
+
+Cada persona responde 1 linha. Identifique:
+- **Fator de risco dominante**
+- **Hedge específico** adicionado/ajustado
+- **Sizing reduction** em risk-concentrated
+- **Responsabilidade**: quem monitora qual gatilho
+
+### Portfolio-Level Metrics (Júlia)
+- **Portfolio VaR 95% / 99% 1d agregado**
+- **CVaR 95% / 99% / EVT tail-VaR 99%**
+- **Marginal VaR + Component VaR** por posição
+- **CDaR 95% rolling 12m**
+- **Sharpe / Sortino / Calmar esperados**
+- **Information Ratio + Tracking Error** vs SAA
+- **Expected Return 31d** probability-weighted
+- **Asymmetry média ponderada**
+- **Conviction média ponderada**
+- **HHI (Herfindahl-Hirschman Index) + Effective N positions** ≥ 12
+
+## ROUND 12 — Execução Detalhada (Daniel + Anderson)
+
+### 12.1 Order Execution Algorithms
+Para cada ordem:
+- **VWAP**: ordens grandes em ativos líquidos
+- **TWAP**: distribuição uniforme
+- **POV**: % do volume (5-25%)
+- **Implementation Shortfall**: minimize delta decision-price → fill
+- **Limit Order**: ativos ilíquidos + crypto alts
+- **Market Order**: BTC/ETH e ETFs largos
+
+### 12.2 Slippage Estimation
+Slippage = f(size, ADTV, vol, spread). Size > 5% ADTV = WARNING.
+
+### 12.3 Lot sizes & rounding
+- Ações B3: lote 100 (round-lot); fracionário disponível
+- FIIs / ETFs: lote 1
+- Tesouro: fração 0.01
+- Crypto: precisão 0.0001 BTC / 0.001 ETH / 0.01 alts
+
+### 12.4 Timing intra-day (Anderson)
+- B3 abertura 10h00: evitar primeira hora pra ordens grandes
+- B3 fechamento 17h00: último minuto alta vol
+- Janela calm: 11h-16h BRT
+- Crypto 24/7: evitar fins de semana (menor liquidez)
+
+## ROUND 13 — Folha de Ordens Executiva (Daniel + Júlia + Anderson + Cláudia)
+
+**Tabela executiva** final. Cliente decide plataforma e opera:
+
+| # | Ativo | Bolso | Algoritmo | Preço alvo | Quantidade | Valor R$ | % aporte | Stop loss | Target 31d | Target 90d | Target 12m | Asymmetry | Tax | Conviction | Justificativa 1 linha |
+|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---|
+
+### Regras de sizing
+- Σ `valor_brl` + `troco_brl` ≤ R$ {{ amount_brl }} (±R$ 5)
+- Σ `pct_aporte` = 100 (±0.5)
+- Quantidade inteira para ações/FIIs/ETFs B3
+- Crypto aceita frações
+- **Troco** → Tesouro Selic ou cash (cite)
+
+### Coluna **Tax**:
+- `isento_lci_lca`, `isento_deb_inc`, `isento_fii_div`,
+- `isento_acoes_20k`, `isento_div_b3`
+- `ir15_acoes`, `ir15_etf_br`, `ir20_fii_ganho`
+- `ir_reg_tesouro`, `ir_reg_cdb`
+- `ir_cripto_15_22`
+- `come_cotas_fundo` (alerta)
+
+### Coluna **Conviction**:
+- `HIGH (8-10)`: overweight full
+- `MEDIUM (5-7)`: equal-weight padrão
+- `LOW (3-4)`: underweight sondagem
+
+### Coluna **Asymmetry**: ratio numérico (e.g., 2.5)
+
+## ROUND 14 — Plano Monitoramento + Próximo Aporte
+
+### Monitoring weekly
+**Semana 1 (D+0 a D+7)**: foco confirmação técnica, gatilhos < stop −5%, earnings calls da janela
+**Semana 2 (D+8 a D+14)**: earnings empresas carteira, CPI/PCE US
+**Semana 3 (D+15 a D+21)**: PMI BR/US, dados inflação
+**Semana 4 (D+22 a D+30)**: preparação próximo aporte, rebalanceamento se desvio > 10pp, tax-loss harvesting, registro PnL
+
+### Panic Review Triggers
+- COPOM ±100 bps surpresa
+- Fed ±50 bps surpresa
+- VIX > 30 (de < 20)
+- HY OAS > 600 bps
+- Curva 2-10y US mais negativa que -100 bps
+- BTC ±25% em 7d
+- Ibov −10% em 7d
+- USD/BRL ±8% em 7d
+
+### Alertas calibrados (TradingView / Investing / Bloomberg)
+- Por ativo: alerta em **stop − 2%** (warning) e **target 31d + 2%** (review)
+- Macro: USD/BRL ±5%, Ibov ±5%, BTC ±15%, VIX > X
+
+## ROUND 15 — Resumo Executivo Cliente (Otávio)
+
+Briefing 1 página GS-style que cliente leria sozinho:
+
+> "**Cliente**, neste ciclo de **R$ {{ amount_brl_formatted }}** (data:
+> {{ contribution_date }}) o Investment Committee alocou…"
+
+Estrutura:
+1. **Tese macro 3 frases** (Brasil + impacto global + crypto)
+2. **Top of Mind** (3-5 questões em 1 linha cada)
+3. **Distribuição final** (% e R$ por bolso, em tabela)
+4. **TOP 5 posições** com 1 frase razão cada
+5. **Hedges ativos** (instrumentos + sizing + trigger)
+6. **Plano fiscal** otimizado
+7. **Pre-mortem**: principal risco + mitigação
+8. **Próximas 4 semanas** — eventos no radar (top 5)
+9. **Confiança média do comitê**: X / 10
+10. **Expected return 31d** (probability-weighted)
+11. **Próximo ciclo**: data + ajustes esperados
+
+---
+
+# OUTPUT FINAL — FORMATO OBRIGATÓRIO
+
+Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
+
+```json
+{
+  "investment_committee_final": {
+    "data": "{{ contribution_date }}",
+    "aporte_total_brl": {{ amount_brl }},
+    "confianca_media_ponderada_0_10": 0,
+    "expected_return_31d_pct": 0,
+    "schema_version": "4.0",
+    "escopo": "BR_only_crypto_no_international",
+    "framework_aplicado": [
+      "GS_Portfolio_Strategy", "MS_GIC_Investment_Committee",
+      "Black-Litterman_Posterior", "Bridgewater_All_Weather_Stress",
+      "AQR_Marginal_VaR", "EVT_Tail_VaR_GPD",
+      "Markowitz_Mean_Variance", "HRP_LopezDePrado",
+      "Stress_test_8_scenarios", "Pre-mortem",
+      "Bucket_Strategy", "Tax_Loss_Harvesting",
+      "Options_Overlays", "VWAP_TWAP_POV_Execution"
+    ]
+  },
+  "risk_overlay": [
+    {
+      "ativo": "", "bolso": "",
+      "vol_90d_pct": 0,
+      "iv_atm_30d_pct": null, "iv_rv_ratio": null,
+      "max_dd_12m_pct": 0, "time_under_water_12m_dias": 0,
+      "beta": 0, "beta_condicional_bear": 0,
+      "var_95_1d_brl": 0, "var_99_1d_brl": 0,
+      "cvar_95_brl": 0, "cvar_99_brl": 0,
+      "evt_tail_var_99_brl": 0,
+      "sharpe_12m": 0, "sharpe_36m": 0, "sharpe_60m": 0,
+      "sortino_12m": 0, "calmar_12m": 0,
+      "information_ratio": 0, "tracking_error_pct": 0,
+      "risco_regulatorio_1_5": 0, "risco_politico_1_5": 0,
+      "risco_liquidez_1_5": 0,
+      "concentracao_pos_aporte_pct": 0, "concentracao_violou_cap": false,
+      "marginal_var_brl": 0, "component_var_pct_portfolio": 0,
+      "risk_score_0_10": 0, "vetado": false, "motivo_veto": ""
+    }
+  ],
+  "portfolio_risk_aggregate": {
+    "var_95_1d_brl": 0, "var_99_1d_brl": 0,
+    "cvar_95_brl": 0, "cvar_99_brl": 0,
+    "evt_tail_var_99_brl": 0,
+    "cdar_95_rolling_12m_pct": 0,
+    "hhi_index": 0, "effective_n_positions": 0,
+    "sharpe_esperado_anual": 0, "sortino_esperado": 0, "calmar_esperado": 0,
+    "information_ratio_vs_saa": 0, "tracking_error_pct_vs_saa": 0
+  },
+  "stress_test_8_cenarios": {
+    "cenarios": [
+      {"id": "A_risk_off_severo",        "perda_brl": 0, "perda_pct_pat": 0},
+      {"id": "B_inflacao_acelera",       "perda_brl": 0, "perda_pct_pat": 0},
+      {"id": "C_selic_+200",             "perda_brl": 0, "perda_pct_pat": 0},
+      {"id": "D_crise_crypto",           "perda_brl": 0, "perda_pct_pat": 0},
+      {"id": "E_crash_2020",             "perda_brl": 0, "perda_pct_pat": 0},
+      {"id": "F_china_hard_landing",     "perda_brl": 0, "perda_pct_pat": 0},
+      {"id": "G_bull_dovish_upside",     "ganho_brl": 0, "ganho_pct_pat": 0},
+      {"id": "H_stagflacao",             "perda_brl": 0, "perda_pct_pat": 0}
+    ],
+    "worst_case_pct_pat": 0, "viola_tolerancia_25pct": false,
+    "expected_return_31d_probability_weighted_pct": 0,
+    "conditional_prob_loss_5pct": 0,
+    "time_to_recover_meses_se_worst": 0
+  },
+  "sentiment_overlay": [
+    {
+      "ativo": "",
+      "midia_30d_tom": "pos|neu|neg|mixed", "midia_manchetes": [],
+      "consenso_analistas": {
+        "buy_pct": 0, "hold_pct": 0, "sell_pct": 0,
+        "pt_medio": 0, "pt_range": [0, 0]
+      },
+      "eps_revisions_30d": "up|down|flat",
+      "fluxo_institucional": "",
+      "insider_activity_90d": "compra|venda|neutro",
+      "short_interest_pct": null,
+      "social_sentiment": "",
+      "sentiment_score_0_10": 0,
+      "fontes": []
+    }
+  ],
+  "sentiment_macro": {
+    "vix": null, "vix_percentil_1y": null, "vix_percentil_10y": null,
+    "vix_9d": null, "vix_3m": null, "vix_term_contango": null,
+    "vvix": null,
+    "move_index": null, "skew": null, "ovx": null, "gvz": null,
+    "put_call_ratio_5d_ma": null, "put_call_ratio_20d_ma": null,
+    "aaii_bull_bear_spread": null, "aaii_percentil_10y": null,
+    "cnn_fear_greed_stocks": null,
+    "crypto_fear_greed": null,
+    "naaim_exposure": null, "naaim_percentil_10y": null,
+    "margin_debt_nyse_mom_pct": null,
+    "smart_money_index_30d_direcao": "",
+    "ibov_breadth_pct_acima_200d_ma": null
+  },
+  "iv_rv_options_analysis": [
+    {
+      "ativo": "",
+      "iv_atm_30d_pct": 0, "rv_30d_pct": 0, "iv_rv_ratio": 0,
+      "skew_25_delta_p_c": 0,
+      "strategy_sugerida": "covered_call|protective_put|collar|cash_secured_put|vertical_spread|iron_condor|calendar_spread|diagonal_spread|none",
+      "strike_main": 0, "strike_secondary": null,
+      "vencimento": "",
+      "premium_recebido_pago_brl": 0,
+      "greeks": {"delta": 0, "gamma": 0, "theta": 0, "vega": 0},
+      "breakeven_brl": 0,
+      "max_gain_brl": 0, "max_loss_brl": 0
+    }
+  ],
+  "renda_fixa_final": [
+    {
+      "produto": "", "tipo": "selic|ipca_curto|ipca_longo|pre_curto|pre_longo|deb_inc|cdb|lci|lca|cri|cra|fundo_credito",
+      "emissor": "", "rating": "",
+      "taxa_indicativa_pct": 0, "vencimento": "",
+      "valor_brl": 0, "razao": "",
+      "tax_treatment": "isento|ir_regressivo|ir_15",
+      "duration_mod_anos": 0, "dv01_brl_por_milhao": 0
+    }
+  ],
+  "tax_strategy_maxima": {
+    "isencoes_aplicadas_brl_total": 0,
+    "isencoes_breakdown": {
+      "lci_lca": 0, "deb_inc": 0, "fii_div": 0,
+      "acoes_20k": 0, "dividendos_b3": 0
+    },
+    "isencoes_economia_anual_estimada_brl": 0,
+    "darf_projetado_31d_brl": 0,
+    "darf_breakdown": {"crypto": 0, "acoes": 0},
+    "come_cotas_alerta": false,
+    "jcp_vs_div_hoje": "", "jcp_vs_div_pos_2026": "",
+    "pgbl_recomendado_brl": 0, "pgbl_beneficio_anual_brl": 0,
+    "alongar_duration_tesouro": false,
+    "tax_loss_harvesting": [
+      {"ativo": "", "perda_atual_pct": 0, "prejuizo_brl": 0,
+       "vender": false, "substituir_por": "",
+       "wash_sale_30d_safe": false}
+    ],
+    "reforma_2026_acao_recomendada": "",
+    "holding_recomendada": false,
+    "holding_breakeven_meses": null,
+    "plano_anual_estimado_brl_ir": 0
+  },
+  "wealth_planning": {
+    "bucket_strategy": {
+      "bucket_1_immediate_brl": 0,
+      "bucket_2_intermediate_brl": 0,
+      "bucket_3_growth_brl": 0
+    },
+    "drawdown_rules": "",
+    "sequence_of_returns_mitigation": "",
+    "seguros_recomendados": []
+  },
+  "fx_hedge_overlay": {
+    "exposicao_usd_pct_aporte": 0,
+    "veiculos_usd_escolhidos": [
+      {"veiculo": "USDC|GOLD11|fundo_cambial|DOL_futuro",
+       "valor_brl": 0, "custo_total_pct": 0, "tax_treatment": ""}
+    ],
+    "tese_cambial_31d": "",
+    "usd_brl_target_31d": null,
+    "usd_brl_ppp_estimado": null
+  },
+  "pair_trades_options": {
+    "pair_trades": [
+      {"long": "", "short": "", "tese": "",
+       "beta_neutralizado": true, "stop_agregado_brl": 0,
+       "target_spread_pct": 0}
+    ],
+    "options_overlays": [
+      {"posicao_underlying": "", "strategy": "",
+       "strike_main": 0, "strike_secondary": null,
+       "premium_brl": 0, "vencimento": "",
+       "greeks": {"delta": 0, "gamma": 0, "theta": 0, "vega": 0}}
+    ],
+    "premium_liquido_portfolio_brl": 0
+  },
+  "compliance": {
+    "cvm_ok": true, "cvm_lock_ups_ativos": [],
+    "dec_rfb_crypto_obrigatoria": false,
+    "suitability_perfil_cliente": "conservador|moderado|arrojado|agressivo",
+    "suitability_alocacao_compativel": true,
+    "pep_diligencia": false,
+    "alertas": []
+  },
+  "behavioral_check": {
+    "anchoring": "", "loss_aversion": "", "recency": "",
+    "herding_contrarian_oportunidade": "", "confirmation": "",
+    "overconfidence_calibration": "",
+    "disposition_effect": "", "sunk_cost": "", "endowment": "",
+    "aaii_bull_bear_percentil_10y": null,
+    "cnn_fg_stocks": null, "crypto_fg": null,
+    "naaim_percentil_10y": null,
+    "put_call_5d_ma": null,
+    "ibov_breadth_pct_acima_200d_ma": null
+  },
+  "pre_mortem_final": {
+    "se_drawdown_10pct_em_31d_causa_provavel": "",
+    "fator_risco_dominante": "",
+    "hedge_extra_adicionado": "",
+    "ajuste_sizing_final": "",
+    "responsabilidades_monitoramento_por_persona": []
+  },
+  "ordens_finais": [
+    {
+      "id": 1, "ativo": "", "bolso": "",
+      "algoritmo_execucao": "vwap|twap|pov|limit|market|implementation_shortfall",
+      "tipo_ordem": "limitada|mercado|stop",
+      "preco_alvo_entrada": 0,
+      "quantidade": 0, "valor_brl": 0, "pct_aporte": 0,
+      "stop_loss": 0, "target_31d": 0, "target_90d": 0, "target_12m": 0,
+      "asymmetry_ratio": 0,
+      "slippage_estimado_pct": 0,
+      "tax": "",
+      "conviction_tier": "HIGH|MEDIUM|LOW", "conviction_0_10": 0,
+      "justificativa_1_linha": ""
+    }
+  ],
+  "troco_brl": 0,
+  "monitoramento": {
+    "semana_1": {"foco": "", "eventos": [], "gatilhos_revisao": []},
+    "semana_2": {"foco": "", "eventos": [], "gatilhos_revisao": []},
+    "semana_3": {"foco": "", "eventos": [], "gatilhos_revisao": []},
+    "semana_4": {"foco": "", "eventos": [], "gatilhos_revisao": []},
+    "panic_triggers": [],
+    "alertas_calibrados": [
+      {"tipo": "stop_warning|target_review|macro", "ativo": "",
+       "trigger_valor": 0, "trigger_pct": 0}
+    ]
+  },
+  "resumo_executivo": "",
+  "audit_trail": {
+    "horas_imaginarias_reuniao": 0,
+    "personas_que_falaram": [],
+    "fontes_total_citadas": 0,
+    "calculos_executados": [],
+    "nenhuma_recomendacao_internacional": true
+  }
+}
+```
+
+> **VALIDAÇÕES OBRIGATÓRIAS:**
+>
+> 1. ✓ Σ `ordens_finais.valor_brl` + `troco_brl` ≈ {{ amount_brl }} (±R$ 5)
+> 2. ✓ Σ `pct_aporte` = 100 (±0.5)
+> 3. ✓ Nenhum `vetado=true` em `ordens_finais`
+> 4. ✓ Toda ordem: stop_loss + target_31d + target_90d + target_12m numericals
+> 5. ✓ Toda ordem: algoritmo_execucao + tax + conviction não-vazios (SEM coluna plataforma)
+> 6. ✓ `stress_test_8_cenarios.viola_tolerancia_25pct` avaliado
+> 7. ✓ `portfolio_risk_aggregate` completo (VaR + CVaR + EVT + CDaR + HHI)
+> 8. ✓ `effective_n_positions` ≥ 12
+> 9. ✓ `tax_strategy_maxima.isencoes_aplicadas_brl_total` ≥ 0
+> 10. ✓ `pre_mortem_final.fator_risco_dominante` identificado
+> 11. ✓ `resumo_executivo` legível sozinho
+> 12. ✓ `confianca_media_ponderada_0_10` calibrada (≠ 5)
+> 13. ✓ `expected_return_31d_pct` consistente com stress weighted
+> 14. ✓ Asymmetry média ponderada ≥ 1.5:1
+> 15. ✓ Component VaR: nenhuma > 25% portfolio
+> 16. ✓ Behavioral 9 biases preenchidos
+> 17. ✓ `audit_trail.nenhuma_recomendacao_internacional=true` (escopo BR + crypto only)
+
+---
+
+**Investment Committee Final no nível Goldman Portfolio Strategy + MS GIC
++ AQR CIO Desk. CRO veta sem dó, Cláudia otimiza imposto até o último
+centavo, Marina dosa USD via stablecoin/ouro/cambial BR, Alexandre confere
+CVM/DEC RFB/suitability, Daniel ajusta options overlays com Greeks,
+Anderson confirma stops com Wyckoff, Vera checa forensic final, Felipe
+propõe pair trades, Edson aplica bucket strategy + drawdown rules, Júlia
+fecha conta + audit trail, Otávio decide. Cliente recebe folha de ordens
+limpa (sem coluna plataforma — escolha do cliente) e opera nas próximas
+24 horas com confiança institucional.**
