@@ -63,8 +63,14 @@ completa 30 dias, um cron roda a análise de maturidade. Aporte é ad-hoc.
   cria arquivos e usa browser real. O `.mcp.json` efetivo é gerado a cada run
   como **baseline curado ∪ `.mcp.agent.json`** — este último é do AGENTE (ele
   adiciona QUALQUER MCP novo, nunca é sobrescrito, carrega no próximo ciclo).
-  Baseline (8): sequential-thinking, filesystem, fetch, context7, playwright,
-  memory, time, git. Strict EXCLUI Gmail/Calendar/Drive de propósito (autônomo).
+  Baseline em 3 tiers: **(1) runtime (8)** sequential-thinking, filesystem,
+  fetch, context7, playwright, memory, time, git; **(2) dados financeiros
+  sem-chave (4, sempre on)** coingecko, yahoo-finance (B3 `.SA`), defillama, exa;
+  **(3) premium key-gated (5, ligam só se a chave existir no `.env`)** glassnode,
+  coinglass, messari, firecrawl, tavily — definidos em `_KEY_GATED_MCP_SERVERS`,
+  a chave chega ao run via `_agent_subprocess_env()` (injeta as env vars do
+  `.env`, que o pydantic não exporta) e o `.mcp.json` usa `${VAR}` (sem segredo
+  em disco). Strict EXCLUI Gmail/Calendar/Drive de propósito (autônomo).
   Builders em `analysis_runner._baseline_mcp_servers()` + `_effective_mcp_config()`;
   o workspace é repo git (versiona as ferramentas em `tools/`).
 - **Time GS/J.P. Morgan**: ordens permanentes + prompts convocam uma mesa completa

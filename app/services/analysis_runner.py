@@ -62,9 +62,30 @@ analista só. Rigor máximo institucional, sempre.
 - LIBERDADE TOTAL para pesquisar QUALQUER fonte: preços, notícias, relatórios
   sell-side, filings/CVM/RI, dados on-chain, derivativos, funding, macro, papers.
   Use WebSearch, WebFetch e seus MCPs à vontade.
-- Você TEM os melhores MCPs já carregados (use-os quando ajudarem):
+- Você TEM os melhores MCPs do mercado já carregados (PREFIRA-OS a scrapar à mão
+  — dados estruturados batem HTML frágil). Use os que ajudarem em cada reunião:
+  DADOS FINANCEIROS (sempre ligados, sem chave):
+  · **coingecko** — preços/market cap/volume/metadados de QUALQUER cripto (use o
+    CoinGecko-id para resolver símbolos); fonte canônica de identidade de cripto;
+  · **yahoo-finance** — ações B3 (sufixo **.SA**, ex. `PETR4.SA`): cotação,
+    fundamentos, demonstrações, holders, opções e notícias; também índices/FX/cripto;
+  · **defillama** — TVL, **yields/APY**, receita/fees de protocolos DeFi
+    (Aave/Pendle/Spark/Lido/Morpho etc.) e stablecoins/bridges;
+  · **exa** — busca semântica/neural em fontes de alta qualidade (research, papers,
+    sell-side) — melhor que busca por palavra-chave para teses e fontes primárias;
+  DADOS PREMIUM (ligam SOZINHOS quando a chave existe no .env — podem estar
+  ausentes; se não aparecerem, caia para playwright/fetch nos sites equivalentes):
+  · **glassnode** — on-chain institucional (MVRV-Z, NUPL, SOPR, Puell, Reserve
+    Risk, HODL, CDD, RHODL, NVT, Dormancy);
+  · **coinglass** — derivativos (funding, open interest, **CME basis**, DVOL,
+    long/short, liquidation heatmap);
+  · **messari** — research/fundamentos de cripto (tokenomics, unlocks, perfis);
+  · **firecrawl** — scraping ESTRUTURADO de sites JS (StatusInvest, Fundamentus,
+    Investidor10, TradingView, RI/CVM) → JSON limpo;
+  · **tavily** — research web com score de credibilidade de fonte (citações);
+  RACIOCÍNIO/RUNTIME:
   · **sequential-thinking** — raciocínio estruturado profundo;
-  · **playwright** — navegador real para sites com JS (dashboards, on-chain, RI);
+  · **playwright** — navegador real para sites com JS sem MCP dedicado;
   · **fetch** — extrair páginas/filings em markdown;
   · **filesystem** — navegar/ler/escrever em QUALQUER lugar da máquina ($HOME);
   · **context7** — docs atualizadas de bibliotecas quando você programar ferramentas;
@@ -158,7 +179,7 @@ ciclo. Estrutura sugerida:
 
 _SEED_AGENT_MCP = """\
 {
-  "_comment": "MCPs que VOCE (agente) adiciona aqui sao mesclados ao baseline a cada ciclo e carregam no PROXIMO ciclo. Voce tem prioridade em conflito de nome. Ex.: adicione em mcpServers: \\"coingecko\\": {\\"command\\": \\"npx\\", \\"args\\": [\\"-y\\", \\"coingecko-mcp\\"]}",
+  "_comment": "Baseline ja traz: sequential-thinking, filesystem, fetch, context7, playwright, memory, time, git, coingecko, yahoo-finance, defillama, exa (+ glassnode/coinglass/messari/firecrawl/tavily quando a chave existe no .env). Adicione AQUI qualquer MCP EXTRA: e mesclado ao baseline a cada ciclo e carrega no PROXIMO ciclo (voce tem prioridade em conflito de nome). Ex. (CryptoQuant, exchange/miner flows): mcpServers: \\"cryptoquant\\": {\\"command\\": \\"npx\\", \\"args\\": [\\"-y\\", \\"pacote-mcp\\"], \\"env\\": {\\"CRYPTOQUANT_API_KEY\\": \\"${CRYPTOQUANT_API_KEY}\\"}}",
   "mcpServers": {}
 }
 """
@@ -196,6 +217,65 @@ _MCP_FILENAME = ".mcp.json"  # effective config Claude loads (regenerated each r
 _AGENT_MCP_FILENAME = ".mcp.agent.json"  # agent-owned; merged in and NEVER overwritten
 
 
+# Optional premium data MCPs, keyed by the settings attr that gates them. Each
+# is only added to the effective config when that key is set, so an autonomous
+# run never fails to boot for a missing key. The API key reaches the server via
+# the headless run's environment (see ``_agent_subprocess_env``); ``${VAR}`` in
+# the config below is expanded by Claude from that environment at load time.
+_KEY_GATED_MCP_SERVERS: tuple[tuple[str, str, dict[str, Any]], ...] = (
+    # On-chain metrics desk (MVRV-Z, NUPL, SOPR, Puell, Reserve Risk, ...).
+    (
+        "glassnode",
+        "glassnode_api_key",
+        {
+            "type": "http",
+            "url": "https://mcp.glassnode.com",
+            "headers": {"X-Api-Key": "${GLASSNODE_API_KEY:-}"},
+        },
+    ),
+    # Derivatives desk (funding, open interest, CME basis, liquidation heatmap).
+    (
+        "coinglass",
+        "coinglass_api_key",
+        {
+            "command": "npx",
+            "args": ["-y", "mcp-coinglass"],
+            "env": {"COINGLASS_API_KEY": "${COINGLASS_API_KEY:-}"},
+        },
+    ),
+    # Crypto research/fundamentals (tokenomics, unlocks, asset profiles).
+    (
+        "messari",
+        "messari_api_key",
+        {
+            "command": "npx",
+            "args": ["-y", "@messari/sdk-ts-mcp"],
+            "env": {"MESSARI_SDK_API_KEY": "${MESSARI_SDK_API_KEY:-}"},
+        },
+    ),
+    # Structured scraping of JS-heavy sources (StatusInvest, TradingView, RI).
+    (
+        "firecrawl",
+        "firecrawl_api_key",
+        {
+            "command": "npx",
+            "args": ["-y", "firecrawl-mcp"],
+            "env": {"FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY:-}"},
+        },
+    ),
+    # Citation-grade web research with source scoring.
+    (
+        "tavily",
+        "tavily_api_key",
+        {
+            "command": "npx",
+            "args": ["-y", "tavily-mcp"],
+            "env": {"TAVILY_API_KEY": "${TAVILY_API_KEY:-}"},
+        },
+    ),
+)
+
+
 def _baseline_mcp_servers() -> dict[str, Any]:
     """Curated, research-grade MCP servers always available to the analyst.
 
@@ -203,9 +283,13 @@ def _baseline_mcp_servers() -> dict[str, Any]:
     agent runs autonomously and must not act in those on its own); paired with
     ``--strict-mcp-config`` so ONLY the effective set loads. The agent can add
     ANY extra server itself via ``.mcp.agent.json`` (see ``_effective_mcp_config``).
+
+    Tiers: (1) general research/runtime; (2) keyless financial-data servers,
+    always on; (3) premium key-gated servers, added only when the key is set.
     """
     home = str(Path.home())
-    return {
+    servers: dict[str, Any] = {
+        # --- Tier 1: reasoning, filesystem, browser, memory, runtime ----------
         # Deep, structured reasoning for institutional-grade analysis.
         "sequential-thinking": {
             "command": "npx",
@@ -232,7 +316,54 @@ def _baseline_mcp_servers() -> dict[str, Any]:
         "time": {"command": "uvx", "args": ["mcp-server-time"]},
         # Version-control the tools the agent builds in ./tools/.
         "git": {"command": "uvx", "args": ["mcp-server-git", "--repository", str(WORKSPACE)]},
+        # --- Tier 2: keyless financial-data servers (always on) ----------------
+        # Crypto market data: prices, market cap, volume, coin metadata. Public
+        # remote endpoint (streamable HTTP), no API key required.
+        "coingecko": {"type": "http", "url": "https://mcp.api.coingecko.com/mcp"},
+        # Equities incl. B3 (suffix .SA): quotes, fundamentals, statements,
+        # holders, options, news. No API key required.
+        "yahoo-finance": {
+            "command": "uvx",
+            "args": [
+                "--from",
+                "git+https://github.com/Alex2Yang97/yahoo-finance-mcp",
+                "yahoo-finance-mcp",
+            ],
+        },
+        # DeFi TVL, yields/APY, protocol revenue & fees. Public DeFiLlama API.
+        "defillama": {"command": "npx", "args": ["-y", "@iqai/defillama-mcp"]},
+        # Neural/semantic web research over high-quality sources (streamable
+        # HTTP). Free tier works without a key (rate-limited); set TAVILY too.
+        "exa": {"type": "http", "url": "https://mcp.exa.ai/mcp"},
     }
+    # --- Tier 3: premium key-gated servers (added only when configured) --------
+    for name, key_attr, config in _KEY_GATED_MCP_SERVERS:
+        if getattr(settings, key_attr, ""):
+            servers[name] = config
+    return servers
+
+
+def _agent_subprocess_env() -> dict[str, str]:
+    """Environment for the headless ``claude`` subprocess.
+
+    Inherits the parent process env and injects the optional data-provider API
+    keys from settings. Pydantic reads these from ``.env`` but does NOT export
+    them to ``os.environ``, so without this the key-gated MCP servers (which
+    expand ``${VAR}`` from Claude's environment) would see nothing. Absent keys
+    are skipped, so their servers simply aren't configured.
+    """
+    env = dict(os.environ)
+    injected = {
+        "GLASSNODE_API_KEY": settings.glassnode_api_key,
+        "COINGLASS_API_KEY": settings.coinglass_api_key,
+        "MESSARI_SDK_API_KEY": settings.messari_api_key,
+        "FIRECRAWL_API_KEY": settings.firecrawl_api_key,
+        "TAVILY_API_KEY": settings.tavily_api_key,
+    }
+    for var, val in injected.items():
+        if val:
+            env[var] = val
+    return env
 
 
 def _load_agent_mcp_servers(workspace: Path) -> dict[str, Any]:
@@ -509,6 +640,7 @@ def _run_claude_step(
             text=True,
             timeout=timeout,
             cwd=str(cwd),
+            env=_agent_subprocess_env(),
         )
     except subprocess.TimeoutExpired as exc:
         # A timeout is treated as transient — the window may have been slow.

@@ -14,6 +14,16 @@ class Settings(BaseSettings):
     coingecko_api_url: str = "https://api.coingecko.com/api/v3"
     coingecko_api_key: str = ""
 
+    # Optional premium data-provider keys for the autonomous analyst's MCPs.
+    # All blank by default: the matching MCP server is only wired up when its
+    # key is present, so the agent boots fine with none of them set. Keys live
+    # in .env (never committed) and are injected into the headless run's env.
+    glassnode_api_key: str = ""  # on-chain metrics (MVRV/NUPL/SOPR/...)
+    coinglass_api_key: str = ""  # derivatives (funding/OI/liquidations)
+    messari_api_key: str = ""  # crypto research/fundamentals
+    firecrawl_api_key: str = ""  # structured scraping of JS-heavy sources
+    tavily_api_key: str = ""  # citation-grade web research
+
     # Portfolio targets (used to compute deviation, in fraction of 1.0)
     target_fixed_income: float = 0.35
     target_stocks: float = 0.40
