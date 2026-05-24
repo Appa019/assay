@@ -38,6 +38,10 @@ class Contribution(SQLModel, table=True):
     final_summary: str | None = Field(default=None, sa_column=Column(Text))
     notes: str | None = Field(default=None, sa_column=Column(Text))
 
+    # Claude Code session id of the chained analysis run. Persisted so an
+    # interrupted run (limit/crash) can be resumed from where it stopped.
+    claude_session_id: str | None = Field(default=None)
+
     created_at: datetime = Field(default_factory=_now_utc, index=True)
     completed_at: datetime | None = Field(default=None)
 

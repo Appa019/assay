@@ -69,6 +69,16 @@ def _make_event_printer() -> Any:
                     _YELLOW,
                 )
             )
+        elif name == "run_resume":
+            print(
+                _c(
+                    f"  ↻ retomando de onde parou: a partir da etapa {payload['from_step']}"
+                    f"/{payload['total']}  ({payload['done']} já concluída(s))",
+                    _CYAN,
+                )
+            )
+        elif name == "run_resume_failed":
+            print(_c("  ↻ sessão anterior expirou — recomeçando a análise do zero", _YELLOW))
         elif name == "step_start":
             print()
             print(
@@ -161,6 +171,7 @@ def main() -> int:
     session_gen = get_session()
     session = next(session_gen)
     try:
+        resume_id: str | None = args.contribution_id
         if args.contribution_id:
             contribution = session.get(Contribution, UUID(args.contribution_id))
             if contribution is None:
@@ -186,6 +197,7 @@ def main() -> int:
             n_prompts = len(prompts)
             amount = float(amount_dec)
 
+        resume_id = str(contribution.id)
         if not args.yes and not _confirm(amount, n_prompts, args.model, args.effort):
             print(
                 _c(
@@ -208,12 +220,21 @@ def main() -> int:
         return 0
     except analysis_runner.AnalysisError as exc:
         print(_c(f"Erro na análise: {exc}", _RED))
+        if resume_id:
+            print(
+                _c(
+                    "Progresso parcial salvo. Quando o limite de uso voltar, retome de "
+                    "onde parou com:\n"
+                    f"  python scripts/run_analysis.py --contribution-id {resume_id} -y",
+                    _YELLOW,
+                )
+            )
         return 1
     except KeyboardInterrupt:
         print(
             _c(
-                "\nInterrompido. Estado parcial salvo; retome com "
-                f"--contribution-id {args.contribution_id or ''}",
+                "\nInterrompido. Estado parcial salvo; retome de onde parou com "
+                f"--contribution-id {resume_id or ''}",
                 _YELLOW,
             )
         )

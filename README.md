@@ -84,7 +84,10 @@ acompanha etapa por etapa)…
 - **Revisão semanal** (macro + desempenho + maturidade) chega no Telegram, fica
   salva em `/relatorios` e é consultada nos aportes.
 - **Maturidade**: quando um lote completa 30 dias, o comitê analisa manter/vender.
-- **Auto-resume**: se bater limite de uso, o agente espera e retoma sozinho.
+- **Auto-resume**: se bater limite de uso, o agente espera o reset e retoma
+  sozinho. E se o processo cair no meio (créditos/queda), ao re-rodar o mesmo
+  aporte (`run_analysis.py --contribution-id <uuid>`) ele **retoma de onde
+  parou** — não refaz as reuniões já concluídas.
 
 > ⚠️ Cada run é Opus/max em ~110k chars × N reuniões — custa alguns dólares e
 > leva dezenas de minutos. Teste barato: `--model haiku --effort low`.

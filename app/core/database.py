@@ -24,10 +24,27 @@ engine = create_engine(
 )
 
 
+# Columns added after the initial schema shipped. SQLite has no migration tool
+# here and create_all() won't add columns to an existing table, so patch them in.
+_ADDED_COLUMNS: dict[str, dict[str, str]] = {
+    "contribution": {"claude_session_id": "TEXT"},
+}
+
+
+def _ensure_sqlite_columns() -> None:
+    with engine.begin() as conn:
+        for table, columns in _ADDED_COLUMNS.items():
+            existing = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")}
+            for name, ddl in columns.items():
+                if name not in existing:
+                    conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+
+
 def init_db() -> None:
     from app import models  # noqa: F401
 
     SQLModel.metadata.create_all(engine)
+    _ensure_sqlite_columns()
 
 
 def get_session() -> Iterator[Session]:

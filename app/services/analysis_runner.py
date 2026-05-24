@@ -187,6 +187,10 @@ class AnalysisError(RuntimeError):
     """A Claude CLI step failed or returned an error result."""
 
 
+class SessionNotFoundError(AnalysisError):
+    """The Claude session to ``--resume`` no longer exists; restart fresh."""
+
+
 _MCP_FILENAME = ".mcp.json"  # effective config Claude loads (regenerated each run)
 _AGENT_MCP_FILENAME = ".mcp.agent.json"  # agent-owned; merged in and NEVER overwritten
 
@@ -440,6 +444,15 @@ _HARD_PATTERNS = (
     "invalid api key",
     "authentication",
 )
+# A resume target that no longer exists → fall back to a fresh run, don't retry.
+_SESSION_GONE_PATTERNS = (
+    "no conversation found",
+    "session not found",
+    "no session found",
+    "could not find session",
+    "couldn't find session",
+    "no such session",
+)
 
 # Indirection so tests can run without real sleeping.
 _sleep = time.sleep
@@ -516,6 +529,8 @@ def _run_claude_step(
 
     if failed:
         detail = (proc.stderr.strip() or str(data.get("result", "")) or "sem detalhe")[:500]
+        if _is(_SESSION_GONE_PATTERNS):
+            raise SessionNotFoundError(f"Sessão de resume não encontrada: {detail}")
         if _is(_HARD_PATTERNS):
             raise AnalysisError(f"Erro não-recuperável do Claude: {detail}")
         if _is(_LIMIT_PATTERNS):
@@ -637,6 +652,8 @@ def run_chain(
     min_holding_days: int | None = None,
     on_event: EventCallback | None = None,
     persist: Callable[[int, str, StepResult], None] | None = None,
+    resume_session_id: str | None = None,
+    on_session_id: Callable[[str], None] | None = None,
 ) -> RunSummary:
     """Run an ordered list of (title, prompt) steps in one chained Claude session.
 
@@ -651,6 +668,7 @@ def run_chain(
     )
     workspace = _ensure_workspace(min_holding_days)
     summary = RunSummary(run_id=run_id)
+    summary.session_id = resume_session_id or ""
     total = len(steps)
 
     for index, (title, prompt) in enumerate(steps):
@@ -672,6 +690,8 @@ def run_chain(
             summary.session_id = result.session_id
             if not summary.session_id:
                 raise AnalysisError("Claude não retornou session_id na 1ª etapa")
+            if on_session_id is not None:
+                on_session_id(summary.session_id)
         summary.steps.append(result)
         if persist is not None:
             persist(index, title, result)
@@ -734,11 +754,40 @@ def run_analysis(
     # Optional: surface the latest weekly review so the committee can consult it.
     review_ctx = _latest_weekly_context(session)
 
-    steps: list[tuple[str, str]] = []
+    all_steps: list[tuple[str, str]] = []
     for index, prompt in enumerate(prompts):
         head = (preamble + review_ctx) if index == 0 else ""
-        steps.append((prompt.title, head + prompt.content))
-    steps.append(("Fechamento executivo", _SYNTHESIS_PROMPT))
+        all_steps.append((prompt.title, head + prompt.content))
+    all_steps.append(("Fechamento executivo", _SYNTHESIS_PROMPT))
+
+    # Resume point: prompts fill in order, so the completed ones are a prefix.
+    done_prompts = 0
+    for prompt in prompts:
+        if prompt.response:
+            done_prompts += 1
+        else:
+            break
+    # Nothing left to do — every meeting and the closing summary are persisted.
+    if done_prompts == len(prompts) and contribution.final_summary:
+        _emit(
+            on_event,
+            "run_done",
+            contribution_id=str(contribution_id),
+            total_cost_usd=0.0,
+            total_duration_s=0.0,
+            final_summary=contribution.final_summary,
+        )
+        return RunSummary(
+            run_id=str(contribution_id),
+            session_id=contribution.claude_session_id or "",
+            final_summary=contribution.final_summary,
+        )
+
+    resume_index = min(done_prompts, len(prompts))
+    saved_session = contribution.claude_session_id
+    # True resume needs Claude's chained session; without it, restart fresh.
+    if not (resume_index > 0 and saved_session):
+        resume_index, saved_session = 0, None
 
     contribution.status = ContributionStatus.IN_PROGRESS
     session.add(contribution)
@@ -748,20 +797,37 @@ def run_analysis(
         on_event,
         "run_start",
         contribution_id=str(contribution_id),
-        total_steps=len(steps),
+        total_steps=len(all_steps) - resume_index,
         model=model,
         effort=effort,
     )
+    if resume_index > 0:
+        _emit(
+            on_event,
+            "run_resume",
+            contribution_id=str(contribution_id),
+            from_step=resume_index + 1,
+            total=len(all_steps),
+            done=resume_index,
+        )
 
-    def _persist(index: int, title: str, step: StepResult) -> None:
-        if index < len(prompts):
-            prompts[index].response = step.result
-            prompts[index].responded_at = datetime.now(UTC)
-            session.add(prompts[index])
+    def _execute(from_index: int, sess: str | None) -> RunSummary:
+        steps = all_steps[from_index:]
+
+        def _persist(index: int, title: str, step: StepResult) -> None:
+            abs_index = from_index + index
+            if abs_index < len(prompts):
+                prompts[abs_index].response = step.result
+                prompts[abs_index].responded_at = datetime.now(UTC)
+                session.add(prompts[abs_index])
+                session.commit()
+
+        def _save_session(sid: str) -> None:
+            contribution.claude_session_id = sid
+            session.add(contribution)
             session.commit()
 
-    try:
-        summary = run_chain(
+        return run_chain(
             steps,
             run_id=str(contribution_id),
             model=model,
@@ -770,7 +836,24 @@ def run_analysis(
             min_holding_days=min_holding_days,
             on_event=on_event,
             persist=_persist,
+            resume_session_id=sess,
+            on_session_id=_save_session,
         )
+
+    try:
+        try:
+            summary = _execute(resume_index, saved_session)
+        except SessionNotFoundError as exc:
+            logger.warning(
+                "resume_session_gone_restarting_fresh",
+                contribution_id=str(contribution_id),
+                error=str(exc),
+            )
+            contribution.claude_session_id = None
+            session.add(contribution)
+            session.commit()
+            _emit(on_event, "run_resume_failed", contribution_id=str(contribution_id))
+            summary = _execute(0, None)
 
         contribution.final_summary = summary.final_summary
         contribution.status = ContributionStatus.COMPLETED

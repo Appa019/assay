@@ -40,8 +40,16 @@ completa 30 dias, um cron roda a análise de maturidade. Aporte é ad-hoc.
 - **Mandato de alocação**: Renda Fixa = **100% CDB**; Ações = **só equities da
   B3** (sem FII/ETF/BDR); Crypto = **agressivo** (alto upside, com risco). Está
   nas ordens permanentes, no preâmbulo, na síntese e nos cabeçalhos dos templates.
-- **Auto-resume**: se uma etapa falha por limite de uso/taxa, `run_chain` espera
-  (backoff até ~1h) e retoma a MESMA etapa via `--resume` automaticamente.
+- **Auto-resume (no processo)**: se uma etapa falha por limite de uso/taxa,
+  `run_chain` espera (até a hora do reset, backoff até ~1h) e retoma a MESMA
+  etapa via `--resume` automaticamente.
+- **Resume entre reinícios de processo**: o `session_id` do Claude é persistido
+  em `Contribution.claude_session_id` e cada resposta é salva ao concluir. Se o
+  processo morrer (créditos/queda), re-rodar `run_analysis` (CLI
+  `--contribution-id <uuid>`) RETOMA da 1ª etapa não concluída na MESMA sessão
+  encadeada — não refaz as reuniões já feitas. Se a sessão expirou
+  (`SessionNotFoundError`), recomeça do zero sozinho. Migração da coluna em
+  `core/database._ensure_sqlite_columns`.
 - **MCPs + acesso total + auto-provisionamento**: cada run usa
   `--mcp-config storage/agent_workspace/.mcp.json` + `--strict-mcp-config` e
   `--add-dir $HOME` + `--dangerously-skip-permissions` → navega a máquina toda,
@@ -144,7 +152,8 @@ sem Playwright.
   auto-carregados), via subprocess do `claude` com
   `--dangerously-skip-permissions --effort max --model opus --output-format json`;
   a 1ª etapa roda fresh e o `session_id` é capturado do JSON de saída, as
-  etapas seguintes usam `--resume <id>`
+  etapas seguintes usam `--resume <id>` (e o id é persistido em
+  `Contribution.claude_session_id` para retomar entre reinícios de processo)
 - effort SEMPRE `max` no fluxo automático; agente tem carta branca e gerencia
   a própria memória em `storage/agent_workspace/MEMORY.md`
 - Trava de venda: `MIN_HOLDING_DAYS` (30) dias por LOTE vale só p/ AÇÕES e
