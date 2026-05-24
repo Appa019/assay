@@ -1,10 +1,15 @@
 """Minimal Telegram Bot API client — notifications + locked two-way control.
 
 All sends target the single configured chat (``settings.telegram_chat_id``);
-the bot is private to one user. Messages are plain text (no parse_mode) so the
-committee's markdown/tables never break Telegram's strict escaping.
+the bot is private to one user. The committee's markdown is converted to
+Telegram HTML (``parse_mode=HTML``): bold/headers become <b>, and since
+Telegram has no tables, markdown tables are rendered as aligned monospace
+<pre> blocks. If an HTML send is ever rejected, we fall back to plain text so
+a message is never lost.
 """
 
+import html as _html
+import re
 from typing import Any
 
 import httpx
@@ -17,6 +22,75 @@ logger = structlog.get_logger()
 _API = "https://api.telegram.org"
 _MAX_LEN = 4000  # Telegram hard limit is 4096; leave headroom.
 _TIMEOUT = 30.0
+
+# --- markdown → Telegram HTML --------------------------------------------------
+_BOLD2 = re.compile(r"\*\*(.+?)\*\*")
+_BOLD1 = re.compile(r"(?<!\*)\*(?!\s)([^*\n]+?)(?<!\s)\*(?!\*)")
+_CODE = re.compile(r"`([^`\n]+)`")
+_HEADER = re.compile(r"^\s{0,3}#{1,6}\s+(.*)$")
+_HR = re.compile(r"^\s*([-*_])\1{2,}\s*$")
+_BULLET = re.compile(r"^(\s*)[-*]\s+(.*)$")
+_QUOTE = re.compile(r"^\s*>\s?(.*)$")
+_TABLE_SEP_CELL = re.compile(r"^:?-{1,}:?$")
+
+
+def _inline(s: str) -> str:
+    """Escape HTML then apply inline bold/code markdown."""
+    s = _html.escape(s, quote=False)
+    s = _BOLD2.sub(r"<b>\1</b>", s)
+    s = _BOLD1.sub(r"<b>\1</b>", s)
+    s = _CODE.sub(r"<code>\1</code>", s)
+    return s
+
+
+def _is_table_row(line: str) -> bool:
+    return line.strip().startswith("|") and line.count("|") >= 2
+
+
+def _render_table(block: list[str]) -> str:
+    """Render markdown table rows as an aligned monospace <pre> block."""
+    def _clean(cell: str) -> str:
+        # Tables are monospace; drop bold/code markers so they don't show literal.
+        return cell.strip().replace("**", "").replace("`", "")
+
+    rows = [[_clean(c) for c in ln.strip().strip("|").split("|")] for ln in block]
+    data = [r for r in rows if not all(_TABLE_SEP_CELL.match(c or "-") for c in r)]
+    if not data:
+        return ""
+    ncol = max(len(r) for r in data)
+    data = [r + [""] * (ncol - len(r)) for r in data]
+    widths = [max(len(r[i]) for r in data) for i in range(ncol)]
+    lines = ["  ".join(r[i].ljust(widths[i]) for i in range(ncol)).rstrip() for r in data]
+    return "<pre>" + _html.escape("\n".join(lines), quote=False) + "</pre>"
+
+
+def format_for_telegram(text: str) -> str:
+    """Convert the committee's markdown to Telegram-safe HTML."""
+    lines = text.split("\n")
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if _is_table_row(line):
+            block: list[str] = []
+            while i < len(lines) and _is_table_row(lines[i]):
+                block.append(lines[i])
+                i += 1
+            out.append(_render_table(block) if len(block) >= 2 else _inline(block[0]))
+            continue
+        header = _HEADER.match(line)
+        if header:
+            out.append("<b>" + _html.escape(header.group(1), quote=False) + "</b>")
+        elif _HR.match(line):
+            out.append("──────────")
+        elif bullet := _BULLET.match(line):
+            out.append(bullet.group(1) + "• " + _inline(bullet.group(2)))
+        elif quote := _QUOTE.match(line):
+            out.append(_inline(quote.group(1)))
+        else:
+            out.append(_inline(line))
+        i += 1
+    return "\n".join(out)
 
 
 class TelegramError(RuntimeError):
@@ -101,16 +175,30 @@ def send_message(
         logger.warning("telegram_not_configured", has_token=bool(token), has_chat=bool(chat_id))
         return False
 
+    url = f"{_base(token)}/sendMessage"
     try:
         with httpx.Client(timeout=_TIMEOUT) as client:
             for chunk in chunk_text(text):
+                html_text = format_for_telegram(chunk)
                 resp = client.post(
-                    f"{_base(token)}/sendMessage",
+                    url,
+                    json={
+                        "chat_id": chat_id,
+                        "text": html_text,
+                        "parse_mode": "HTML",
+                        "disable_web_page_preview": True,
+                    },
+                )
+                if resp.json().get("ok"):
+                    continue
+                # HTML rejected → never lose the message: resend as plain text.
+                logger.warning("telegram_html_rejected_fallback_plain")
+                resp = client.post(
+                    url,
                     json={"chat_id": chat_id, "text": chunk, "disable_web_page_preview": True},
                 )
-                payload = resp.json()
-                if not payload.get("ok"):
-                    raise TelegramError(f"sendMessage falhou: {payload}")
+                if not resp.json().get("ok"):
+                    raise TelegramError(f"sendMessage falhou: {resp.json()}")
         return True
     except (httpx.HTTPError, TelegramError) as exc:
         logger.error("telegram_send_failed", error=str(exc))
