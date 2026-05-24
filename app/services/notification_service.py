@@ -18,7 +18,7 @@ import structlog
 from sqlmodel import Session, select
 
 from app.config import settings
-from app.models.asset import Asset
+from app.models.asset import Asset, AssetClass
 from app.models.contribution import Contribution
 from app.services import telegram_service
 
@@ -75,6 +75,9 @@ def pending_maturities(
     rows: list[dict[str, Any]] = []
     keys: list[str] = []
     for asset in session.exec(select(Asset).order_by(Asset.entry_date)).all():
+        # CDB / fixed income has daily liquidity — it never "unlocks", skip it.
+        if asset.asset_class == AssetClass.FIXED_INCOME:
+            continue
         days = (today - asset.entry_date).days
         if days < min_days:
             continue

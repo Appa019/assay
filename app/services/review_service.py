@@ -59,8 +59,10 @@ def _macro_block(macro_ctx: dict[str, Any]) -> str:
 
 _MANDATE = (
     "MANDATO: Renda Fixa = 100% CDB; Ações = só equities da B3 (sem FII/ETF/BDR); "
-    "Crypto = agressivo (alto upside, risco controlado). Trava de venda é POR LOTE "
-    f"({settings.min_holding_days} dias a partir da data de cada compra)."
+    "Crypto = agressivo (alto upside, risco controlado). Trava de venda POR LOTE de "
+    f"{settings.min_holding_days} dias vale só para AÇÕES e CRYPTO; CDB tem liquidez "
+    "diária (dry powder) e pode ser vendido a qualquer momento para aproveitar "
+    "oportunidades."
 )
 
 
@@ -86,6 +88,12 @@ def _weekly_steps(
         f"3. Para cada LOTE já LIBERADO (≥{min_days} dias): recomendação MANTER / VENDER / "
         "AUMENTAR com racional e gatilhos. Para lotes travados: status e plano.\n"
         "4. Riscos, alertas e oportunidades novas dentro do mandato (CDB / ações B3 / crypto).\n"
+        "5. ROTAÇÃO DE DRY POWDER: o CDB tem LIQUIDEZ DIÁRIA (sem trava). Se houver uma "
+        "OPORTUNIDADE de mercado RELEVANTE esta semana (ação B3 ou crypto) — entrada "
+        "claramente assimétrica —, recomende VENDER parte/todo o CDB e COMPRAR o ativo, "
+        "com R$, preço-alvo, tamanho e racional. Só recomende a rotação se a convicção "
+        "for alta; senão, mantenha o CDB rendendo. Lembre que a NOVA compra (ação/crypto) "
+        f"entra em trava de {settings.min_holding_days} dias.\n"
         "Seja rigoroso, cite números e fontes. NÃO cite corretora/exchange."
     )
     synthesis = (
@@ -95,6 +103,8 @@ def _weekly_steps(
         "• Desempenho da carteira (resumo + destaques positivos/negativos).\n"
         "• Ações sobre lotes liberados: tabela curta Ticker | Ação (manter/vender/aumentar) | "
         "motivo em 1 linha.\n"
+        "• ROTAÇÃO: se houver oportunidade, ordem clara 'VENDER R$ X de CDB → COMPRAR <ativo>' "
+        "com preço-alvo; se não houver, diga 'manter CDB, sem rotação esta semana'.\n"
         "• Alertas e o que observar na próxima semana.\n"
         "ANTES de escrever, ATUALIZE ./MEMORY.md com o que mudou. Depois entregue o relatório."
     )

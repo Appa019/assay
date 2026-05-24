@@ -27,9 +27,14 @@ a recomendação no **Telegram**; a cada vencimento de 30 dias um cron avisa.
 - **Revisão semanal (7d)**: comitê analisa macro + desempenho das posições +
   maturidade → `Report(weekly)` salvo + Telegram; injetado como consulta nos
   aportes (`analysis_runner._latest_weekly_context`).
-- **Maturidade (por LOTE)**: a trava de 30d é por compra (cada `Asset` é um
-  lote com seu `entry_date`). Ao um lote cruzar 30d, `check_cadence` roda uma
-  análise de maturidade (manter/vender) → `Report(maturity)` + Telegram.
+- **Maturidade (por LOTE, só AÇÕES e CRYPTO)**: a trava de 30d é por compra
+  (cada `Asset` é um lote com seu `entry_date`). **CDB/Renda Fixa = liquidez
+  diária, SEM trava** (dry powder) — excluído de `pending_maturities`, vendável
+  a qualquer hora no `/vender`. Ao um lote de ação/crypto cruzar 30d,
+  `check_cadence` roda análise de maturidade → `Report(maturity)` + Telegram.
+- **Rotação de dry powder**: a revisão semanal pode recomendar VENDER CDB e
+  COMPRAR uma ação/crypto se achar oportunidade relevante (a nova compra entra
+  na trava de 30d).
 - **Mandato de alocação**: Renda Fixa = **100% CDB**; Ações = **só equities da
   B3** (sem FII/ETF/BDR); Crypto = **agressivo** (alto upside, com risco). Está
   nas ordens permanentes, no preâmbulo, na síntese e nos cabeçalhos dos templates.
@@ -138,8 +143,9 @@ sem Playwright.
   usando `--session-id` na 1ª etapa e `--resume` nas seguintes
 - effort SEMPRE `max` no fluxo automático; agente tem carta branca e gerencia
   a própria memória em `storage/agent_workspace/MEMORY.md`
-- Trava de venda: cliente só vende após `MIN_HOLDING_DAYS` (30) dias — o agente
-  considera isso; o bot bloqueia `/vender` antes do prazo
+- Trava de venda: `MIN_HOLDING_DAYS` (30) dias por LOTE vale só p/ AÇÕES e
+  CRYPTO. CDB/Renda Fixa = liquidez diária (vende a qualquer hora). O bot
+  bloqueia `/vender` de ação/crypto antes do prazo, mas libera CDB sempre
 - Bot do Telegram é PRIVADO: responde só ao `TELEGRAM_CHAT_ID` configurado
 - Os prompts são para Claude Code CLI (com WebSearch/WebFetch/Bash) —
   não para claude.ai web

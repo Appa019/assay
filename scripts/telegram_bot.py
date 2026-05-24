@@ -7,7 +7,7 @@ Long-polls Telegram and speaks Portuguese only.
 Commands:
     /aporte <valor>                 cria o aporte e roda o comitê inteiro
     /comprei <ticker> <classe> <qtd> <preço>   registra uma compra
-    /vender <ticker>                vende (respeita a trava de 30 dias)
+    /vender <ticker>                vende (ações/crypto após 30 dias; CDB quando quiser)
     /carteira                       lista posições + elegibilidade de venda
     /status                         alocação atual vs. alvo + cadência
     /ajuda                          esta ajuda
@@ -64,7 +64,7 @@ _HELP = (
     "Te devolvo onde investir e quanto.\n"
     "/comprei <ticker> <classe> <qtd> <preço> — registro o que você comprou. "
     "Classe: rf, acoes ou crypto.\n"
-    "/vender <ticker> — vendo (só após 30 dias de posse, por lote).\n"
+    "/vender <ticker> — vendo (ações/crypto após 30 dias por lote; CDB quando quiser).\n"
     "/carteira — suas posições e o que já pode ser vendido.\n"
     "/revisao — rodo agora a revisão semanal do comitê (macro + carteira).\n"
     "/relatorios — últimos relatórios (semanais e de maturidade).\n"
@@ -135,7 +135,9 @@ def _cmd_carteira() -> str:
         days = (today - a.entry_date).days
         price = a.current_price if a.current_price is not None else a.avg_price
         value = float(a.quantity * price)
-        if days >= min_days:
+        if a.asset_class == AssetClass.FIXED_INCOME:
+            lock = "🔓 liquidez diária"  # CDB has no lock
+        elif days >= min_days:
             lock = "🔓 liberado"
         else:
             lock = f"🔒 faltam {min_days - days}d"
@@ -166,10 +168,13 @@ def _cmd_comprei(args: list[str]) -> str:
                 entry_date=date.today(),
             ),
         )
+    if asset_class == AssetClass.FIXED_INCOME:
+        liquidez = "Liquidez diária — pode vender quando quiser."
+    else:
+        liquidez = f"Liberado para venda em {settings.min_holding_days} dias (trava por lote)."
     return (
         f"✅ Registrado: {asset.ticker} ({asset.asset_class}) — "
-        f"{float(asset.quantity)} @ {_fmt_brl(float(asset.avg_price))}.\n"
-        f"Liberado para venda em {settings.min_holding_days} dias."
+        f"{float(asset.quantity)} @ {_fmt_brl(float(asset.avg_price))}.\n{liquidez}"
     )
 
 
@@ -186,14 +191,19 @@ def _cmd_vender(args: list[str]) -> str:
         )
         if not lots:
             return f"Não achei {ticker} na carteira."
-        matured = [a for a in lots if (today - a.entry_date).days >= min_days]
-        if not matured:
+        # CDB / fixed income = daily liquidity (no lock). Stocks/crypto: 30d per lot.
+        sellable = [
+            a
+            for a in lots
+            if a.asset_class == AssetClass.FIXED_INCOME or (today - a.entry_date).days >= min_days
+        ]
+        if not sellable:
             soonest = min(min_days - (today - a.entry_date).days for a in lots)
             return (
                 f"🔒 {ticker} ainda travado — o lote mais próximo libera em {soonest} dia(s) "
-                f"(trava de {min_days}d, por lote)."
+                f"(trava de {min_days}d vale só p/ ações e crypto)."
             )
-        target = matured[0]
+        target = sellable[0]
         days = (today - target.entry_date).days
         result = portfolio_service.sell_asset(s, target.id)
     remaining = len(lots) - 1

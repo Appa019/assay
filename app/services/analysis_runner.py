@@ -78,14 +78,18 @@ analista só. Rigor máximo institucional, sempre.
   CoinGecko-ids corretos, o que recomendou e por quê, o que funcionou/falhou,
   watchlist e erros a evitar. Use ./memory/ para notas longas por tema.
 
-## Trava de venda — {min_holding_days} dias, POR LOTE (CRÍTICO)
-- A trava vale por LOTE DE COMPRA, não por ticker. Cada compra matura
-  {min_holding_days} dias a partir da SUA data de entrada. Ex.: 10 ações
-  compradas hoje liberam antes de 15 do mesmo ticker compradas semana que vem.
-- Portanto: (a) só recomende compras que você tem convicção de segurar
-  ≥{min_holding_days} dias; (b) considere a trava em liquidez, risco e timing;
-  (c) ao revisar, trate cada LOTE separadamente e sinalize quais já passaram de
-  {min_holding_days} dias (LIBERADOS para venda) e quais ainda estão travados.
+## Trava de venda — {min_holding_days} dias POR LOTE (só AÇÕES e CRYPTO)
+- A trava de {min_holding_days} dias vale APENAS para AÇÕES e CRYPTO, por LOTE
+  de compra (não por ticker): cada compra matura {min_holding_days} dias a
+  partir da SUA data. Ex.: 10 ações de hoje liberam antes de 15 do mesmo ticker
+  compradas semana que vem.
+- **CDB / Renda Fixa = LIQUIDEZ DIÁRIA**: pode ser vendido a QUALQUER momento,
+  sem trava. É o DRY POWDER (caixa estratégico) da carteira.
+- Portanto: (a) ações/crypto só com convicção de segurar ≥{min_holding_days}
+  dias; (b) na revisão semanal, se surgir uma OPORTUNIDADE de mercado relevante
+  (ação B3 ou crypto), pode recomendar VENDER CDB e comprar o ativo — o CDB
+  existe pra isso; (c) ao revisar, trate cada lote de ação/crypto separadamente
+  (travado vs liberado); o CDB está sempre disponível.
 
 ## Mandato de alocação (PRIORIDADE MÁXIMA — três classes APENAS)
 - **Renda Fixa = 100% CDB** (preferir CDB ≥100% do CDI; prazo/liquidez conforme
@@ -216,9 +220,9 @@ def _build_preamble(*, amount_brl: float, when: str, min_holding_days: int) -> s
         f"- Data: {when}\n"
         "- MANDATO: Renda Fixa = 100% CDB; Ações = só equities da B3 (sem "
         "FII/ETF/BDR); Crypto = agressivo (alto upside, com risco controlado).\n"
-        f"- Trava de venda POR LOTE: cada compra só pode ser vendida após "
-        f"{min_holding_days} dias da sua data — recomende apenas posições para "
-        f"segurar ≥{min_holding_days} dias.\n"
+        f"- Trava POR LOTE só de AÇÕES e CRYPTO: cada compra vende após "
+        f"{min_holding_days} dias da sua data. CDB/Renda Fixa tem liquidez "
+        "diária (dry powder) — vende quando quiser.\n"
         "- LEIA seu ./MEMORY.md (memória dos ciclos anteriores) antes de decidir; "
         "ATUALIZE-o ao final.\n"
         "- Carta branca: pesquise qualquer fonte (WebSearch/WebFetch), rode "
