@@ -32,8 +32,9 @@ Três classes, **apenas** — o comitê não recomenda nada fora disso:
 - ❌ FIIs, ETFs, BDRs
 - ❌ Ações, REITs ou stocks internacionais
 
-> O mandato é cravado como override de prioridade máxima no topo dos 3 prompts
-> do comitê e nas ordens permanentes do agente.
+> O mandato é **nativo** dos 3 prompts do comitê — todo o universo analisado é
+> CDB · Ações B3 · Crypto, sem nenhuma análise de classes fora do escopo — e
+> está também nas ordens permanentes do agente.
 
 ## Quick start
 
@@ -102,12 +103,13 @@ acompanha etapa por etapa)…
 
 | # | Reunião | Personas | Linhas | Chars |
 |---|---|---:|---:|---:|
-| 1 | **GIC — Macro + Alocação Tática** | 14 | ~1100 | ~46k |
-| 2 | **Equity Research Memo** | 14 | ~850 | ~34k |
-| 3 | **Investment Committee Final** | 14 | ~800 | ~31k |
+| 1 | **GIC — Macro + Alocação Tática (CDB·B3·Crypto)** | 12 | ~720 | ~36k |
+| 2 | **Equity & Crypto Research + CDB Credit** | 12+2 | ~470 | ~29k |
+| 3 | **Investment Committee Final** | 14 | ~530 | ~28k |
 
-**Total**: ~2750 linhas / ~111k chars / ~28k tokens. Cada prompt
-isolado fica folgado em Opus 4.7 (1M context).
+**Total**: ~1730 linhas / ~92k chars / ~23k tokens. Os 3 prompts são
+nativamente de 3 classes (CDB · Ações B3 · Crypto) — sem análise de FII/
+Tesouro/debênture/ETF — e cada um fica folgado em Opus 4.7 (1M context).
 
 Cada prompt instrui o Claude a usar `WebSearch`/`WebFetch`/`Bash` para
 validar dados (Glassnode, CryptoQuant, Coinglass, Fundamentus, StatusInvest,

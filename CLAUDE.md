@@ -42,12 +42,16 @@ completa 30 dias, um cron roda a análise de maturidade. Aporte é ad-hoc.
   nas ordens permanentes, no preâmbulo, na síntese e nos cabeçalhos dos templates.
 - **Auto-resume**: se uma etapa falha por limite de uso/taxa, `run_chain` espera
   (backoff até ~1h) e retoma a MESMA etapa via `--resume` automaticamente.
-- **MCPs + acesso total**: cada run usa `--mcp-config storage/agent_workspace/.mcp.json`
-  + `--strict-mcp-config` (servidores curados: sequential-thinking, filesystem,
-  fetch, context7, playwright) e `--add-dir $HOME` + `--dangerously-skip-permissions`
-  → o agente navega a máquina inteira, cria arquivos e usa browser real. Strict
-  EXCLUI Gmail/Calendar/Drive de propósito (o agente é autônomo). Config em
-  `analysis_runner._mcp_config()`.
+- **MCPs + acesso total + auto-provisionamento**: cada run usa
+  `--mcp-config storage/agent_workspace/.mcp.json` + `--strict-mcp-config` e
+  `--add-dir $HOME` + `--dangerously-skip-permissions` → navega a máquina toda,
+  cria arquivos e usa browser real. O `.mcp.json` efetivo é gerado a cada run
+  como **baseline curado ∪ `.mcp.agent.json`** — este último é do AGENTE (ele
+  adiciona QUALQUER MCP novo, nunca é sobrescrito, carrega no próximo ciclo).
+  Baseline (8): sequential-thinking, filesystem, fetch, context7, playwright,
+  memory, time, git. Strict EXCLUI Gmail/Calendar/Drive de propósito (autônomo).
+  Builders em `analysis_runner._baseline_mcp_servers()` + `_effective_mcp_config()`;
+  o workspace é repo git (versiona as ferramentas em `tools/`).
 - **Time GS/J.P. Morgan**: ordens permanentes + prompts convocam uma mesa completa
   (economista-chefe, alocação, equity B3, crypto, RF, quant, CRO, forensic, CIO).
 - **Bot exclusivo**: `telegram_bot.py` só responde ao `TELEGRAM_CHAT_ID`; qualquer
@@ -159,51 +163,51 @@ sem Playwright.
 - Commits em inglês, Conventional Commits (feat:, fix:, chore:, refactor:)
 - NEVER mencionar Claude em commits, código ou co-author tags
 
-## Os 3 prompts (escopo BR + Crypto)
+## Os 3 prompts (3 classes: CDB · Ações B3 · Crypto)
+
+Mandato NATIVO: todo o universo analisado é CDB, Ações B3 e Crypto. Nenhum
+prompt analisa/cita Tesouro, LCI/LCA, debênture, CRI/CRA, fundo, FII, ETF
+(GOLD11/BOVA11/IVVB11), BDR, ouro, DOL ou internacional (só aparecem em
+linhas de veto). Schema JSON `version=5.0`, `escopo=BR_3_classes_cdb_acoesB3_crypto`.
+Os campos de R1 (`final_tactical_brl`, `juros_e_cdb`, etc.) são lidos por R2/R3.
 
 ### Reunião nº 1 (GIC) — Macro · Alocação Tática
-14 personas (Helena macro BR, Marcus global, Bruno alocação, Ricardo
-setor B3, Letícia FII, Aline crypto, Henrique RF, Mateus quant, Tiago
-CRO, Cláudia tax, Diogo ESG, Felipe special situations, Júlia secretary).
+12 personas (Helena macro BR, Marcus global, Bruno alocação, Ricardo setor
+B3, Aline crypto, Henrique CDB & rates, Mateus quant, Tiago CRO, Cláudia
+tax, Diogo ESG, Felipe special situations, Júlia secretary).
 
-13 rounds: Top of Mind (GS) → macro BR → macro global (impacto BR) →
-yield curves → setor B3 + style tilts → FIIs → crypto on-chain → RF
-crédito → BL setup → ESG + special sit → tax overlay → behavioral →
-decisão tactical via BL + RP + HRP comparison.
+11 rounds: Top of Mind → macro BR → macro global → **juros & estratégia de
+CDB** (curva DI como SINAL de CDI; FGC; crédito bancário) → setor B3 + style
+tilts → crypto on-chain → risk frame + Black-Litterman (3 buckets) → ESG +
+special sit → tax overlay → behavioral → decisão tactical (BL + RP + HRP) →
+pre-mortem. Buckets = cdb / acoes_b3 / crypto. Defesa = CDB líquido (dry
+powder) + USDC (sem ouro/ETF/DOL).
 
-Frameworks: GS Top of Mind, GS Asset Allocation, MS Capital Market
-Assumptions, MS GIC, Black-Litterman, Bridgewater All-Weather, AQR
-Multi-Factor, Fama-French 5, Damodaran ERP, Fed Model BR-adapted, GMO
-7-Year, HRP López de Prado, Markowitz, Kelly fracional.
+### Reunião nº 2 (Equity & Crypto Research + CDB Credit)
+12 personas + 2 vetos (Lucas head equity, 4 analysts setoriais, Sophia
+behavioral/multi-asset, Rafael crypto on-chain, Henrique CDB credit, Anderson
+CMT, Vera CFE forensic, Felipe special sit, Júlia quant; vetos Tiago CRO +
+Diogo ESG).
 
-### Reunião nº 2 (Equity Research Memo)
-14 personas (Lucas head equity, 5 senior analysts setoriais, Letícia FII,
-Sophia behavioral + multi-asset, Rafael crypto on-chain, Henrique RF,
-Anderson CMT, Vera CFE forensic, Felipe special sit, Júlia quant).
-
-6 rounds densos. Por nome: investment thesis GS-style + valuation
-triangulada (DCF 3-stage + Reverse DCF + CCA + Precedent Transactions
-+ LBO + SOTP) + forensic completo (Piotroski + Altman + Beneish + Sloan
-+ Dechow) + Capital Allocation Scorecard + Earnings Quality + technical
-institucional (Wyckoff/VP/Ichimoku/Bollinger/Elliott/Fib/EMA) + factor
-exposure + bull/base/bear + asymmetry ≥ 2:1 + conviction tier.
-
-Crypto: on-chain Glassnode-tier (MVRV-Z, NUPL, SOPR, Puell, Reserve Risk,
-HODL, STH-LTH, CDD, RHODL, NVT, Dormancy) + derivatives (Coinglass) +
-dev activity (Electric Capital).
+6 rounds densos. **Ações B3**: investment thesis + valuation triangulada (DCF
+3-stage + Reverse DCF + CCA + Precedent + LBO + SOTP) + forensic (Piotroski/
+Altman/Beneish/Sloan/Dechow) + Capital Allocation + Earnings Quality + técnica
+institucional + factor exposure + bull/base/bear ≥ 2:1 + conviction. **Crypto**:
+on-chain Glassnode-tier + derivatives (Coinglass) + tokenomics/unlocks + dev
+activity. **CDB**: credit analysis do banco emissor (Basel III Tier 1, NPL,
+ROE, rating), %CDI pós-IR, cobertura FGC R$ 250k.
 
 ### Reunião nº 3 (Investment Committee Final)
 14 personas (Otávio CIO, Tiago CRO, Mateus quant, Sofia sentiment, Daniel
-trader, Marina FX, Cláudia tax, Alexandre compliance, Anderson CMT,
-Felipe special sit, Vera forensic, Júlia validator, Diogo ESG, Edson
-wealth planning).
+trader, Henrique CDB, Cláudia tax, Alexandre compliance, Anderson CMT, Felipe
+special sit, Vera forensic, Júlia validator, Diogo ESG, Edson wealth).
 
-15 rounds: risk overlay (VaR + CVaR + EVT + CDaR + Marginal/Component
-VaR) → stress test 8 cenários → sentiment + IV/RV → RF final → tax
-máxima (isenções + DARF + PGBL + holding + harvesting) → FX hedge
-(USDC/GOLD11/cambial BR) → pair trades + options Greeks → compliance →
-behavioral 9 biases → cross-check CIO → execution algorithms → folha
-de ordens executiva → monitoramento + panic triggers → resumo executivo.
+14 rounds: risk overlay (VaR + CVaR + EVT + CDaR + Marginal/Component VaR; CDB
+por risco de crédito/FGC) → stress 8 cenários (incl. **evento de crédito
+bancário**) → sentiment + IV/RV → **CDB final** → tax (CDB IR regr + 20k ações
++ 35k crypto + PGBL + holding + harvesting) → pair trades + options → compliance
+→ behavioral 9 biases → cross-check CIO → execution → folha de ordens →
+monitoramento → resumo executivo. Bolso ∈ {cdb, acoes_b3, crypto}.
 
 **Folha de ordens SEM coluna plataforma** — cliente decide onde executar.
 

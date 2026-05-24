@@ -40,9 +40,10 @@ _PROMPT_DEFINITIONS = [
         "template": "02_research_diligence.j2",
         "title": "Reunião nº 2 — Screening e Due Diligence Profunda",
         "description": (
-            "Time de Equity Research (cíclicos / defensivos / commodities) e Crypto Research valida tickers, "
-            "filtra universo (liquidez, market cap, governança), faz deep due diligence em 5-8 ações + 3-5 crypto "
-            "com fundamentos, valuation, tokenomics e position sizing por ativo."
+            "Time de Equity Research (cíclicos / defensivos / commodities / small caps), Crypto Research e CDB "
+            "Credit valida tickers e emissores, filtra universo, faz deep due diligence em ações B3 + crypto "
+            "(fundamentos, valuation, tokenomics) e analisa o crédito do banco emissor do CDB (Basel III, FGC, "
+            "%CDI), com position sizing por ativo."
         ),
     },
     {
@@ -51,9 +52,10 @@ _PROMPT_DEFINITIONS = [
         "template": "03_decision_orders.j2",
         "title": "Reunião nº 3 — Risco, Sentimento e Ordens Finais",
         "description": (
-            "CIO + CRO + Head of Sentiment + Trader Sênior validam shortlist contra risco e sentimento, "
-            "definem produtos de Renda Fixa, e geram a folha de ordens executiva: ticker, qtd, preço alvo, "
-            "stop, target 31d/90d, algoritmo de execução (VWAP/TWAP/POV/Limit) — pronto para o cliente operar."
+            "CIO + CRO + Head of Sentiment + Trader Sênior validam a shortlist contra risco e sentimento, "
+            "materializam a fatia de Renda Fixa em CDBs (banco emissor, %CDI, FGC) e geram a folha de ordens "
+            "executiva: ticker, qtd, preço alvo, stop, target 31d/90d, algoritmo de execução (VWAP/TWAP/POV/"
+            "Limit) — pronto para o cliente operar."
         ),
     },
 ]
