@@ -25,7 +25,7 @@ concluir, manda a recomendação no **Telegram**; quando um lote de ação/crypt
 completa 30 dias, um cron roda a análise de maturidade. Aporte é ad-hoc.
 
 ### Ciclos e mandato (2026-05)
-- **Aporte (30d)**: 3 prompts encadeados + fechamento → folha de ordens.
+- **Aporte (ad-hoc)**: 3 prompts encadeados + fechamento → folha de ordens.
 - **Revisão semanal (7d)**: comitê analisa macro + desempenho das posições +
   maturidade → `Report(weekly)` salvo + Telegram; injetado como consulta nos
   aportes (`analysis_runner._latest_weekly_context`).
@@ -116,21 +116,18 @@ sem Playwright.
 > investimento (o quê comprar, quanto, quando). Plataforma e exchange
 > são decisão do usuário ao executar a folha de ordens.
 
-- **Escopo de ativos**: Brasil-resident apenas (B3 ações + FIIs + Tesouro
-  + Debêntures + CDB/LCI/LCA + Fundos BR) + Crypto/DeFi. **SEM
-  internacional direto** (sem BDRs, sem ETFs internacionais B3, sem stocks
-  USA via Avenue/Inter Invest/Nomad).
-- **Broker B3 preferido**: a corretora do banco para ações,
-  FIIs, ETFs B3, Tesouro Direto, debêntures, CDB/LCI/LCA.
+- **Escopo de ativos (mandato)**: três classes APENAS — Renda Fixa = 100%
+  CDB, Ações = só equities da B3, Crypto = agressivo. SEM FII/ETF/BDR,
+  Tesouro, LCI/LCA, debêntures, fundos ou internacional direto.
+- **Broker B3 preferido**: a corretora do banco para ações e CDB.
 - **Crypto**: comitê é agnóstico (escolhe por liquidez/segurança). Usuário
   decide exchange:
   - BTC/ETH/majors: Mercado Bitcoin, Binance BR, Bitso, Coinext
   - Alts de menor liquidez: Binance BR
   - DeFi yield (USDC/USDT/USDe): wallet própria (MetaMask) + Aave / Pendle /
     Spark / Lido / Morpho
-- **Exposição USD permitida**: stablecoins (USDC), GOLD11 (ouro B3),
-  Tesouro IPCA+ (proteção real local), fundos cambiais BR, DOL futuro B3.
-  **Não há stocks USA direto.**
+- **Exposição USD permitida**: stablecoins (USDC) via crypto. Não há
+  stocks USA direto.
 
 ## IMPORTANT
 - NEVER commit `.env` files ou expor secrets (inclui TELEGRAM_BOT_TOKEN)
@@ -141,8 +138,9 @@ sem Playwright.
   encadeado, e salva tudo) e MANUAL (backend só gera prompts p/ colar à mão).
   O orquestrador roda no `storage/agent_workspace/` (CLAUDE.md + MEMORY.md
   auto-carregados), via subprocess do `claude` com
-  `--dangerously-skip-permissions --effort max --model opus --output-format json`,
-  usando `--session-id` na 1ª etapa e `--resume` nas seguintes
+  `--dangerously-skip-permissions --effort max --model opus --output-format json`;
+  a 1ª etapa roda fresh e o `session_id` é capturado do JSON de saída, as
+  etapas seguintes usam `--resume <id>`
 - effort SEMPRE `max` no fluxo automático; agente tem carta branca e gerencia
   a própria memória em `storage/agent_workspace/MEMORY.md`
 - Trava de venda: `MIN_HOLDING_DAYS` (30) dias por LOTE vale só p/ AÇÕES e

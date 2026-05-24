@@ -18,23 +18,22 @@ manter/vender. CDB tem liquidez diária. Você só registra o que comprou.
 **Stack 100% local:** FastAPI + SQLite + Next.js + Telegram Bot API.
 Sem auth, sem nuvem.
 
-## Escopo de ativos
+## Mandato de ativos
 
-**Universo investível**: Brasil-resident + Crypto/DeFi
-- ✅ Ações B3 (large/mid/small)
-- ✅ FIIs (Tijolo, Papel, Híbrido, Logística, Shoppings, Hospitais, Agro)
-- ✅ Tesouro Direto BR (Selic, IPCA+, Pré, Renda+)
-- ✅ Debêntures (incentivadas, comuns), CRI, CRA, CDB, LCI, LCA, LF
-- ✅ Fundos BR (DI, RF, MM, Crédito, Cambial)
-- ✅ Crypto (BTC, ETH, alts L1/L2, DeFi, AI, RWA, Restaking, Memes)
-- ✅ DeFi yield (USDC/USDe via Aave/Pendle/Spark/Lido)
-- ✅ Hedges (GOLD11, USDC, NTN-B longa, fundos cambiais BR, DOL futuro)
+Três classes, **apenas** — o comitê não recomenda nada fora disso:
+- ✅ **Renda Fixa = 100% CDB** (preferência por CDB ≥100% do CDI). Liquidez
+  diária: é o *dry powder* que a revisão semanal pode girar para oportunidades.
+- ✅ **Ações = só equities listadas na B3** (large/mid/small).
+- ✅ **Crypto = agressivo** (BTC/ETH core + alts L1/L2, DeFi, AI, RWA — alto
+  upside com risco controlado).
 
-**Não incluso**:
-- ❌ Stocks USA direto (Avenue/Inter Invest/Nomad/Stake)
-- ❌ BDRs (AAPL34, MSFT34, etc.)
-- ❌ ETFs internacionais B3 (IVVB11, USTK11, NASD11, etc.)
-- ❌ REITs USA
+**Fora do mandato**:
+- ❌ Tesouro Direto, LCI/LCA, debêntures, CRI/CRA, fundos de renda fixa
+- ❌ FIIs, ETFs, BDRs
+- ❌ Ações, REITs ou stocks internacionais
+
+> O mandato é cravado como override de prioridade máxima no topo dos 3 prompts
+> do comitê e nas ordens permanentes do agente.
 
 ## Quick start
 
@@ -175,13 +174,13 @@ breadth
 ### Wealth Planning (R3)
 Bucket Strategy (immediate/intermediate/growth) · 4% Rule · Dynamic
 withdrawal · Sequence-of-returns risk mitigation · Holding analysis com
-breakeven · PGBL análise
+breakeven
 
 ### Tax Strategy (R3)
-Isenções breakdown (LCI/LCA + Deb. incent. + FII + R$ 20k ações +
-dividendos B3) · DARF projetado · Come-cotas alert · JCP vs Dividendo ·
-Tax-Loss Harvesting com Wash-Sale 30d · Reforma 2026 dividendos ·
-Tesouro IR regressivo
+CDB IR regressivo (22.5%→15%) · Isenção R$ 20k/mês em ações · Crypto:
+isenção até R$ 35k/mês em vendas · Dividendos B3 · JCP vs Dividendo ·
+Tax-Loss Harvesting com Wash-Sale 30d · DARF projetado · Reforma 2026
+dividendos
 
 ## Configuração
 
@@ -192,8 +191,12 @@ SQLITE_PATH=storage/portfolio.db
 TARGET_FIXED_INCOME=0.35
 TARGET_STOCKS=0.40
 TARGET_CRYPTO=0.25
-CONTRIBUTION_INTERVAL_DAYS=30
+MIN_HOLDING_DAYS=30        # trava de venda por lote (ações/crypto; CDB é líquido)
+AGENT_MODEL=opus
+AGENT_EFFORT=max
 COINGECKO_API_KEY=        # opcional (CoinGecko Pro)
+TELEGRAM_BOT_TOKEN=       # @BotFather — NUNCA commitar valor real
+TELEGRAM_CHAT_ID=         # preenchido por scripts/telegram_setup.py
 ```
 
 Reinicie o backend após editar.
@@ -204,15 +207,21 @@ Reinicie o backend após editar.
 app/
   agents_prompts/    # 3 templates Jinja2 (GS/MS-tier · 111k chars total)
   core/database.py   # SQLite + SQLModel
-  models/            # Asset, Contribution, ContributionPrompt
-  routers/           # portfolio, contributions, macro, cadence
-  services/          # portfolio, market_data, prompt_generator
+  models/            # Asset, Contribution, ContributionPrompt, Report
+  routers/           # portfolio, contributions, macro, cadence, reports
+  services/          # analysis_runner   → motor do agente (claude headless)
+                     # review_service    → revisão semanal + maturidade
+                     # telegram_service  → cliente + formatação Telegram
+                     # notification_service, contribution_service
+                     # prompt_generator, market_data_service, portfolio_service
+scripts/             # run_analysis · weekly_review · check_cadence
+                     # telegram_bot · telegram_setup · install_cron
 frontend/
   src/app/(dashboard)/
     page.tsx            # dashboard + widget último aporte
-    aporte/             # fluxo de aporte (auto-run)
-    ativos/             # CRUD carteira
-    relatorios/         # histórico
+    aporte/             # fluxo de aporte (auto-run, etapa por etapa)
+    ativos/             # CRUD carteira (lotes)
+    relatorios/         # histórico de aportes + relatórios do agente
     configuracoes/      # leitura do .env
 ```
 
