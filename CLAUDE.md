@@ -25,7 +25,7 @@ concluir, manda a recomendação no **Telegram**; quando um lote de ação/crypt
 completa 30 dias, um cron roda a análise de maturidade. Aporte é ad-hoc.
 
 ### Ciclos e mandato (2026-05)
-- **Aporte (ad-hoc)**: 3 prompts encadeados + fechamento → folha de ordens.
+- **Aporte (ad-hoc)**: 5 etapas encadeadas + fechamento → folha de ordens.
 - **Revisão semanal (7d)**: comitê analisa macro + desempenho das posições +
   maturidade → `Report(weekly)` salvo + Telegram; injetado como consulta nos
   aportes (`analysis_runner._latest_weekly_context`).
@@ -104,7 +104,7 @@ sem Playwright.
 
 ## Architecture
 - `/app`: FastAPI backend
-  - `agents_prompts/`: 3 templates Jinja2 (super prompts GS/MS-tier)
+  - `agents_prompts/`: 5 templates Jinja2 (macro · seleção · DD ações · DD crypto · decisão)
   - `core/database.py`: SQLite + SQLModel
   - `models/`: Asset, Contribution, ContributionPrompt, Report (weekly/maturity)
   - `routers/`: portfolio, contributions, macro, cadence, reports
@@ -184,51 +184,51 @@ sem Playwright.
 - Commits em inglês, Conventional Commits (feat:, fix:, chore:, refactor:)
 - NEVER mencionar Claude em commits, código ou co-author tags
 
-## Os 3 prompts (3 classes: CDB · Ações B3 · Crypto)
+## As 5 etapas (3 classes: CDB · Ações B3 · Crypto)
 
-Mandato NATIVO: todo o universo analisado é CDB, Ações B3 e Crypto. Nenhum
-prompt analisa/cita Tesouro, LCI/LCA, debênture, CRI/CRA, fundo, FII, ETF
-(GOLD11/BOVA11/IVVB11), BDR, ouro, DOL ou internacional (só aparecem em
-linhas de veto). Schema JSON `version=5.0`, `escopo=BR_3_classes_cdb_acoesB3_crypto`.
-Os campos de R1 (`final_tactical_brl`, `juros_e_cdb`, etc.) são lidos por R2/R3.
+Mandato NATIVO: todo o universo analisado é CDB, Ações B3 e Crypto (fora do
+escopo só em linhas de veto). Schema JSON `version=5.0`,
+`escopo=BR_3_classes_cdb_acoesB3_crypto`. As etapas rodam encadeadas numa única
+sessão; cada uma lê o JSON das anteriores. A pesquisa foi **SPLITADA** (seleção →
+DD ações → DD crypto, 2026-05-24) para cada nome receber um turno dedicado de DD
+profunda — resolve o gargalo de output da antiga reunião única de research.
+Templates em `app/agents_prompts/` (01_macro_strategy, 02_research_selection,
+03_equity_diligence, 04_crypto_diligence, 05_decision_orders); mapeados em
+`prompt_generator._PROMPT_DEFINITIONS`; `PromptKey` =
+macro/selection/equity_diligence/crypto_diligence/decision.
 
-### Reunião nº 1 (GIC) — Macro · Alocação Tática
-12 personas (Helena macro BR, Marcus global, Bruno alocação, Ricardo setor
-B3, Aline crypto, Henrique CDB & rates, Mateus quant, Tiago CRO, Cláudia
-tax, Diogo ESG, Felipe special situations, Júlia secretary).
+### Reunião nº 1 — Macro · Alocação Tática (GIC)
+12 personas. 11 rounds: Top of Mind → macro BR → macro global → juros & CDB
+(curva DI como SINAL de CDI; FGC) → setor B3 + style tilts → crypto on-chain →
+risk frame + Black-Litterman (3 buckets) → ESG/special sit → tax → behavioral →
+decisão tactical (BL+RP+HRP) → pre-mortem. Saída: `final_tactical_brl`
+(cdb/acoes_b3/crypto), `juros_e_cdb`, `setores_b3`, `digital_assets`.
 
-11 rounds: Top of Mind → macro BR → macro global → **juros & estratégia de
-CDB** (curva DI como SINAL de CDI; FGC; crédito bancário) → setor B3 + style
-tilts → crypto on-chain → risk frame + Black-Litterman (3 buckets) → ESG +
-special sit → tax overlay → behavioral → decisão tactical (BL + RP + HRP) →
-pre-mortem. Buckets = cdb / acoes_b3 / crypto. Defesa = CDB líquido (dry
-powder) + USDC (sem ouro/ETF/DOL).
+### Reunião nº 2 — Universo, Filtros e Seleção (+ CDB final)
+12 personas + 2 vetos. Universo → long lists → filtros (quant + forense preview)
+→ **SELEÇÃO** (5-8 ações + 3-5 cryptos, com sizing-alvo) → **CDB final** com
+credit analysis. Saída: `selecao_acoes_b3`, `selecao_crypto`, `shortlist_cdb`
+(valor_brl + credit do emissor), `sanidade_selecao`. NÃO escreve o memo final.
 
-### Reunião nº 2 (Equity & Crypto Research + CDB Credit)
-12 personas + 2 vetos (Lucas head equity, 4 analysts setoriais, Sophia
-behavioral/multi-asset, Rafael crypto on-chain, Henrique CDB credit, Anderson
-CMT, Vera CFE forensic, Felipe special sit, Júlia quant; vetos Tiago CRO +
-Diogo ESG).
+### Reunião nº 3 — Due Diligence de Ações B3
+Equity desk. Memo COMPLETO por ação de `selecao_acoes_b3`: thesis + valuation
+triangulada (DCF 3-stage/Reverse/CCA/Precedent/LBO/SOTP) + forense (Piotroski/
+Altman/Beneish/Sloan/Dechow) + Capital Allocation + técnica + factor + bull/base/
+bear. Saída: `shortlist_acoes_b3` (objeto completo por nome) + pair_trades. Pode
+usar subagentes (Task) por ticker (memo em ./dd/), best-effort.
 
-6 rounds densos. **Ações B3**: investment thesis + valuation triangulada (DCF
-3-stage + Reverse DCF + CCA + Precedent + LBO + SOTP) + forensic (Piotroski/
-Altman/Beneish/Sloan/Dechow) + Capital Allocation + Earnings Quality + técnica
-institucional + factor exposure + bull/base/bear ≥ 2:1 + conviction. **Crypto**:
-on-chain Glassnode-tier + derivatives (Coinglass) + tokenomics/unlocks + dev
-activity. **CDB**: credit analysis do banco emissor (Basel III Tier 1, NPL,
-ROE, rating), %CDI pós-IR, cobertura FGC R$ 250k.
+### Reunião nº 4 — Due Diligence de Crypto
+Crypto desk. Memo COMPLETO por cripto de `selecao_crypto`: tese + tokenomics/
+unlocks + on-chain (MVRV-Z/NUPL/SOPR/…) + derivativos (Coinglass) + dev activity
++ bull/base/bear. Saída: `shortlist_crypto`. BTC+ETH ≥ 50%. Subagentes por nome
+(best-effort).
 
-### Reunião nº 3 (Investment Committee Final)
-14 personas (Otávio CIO, Tiago CRO, Mateus quant, Sofia sentiment, Daniel
-trader, Henrique CDB, Cláudia tax, Alexandre compliance, Anderson CMT, Felipe
-special sit, Vera forensic, Júlia validator, Diogo ESG, Edson wealth).
-
-14 rounds: risk overlay (VaR + CVaR + EVT + CDaR + Marginal/Component VaR; CDB
-por risco de crédito/FGC) → stress 8 cenários (incl. **evento de crédito
-bancário**) → sentiment + IV/RV → **CDB final** → tax (CDB IR regr + 20k ações
-+ 35k crypto + PGBL + holding + harvesting) → pair trades + options → compliance
-→ behavioral 9 biases → cross-check CIO → execution → folha de ordens →
-monitoramento → resumo executivo. Bolso ∈ {cdb, acoes_b3, crypto}.
+### Reunião nº 5 — Investment Committee Final
+14 personas. 14 rounds: risk overlay (VaR/CVaR/EVT/CDaR/Component VaR) → stress 8
+cenários (incl. **evento de crédito bancário**) → sentiment + IV/RV → confirma
+CDB (vindo da R2) → tax → pair trades + options → compliance → behavioral →
+cross-check CIO → execution → folha de ordens → monitoramento → resumo. Bolso ∈
+{cdb, acoes_b3, crypto}.
 
 **Folha de ordens SEM coluna plataforma** — cliente decide onde executar.
 

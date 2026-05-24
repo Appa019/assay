@@ -30,32 +30,54 @@ _PROMPT_DEFINITIONS = [
         "title": "Reunião nº 1 — Macro, Setores e Alocação Tática",
         "description": (
             "Comitê multipersona (economista-chefe, estrategista global, alocação, setorial B3, "
-            "crypto, risco, quant) define tese macro Brasil + Global, mapa setorial, narrativas crypto, "
-            "matriz de risco e a alocação tática do aporte (% e R$ por classe)."
+            "crypto on-chain, CDB/juros, quant, risco) define tese macro Brasil + Global, mapa "
+            "setorial, narrativas crypto, Black-Litterman e a alocação tática do aporte por classe "
+            "(CDB / Ações B3 / Crypto)."
         ),
     },
     {
         "order": 2,
-        "key": PromptKey.RESEARCH,
-        "template": "02_research_diligence.j2",
-        "title": "Reunião nº 2 — Screening e Due Diligence Profunda",
+        "key": PromptKey.SELECTION,
+        "template": "02_research_selection.j2",
+        "title": "Reunião nº 2 — Universo, Filtros e Seleção",
         "description": (
-            "Time de Equity Research (cíclicos / defensivos / commodities / small caps), Crypto Research e CDB "
-            "Credit valida tickers e emissores, filtra universo, faz deep due diligence em ações B3 + crypto "
-            "(fundamentos, valuation, tokenomics) e analisa o crédito do banco emissor do CDB (Basel III, FGC, "
-            "%CDI), com position sizing por ativo."
+            "Define o universo investível, monta long lists, aplica filtros (quant + forense + "
+            "técnico) e SELECIONA a shortlist (5-8 ações B3 + 3-5 cryptos). Finaliza a fatia de CDB "
+            "com credit analysis do banco emissor (Basel III, FGC, %CDI pós-IR)."
         ),
     },
     {
         "order": 3,
-        "key": PromptKey.DECISION,
-        "template": "03_decision_orders.j2",
-        "title": "Reunião nº 3 — Risco, Sentimento e Ordens Finais",
+        "key": PromptKey.EQUITY,
+        "template": "03_equity_diligence.j2",
+        "title": "Reunião nº 3 — Due Diligence de Ações B3",
         "description": (
-            "CIO + CRO + Head of Sentiment + Trader Sênior validam a shortlist contra risco e sentimento, "
-            "materializam a fatia de Renda Fixa em CDBs (banco emissor, %CDI, FGC) e geram a folha de ordens "
-            "executiva: ticker, qtd, preço alvo, stop, target 31d/90d, algoritmo de execução (VWAP/TWAP/POV/"
-            "Limit) — pronto para o cliente operar."
+            "Memo completo por ação selecionada: investment thesis, valuation triangulada "
+            "(DCF 3-estágios + Reverse DCF + CCA + Precedent + LBO + SOTP), forense "
+            "(Piotroski/Altman/Beneish/Sloan/Dechow), Capital Allocation, técnica institucional, "
+            "factor exposure, bull/base/bear e sizing."
+        ),
+    },
+    {
+        "order": 4,
+        "key": PromptKey.CRYPTO,
+        "template": "04_crypto_diligence.j2",
+        "title": "Reunião nº 4 — Due Diligence de Crypto",
+        "description": (
+            "Memo completo por cripto selecionada: tese, tokenomics + unlocks, on-chain "
+            "institucional (MVRV-Z/NUPL/SOPR/…), derivativos (Coinglass), dev activity, técnica, "
+            "bull/base/bear e sizing."
+        ),
+    },
+    {
+        "order": 5,
+        "key": PromptKey.DECISION,
+        "template": "05_decision_orders.j2",
+        "title": "Reunião nº 5 — Risco, Sentimento e Ordens Finais",
+        "description": (
+            "CIO + CRO + Sentiment + Trader validam a shortlist contra risco (VaR/CVaR/EVT), "
+            "stress 8 cenários, sentimento e imposto; materializam o CDB e geram a folha de ordens "
+            "executiva (ticker, qtd, preço-alvo, stop, targets, algoritmo) pronta para operar."
         ),
     },
 ]

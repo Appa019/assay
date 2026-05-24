@@ -1,0 +1,197 @@
+═══════════════════════════════════════════════════════════════════════════════
+DUE DILIGENCE DE AÇÕES B3 · REUNIÃO Nº 3 DE 5
+TIER: GS GIR INVESTMENT MEMO + MS EQUITY RESEARCH + BUFFETT-MUNGER + GREENBLATT
+PADRÃO: WORLD-CLASS · NO COMPROMISE · UM MEMO COMPLETO POR NOME
+MANDATO: AÇÕES = SÓ EQUITIES DA B3 (parte de um mandato de 3 classes)
+═══════════════════════════════════════════════════════════════════════════════
+
+# CONTINUIDADE
+
+Mesma sessão. A Reunião nº 2 já SELECIONOU as ações finalistas (`selecao_acoes_b3`,
+com motivo e sizing-alvo). Agora é a **due diligence profunda de CADA ação
+selecionada** — o memo de investimento no nível Goldman GIR / MS Initiating
+Coverage. Crypto e CDB são tratados em outras etapas; **aqui é só Ações B3**.
+
+> **Releia da R2 o array `selecao_acoes_b3`**: são EXATAMENTE esses tickers que
+> recebem o memo completo abaixo. Não inclua nomes que não foram selecionados; se
+> achar que faltou um nome essencial, justifique e só então adicione.
+
+> **Escopo:** só equities listadas na B3 (ON/PN/UNIT). NADA de FII/ETF/BDR/
+> Tesouro/fundos/internacional.
+
+## CAST (equity desk)
+
+Lucas Andrade (Head), Mariana Otani (cíclicos), Pedro Vasconcelos (defensivos),
+Camila Fukui (commodities), Felipe Tanaka (small/mid), Sophia Brandt (factor),
+**Dr.ª Vera Cavalcante, CFE** (forense), **Anderson Pires, CMT** (técnica),
+Felipe Cordeiro (special situations / pair trades), Júlia Reis (valida DCF/CCA),
+e veto de Tiago Ribeiro (CRO) + Diogo Almeida (ESG).
+
+---
+
+# FERRAMENTAS
+
+| Capacidade | Onde |
+|---|---|
+| **Fundamentos** | `fundamentus.com.br/detalhes.php?papel=XXXX`, `statusinvest.com.br/acoes/XXXX`, `investidor10.com.br/acoes/xxxx/`, Economatica via WebSearch |
+| **Técnico** | `br.tradingview.com/symbols/BMFBOVESPA-XXXX/`, `br.investing.com/equities/<slug>-technical` |
+| **Earnings call** | WebSearch `"<TICKER> teleconferência resultados 3T 4T 2025"` → IR, Suno, MZ |
+| **CVM filings** | `siteempresas.b3.com.br/`, `cvm.gov.br/sistemas/dwcompanhias/` |
+| **Consenso sell-side** | WebSearch `"<TICKER> preço-alvo BTG XP UBS Itaú BBA Bradesco BBI 2026"` |
+| **Insider (Form-B)** | `siteempresas.b3.com.br/Form-B-CVM`, Suno Insider |
+
+`Bash` para 3-stage DCF, reverse DCF, F/Z/M-Score, Sloan accruals, sizing Kelly.
+MCPs: sequential-thinking, fetch, playwright (TradingView/IR JS), context7, memory.
+
+> **PROFUNDIDADE POR NOME (recomendado):** se a ferramenta **Task** estiver
+> disponível, despache **um subagente por ticker** — cada um faz o memo completo,
+> grava em `./dd/{{ contribution_id }}_<TICKER>.md` e retorna os números-chave;
+> depois VOCÊ lê todos os memos e consolida o JSON. Isso dá orçamento total de
+> análise a cada nome. Se Task não estiver disponível, faça os memos
+> sequencialmente nesta etapa, sem comprimir. (Ao retomar, pule tickers cujo
+> arquivo de memo já existe.)
+
+---
+
+# PROCESSO — MEMO COMPLETO PARA CADA AÇÃO SELECIONADA
+
+Para **CADA** ação de `selecao_acoes_b3`, produza um **memo 1-2 páginas**:
+
+1. **Investment Thesis (3 frases GS-style)**: (1) tese fundamental; (2) catalyst path 31d (data + evento); (3) por que o mercado errou (consensus miss / under-pricing)
+2. **Identidade**: ticker, nome, CNPJ, segmento, controlador, free float
+3. **Fundamentos 12m**: Receita + CAGR 3y/5y · EBITDA + margem · Lucro + margem · ROE 12m + 3y · **ROIC + WACC + Economic Profit (EVA) bps** · Dív. líq/EBITDA, Net Debt/Equity, Current/Quick · FCF + FCF yield + trend · **Owner Earnings** · Payout, dividend coverage
+4. **Valuation Triangulada**: (A) P/E fwd vs setor · (B) EV/EBITDA vs setor · (C) EV/Sales · (D) P/B · (E) DY 12m+24m fwd · (F) **Preço-alvo consenso analyst-by-analyst** (XP, BTG, UBS BB, Itaú BBA, Bradesco BBI, GS, MS, JPM) média+range+fontes · (G) Implied upside · (H) **Reverse DCF** (implied growth) · (I) **3-stage DCF** (Júlia via Bash): stage1 1-5y, stage2 6-10y fade, stage3 perpetuity g=2-3% → fair value + sensitivity (WACC×g) · (J) **CCA** peers 3-5 + justified P/E · (K) **Precedent Transactions** · (L) **SOTP** se conglomerado · (M) **LBO check** 5-7× EBITDA
+5. **Forensic (Vera)**: Piotroski X/9 + breakdown · Altman Z + zona · Beneish M + flag · Sloan accruals % · Dechow · Earnings Quality H/M/L
+6. **Capital Allocation Scorecard** (Buffett-Munger) preenchido
+7. **Earnings Quality detail** preenchido
+8. **Histórico 5y**: CAGR receita/lucro/dividend, max DD, Sharpe 5y
+9. **Moat** (3 bullets: escala, custo, marca, regulatório, switching cost, network, intangíveis)
+10. **Catalyst path 31d** com datas: earnings, buyback/dividendo/JCP ex-date, sector catalysts
+11. **Riscos idiosincráticos top 3** com magnitude
+12. **Factor Exposure** (Sophia): Value (P/E·P/B percentil setor 5y) · Growth (CAGR 3y) · Quality (ROE 3y, margem CV, F-Score) · Momentum (12m-1m, 6m-1m) · Low Vol (90d) · Size (log MC)
+13. **Pair Trade Hypothesis (Felipe)**: Long X / Short Y?
+14. **Earnings Call Last Quote**: 1-2 frases CEO/CFO + tom + guidance
+15. **Special Situations (Felipe)**: M&A, tender, spinoff, activist, buyback, JCP windows
+16. **Technical institucional (Anderson)**: Wyckoff phase · Volume Profile (POC/VAH/VAL) · Ichimoku · Bollinger · Elliott · EMA 20/50/200 · RSI 14d daily+weekly · MACD · ADX · Fib 38/50/61 · 3 suportes + 3 resistências (R$) · VWAP semanal+mensal
+17. **Bull/Base/Bear 31d**: tabela (preço, prob, driver), Σ probs=100%, **Asymmetry** = (Bull−Atual)/(Atual−Bear) ≥ 2:1
+18. **Stop loss técnico (R$)** + **Target 90d** + **Target 12m**
+19. **Position sizing %** do bolso de ações (ancore no `sizing_alvo_pct_acoes` da R2; refine com convicção)
+20. **Conviction tier** HIGH (8-10) / MEDIUM (5-7) / LOW (3-4) + **ESG flag** verde/amarelo/vermelho
+
+## CROSS-CHECK (Júlia + Tiago + Diogo + Felipe)
+- Σ `position_sizing_pct_acoes` = 100 · nenhum setor > 50% · top 3 nomes ≤ 60%
+- Forense: ninguém com F < 4, Z < 1.81, M > -2.22 sem justificativa explícita
+- Asymmetry média ponderada (por sizing) ≥ 1.5:1 · ESG vermelho vetado pelo Diogo
+- Liquidez: ADTV sai em 1 sessão s/ mover preço > 1% · overlap com a carteira atual (nome a nome)
+- Σ R$ ≈ fatia de ações da R1 (`final_tactical_brl.acoes_b3`)
+
+---
+
+# OUTPUT FINAL — FORMATO OBRIGATÓRIO
+
+Markdown (os memos) + **JSON validável** entre ` ```json ` e ` ``` `:
+
+```json
+{
+  "schema_version": "5.0",
+  "escopo": "BR_3_classes_cdb_acoesB3_crypto",
+  "etapa": "equity_diligence",
+  "shortlist_acoes_b3": [
+    {
+      "ticker": "", "nome": "", "setor": "", "cnpj": "", "controlador": "",
+      "free_float_pct": 0, "mc_atual_brl_bi": 0, "investment_thesis_3_frases": "",
+      "fundamentos": {
+        "receita_12m_brl_bi": 0, "receita_cagr_3y_pct": 0, "ebitda_margin_pct": 0,
+        "lucro_liquido_brl_bi": 0, "lucro_margem_pct": 0, "roe_pct": 0, "roe_3y_avg_pct": 0,
+        "roic_pct": 0, "wacc_pct": 0, "economic_profit_eva_bps": 0,
+        "divida_liquida_ebitda": 0, "net_debt_equity": 0, "current_ratio": 0,
+        "fcf_brl_bi": 0, "fcf_yield_pct": 0, "owner_earnings_brl_bi": 0,
+        "payout_pct": 0, "dividend_coverage": 0
+      },
+      "valuation": {
+        "pe_fwd": 0, "pe_setor": 0, "ev_ebitda": 0, "ev_ebitda_setor": 0, "ev_sales": 0,
+        "pb": 0, "dy_12m_pct": 0, "dy_24m_fwd_pct": 0, "preco_alvo_consenso_brl": 0,
+        "consenso_range_brl": [0, 0],
+        "consenso_analistas": [{"analista": "", "preco_alvo_brl": 0, "data": ""}],
+        "upside_pct": 0, "reverse_dcf_implied_growth_5y_pct": 0,
+        "dcf_3_stage_fair_value_brl": 0, "dcf_sensitivity": {}, "cca_peers": [],
+        "cca_justified_pe": 0, "precedent_transactions": [], "sotp_breakdown": [],
+        "lbo_check_viable_5_7x_ebitda": false
+      },
+      "forensic": {
+        "piotroski_f_score": 0, "piotroski_breakdown": {}, "altman_z_score": 0,
+        "altman_zone": "safe|grey|distress", "beneish_m_score": 0, "beneish_flag": false,
+        "sloan_accruals_ratio_pct": 0, "dechow_f_score": 0, "earnings_quality": "high|medium|low"
+      },
+      "capital_allocation_scorecard": {
+        "ma_track_5y": "criou|destruiu|neutro",
+        "buyback_discipline": "comprou_baixa|comprou_alta|sem_buyback",
+        "capex_efficiency_marginal_roic_vs_wacc": "above|below|equal",
+        "dividend_policy_consistency": "consistente|erratica",
+        "cash_balance": "saudavel|excessivo|faltante"
+      },
+      "earnings_quality_detail": {
+        "cash_conversion_ratio": 0, "accruals_pct_ativos": 0, "non_recurring_items_12m": [],
+        "sbc_pct_receita": 0, "goodwill_pct_ativos": 0, "tax_rate_efetiva_pct": 0,
+        "working_capital_trend": "estavel|degradando|melhorando"
+      },
+      "historico_5y": {"receita_cagr_pct": 0, "lucro_cagr_pct": 0, "dividend_cagr_pct": 0,
+                        "max_dd_pct": 0, "sharpe_5y": 0},
+      "moat": [],
+      "catalyst_path_31d": [{"data": "", "evento": "", "expectativa": ""}],
+      "riscos_idiosincraticos_top3": [],
+      "factor_exposure": {"value_percentil_setor_5y": 0, "growth_cagr_3y_pct": 0,
+                           "quality_roe_3y_pct": 0, "quality_f_score": 0,
+                           "momentum_12m_1m_pct": 0, "lowvol_90d_annualized_pct": 0, "size_log_mc": 0},
+      "pair_trade_hypothesis": "",
+      "earnings_call_last_quote": "", "earnings_call_tone": "confidente|cauteloso|alarmado",
+      "guidance_status": "reafirmada|elevada|reduzida",
+      "special_situations": {"ma_em_processo": false, "tender_offer": false, "spinoff": false,
+                              "activist_presente": "", "buyback_programa_ativo_brl": 0},
+      "tecnica": {
+        "wyckoff_phase": "", "volume_profile_poc_brl": 0,
+        "value_area_high_brl": 0, "value_area_low_brl": 0,
+        "ichimoku_kumo_position": "above|inside|below", "bollinger": "squeeze|expansion|breakout|none",
+        "elliott_wave": "", "ema_20_50_200_alignment": "", "rsi_14d_daily": 0, "rsi_weekly": 0,
+        "macd_histogram_direcao": "", "adx": 0, "suportes_brl": [], "resistencias_brl": [],
+        "vwap_semanal_brl": 0, "vwap_mensal_brl": 0
+      },
+      "bull_base_bear_31d": {
+        "bull_price_brl": 0, "bull_prob_pct": 0, "bull_driver": "",
+        "base_price_brl": 0, "base_prob_pct": 0, "base_driver": "",
+        "bear_price_brl": 0, "bear_prob_pct": 0, "bear_driver": "", "asymmetry_ratio": 0
+      },
+      "stop_loss_brl": 0, "target_90d_brl": 0, "target_12m_brl": 0,
+      "position_sizing_pct_acoes": 0, "conviction_tier": "HIGH|MEDIUM|LOW", "conviction_0_10": 0,
+      "esg_flag": "verde|amarelo|vermelho", "fontes": []
+    }
+  ],
+  "pair_trades_sugeridos": [
+    {"long": "", "short": "", "tese": "", "beta_neutralizado": true,
+     "stop_agregado_brl": 0, "target_spread_pct": 0}
+  ],
+  "sanidade_acoes": {
+    "soma_position_sizing_100": true, "max_setor_pct": 0, "top3_nomes_pct": 0,
+    "asymmetry_media_ponderada": 0, "forensic_minimo_aplicado": true,
+    "esg_red_flags": [], "overlap_carteira_atual": [],
+    "soma_brl_vs_fatia_acoes_r1_ok": true, "nenhuma_recomendacao_fora_do_mandato": true
+  }
+}
+```
+
+> **VALIDAÇÕES OBRIGATÓRIAS:**
+>
+> 1. ✓ Um item em `shortlist_acoes_b3` para CADA ação de `selecao_acoes_b3` (sem comprimir)
+> 2. ✓ Cada ação: F-Score, Z-Score, M-Score, Sloan, Dechow numéricos + Capital Allocation + Earnings Quality
+> 3. ✓ Cada ação: Reverse DCF + 3-stage DCF (fair value) + CCA peers ≥ 3 · técnica COMPLETA (não vazia)
+> 4. ✓ Cada ação: Bull/Base/Bear probs = 100% + asymmetry numérico
+> 5. ✓ Σ `position_sizing_pct_acoes` = 100 · nenhum setor > 50% · asymmetry média ≥ 1.5:1
+> 6. ✓ Forense: ninguém com F < 4 / Z < 1.81 / M > -2.22 sem justificativa
+> 7. ✓ ≥ 12 fontes verificáveis distintas (URL + data)
+> 8. ✓ **`nenhuma_recomendacao_fora_do_mandato=true`** — só equities da B3
+
+---
+
+**Memo no nível Goldman GIR / MS Initiating Coverage, com lente Buffett-Munger.
+Cada ação selecionada merece um memo COMPLETO — sem compressão. A Reunião nº 4
+fará o mesmo com as cryptos; a nº 5 junta tudo, aplica risco e gera as ordens.**

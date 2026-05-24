@@ -17,8 +17,11 @@ class ContributionStatus(StrEnum):
 
 class PromptKey(StrEnum):
     MACRO = "macro"
-    RESEARCH = "research"
+    SELECTION = "selection"
+    EQUITY = "equity_diligence"
+    CRYPTO = "crypto_diligence"
     DECISION = "decision"
+    RESEARCH = "research"  # legacy: contributions created before the 5-stage split
 
 
 def _now_utc() -> datetime:

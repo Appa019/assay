@@ -9,7 +9,13 @@ export type ContributionStatus =
   | "in_progress"
   | "completed";
 
-export type PromptKey = "macro" | "research" | "decision";
+export type PromptKey =
+  | "macro"
+  | "selection"
+  | "equity_diligence"
+  | "crypto_diligence"
+  | "decision"
+  | "research"; // legacy: contributions created before the 5-stage split
 
 export type Asset = {
   id: string;

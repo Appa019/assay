@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════════════════
-INVESTMENT COMMITTEE FINAL · REUNIÃO Nº 3 DE 3
+INVESTMENT COMMITTEE FINAL · REUNIÃO Nº 5 DE 5
 TIER: GS PORTFOLIO STRATEGY + MS GIC + AQR CIO DESK
 PADRÃO: WORLD-CLASS · NO COMPROMISE
 MANDATO: 3 CLASSES — RENDA FIXA = CDB · AÇÕES = SÓ B3 · CRYPTO (AGRESSIVO)
@@ -8,12 +8,13 @@ TEMA: RISK · SENTIMENT · TAX · STRESS · OPTIONS · ORDENS
 
 # CONTINUIDADE
 
-Terceiro round. Já temos:
+Etapa final. Já temos, na mesma sessão encadeada:
 - **Reunião nº 1 (GIC)**: Top of Mind + tese macro + BL tilts + tactical
   allocation (3 bolsos) + tax overlay + pre-mortem
-- **Reunião nº 2 (Research)**: shortlist por bolso (ações B3, crypto, CDB) com
-  investment thesis + valuation triangulada + forensic + on-chain + credit
-  analysis do banco emissor + bull/base/bear + asymmetry + conviction
+- **Reunião nº 2 (Seleção)**: shortlist selecionada (`selecao_acoes_b3`,
+  `selecao_crypto`) + **CDB final** (`shortlist_cdb`, com credit analysis)
+- **Reunião nº 3 (DD Ações)**: `shortlist_acoes_b3` — memo completo por ação
+- **Reunião nº 4 (DD Crypto)**: `shortlist_crypto` — memo completo por cripto
 
 > ## MANDATO (a TOTALIDADE do universo — a folha de ordens DEVE respeitá-lo)
 > Três classes APENAS: **(1) Renda Fixa = 100% CDB** (≥100% CDI, FGC R$ 250k/
@@ -59,11 +60,13 @@ Agora o **Investment Committee Final** (CIO desk) executa:
 
 # RECAP OBRIGATÓRIO
 
-Releia JSONs R1 + R2 (linha a linha):
+Releia os JSONs das etapas anteriores (linha a linha):
 1. **R1**: `alocacao_tatica_aporte.final_tactical_brl` (cdb/acoes_b3/crypto) + BL tilts + `top_of_mind` + `juros_e_cdb.cdb_postura` + `pre_mortem_gic.fator_risco_dominante`
-2. **R2**: `shortlist_acoes_b3`, `shortlist_crypto`, `shortlist_cdb` com `position_sizing`/`valor_brl`, asymmetry, bull/base/bear, forensic, credit do emissor
+2. **R2 (Seleção)**: `shortlist_cdb` (com `valor_brl` + credit do emissor) + `selecao_*` com sizing-alvo
+3. **R3 (DD Ações)**: `shortlist_acoes_b3` com `position_sizing_pct_acoes`, asymmetry, bull/base/bear, forensic
+4. **R4 (DD Crypto)**: `shortlist_crypto` com `position_sizing_pct_crypto`, asymmetry, on-chain
 
-Inconsistências → **reconcilie**. NÃO sobrescreva R1 — refine.
+Inconsistências → **reconcilie**. NÃO sobrescreva as etapas anteriores — refine.
 
 ---
 
@@ -184,20 +187,14 @@ Para top 5 ações B3 com opções líquidas:
 **Decision tree**: Covered Call (long + IV>RV×1.2) · Protective Put (conviction HIGH + evento binário) ·
 Collar (zero-cost hedge) · Cash-Secured Put (entry barato) · Vertical/Calendar/Diagonal/Iron Condor conforme vol.
 
-## ROUND 5 — Renda Fixa Final = CDB (Henrique + Daniel)
+## ROUND 5 — Renda Fixa = CDB (Henrique + Daniel) — confirmar a R2
 
-Materialize a fatia de RF da R1/R2 em **CDBs específicos** (sem Tesouro/deb/fundos):
-
-### Para cada CDB
-- **Emissor (banco)** + tipo (grande/médio) + rating
-- **%CDI** + equivalente pós-IR por prazo · **prêmio de crédito** vs CDB de grande banco
-- **Liquidez**: diária (dry powder) ou no vencimento · **Vencimento + carência**
-- **Cobertura FGC**: valor ≤ R$ 250k por instituição/CPF (some exposições no mesmo banco)
-- **Saúde do emissor**: Basileia Tier 1, ROE, inadimplência (NPL), evolução de capital
-- **Valor R$** + **papel na carteira** (dry powder de liquidez vs carry de prazo) + razão
-
-> Mantenha um colchão de **liquidez diária** (~100-103% CDI) como dry powder para
-> a revisão semanal poder rotacionar para ação/crypto quando houver oportunidade.
+A fatia de CDB **já foi materializada na Reunião nº 2** (`shortlist_cdb`: emissor,
+%CDI, FGC, credit analysis). Aqui apenas **confirme e ajuste**, replicando em `cdb_final`:
+- Revalide **cobertura FGC** (≤ R$ 250k por instituição, somando exposições no mesmo banco) e o **risco de crédito** do emissor (Basileia Tier 1, ROE, NPL).
+- Se o risk overlay (Round 1) vetar um emissor, **troque** por outro da long list da R2.
+- Garanta um colchão de **liquidez diária** (~100-103% CDI) como dry powder para a revisão semanal poder rotacionar para ação/crypto.
+- Calcule o rendimento líquido **pós-IR** por papel.
 
 ## ROUND 6 — Tax Strategy Máxima (Cláudia + Edson) — 3 classes
 
@@ -229,7 +226,7 @@ Materialize a fatia de RF da R1/R2 em **CDBs específicos** (sem Tesouro/deb/fun
 
 ## ROUND 7 — Pair Trades & Options Overlays (Felipe + Daniel)
 
-### 7.1 Pair trades (vindo R2) — só B3 e crypto
+### 7.1 Pair trades (vindos da R3/R4 — DD) — só B3 e crypto
 Exemplos: Long ITUB4 / Short BBAS3 (privado vs estatal) · Long PETR4 / Short VALE3 (petróleo vs minério) ·
 Long BTC / Short ETH (regime BTC season). Tese (relative value) · beta neutralizado · stop · target spread %.
 
@@ -267,7 +264,7 @@ Por posição candidata: strategy · strike(s) + vencimento + premium R$ · Gree
 
 Tabela consolidada **por candidato** (ações + crypto):
 
-| Ativo | Sizing R2 % | Risk Score | Sentiment Score | Stress max loss % | Asymmetry | Component VaR % | Sizing Final % | Veto? |
+| Ativo | Sizing DD % | Risk Score | Sentiment Score | Stress max loss % | Asymmetry | Component VaR % | Sizing Final % | Veto? |
 
 ### Regra de ajuste
 - **+25% relativo**: Risk ≤ 4 AND Sentiment ≥ 7 AND Stress max loss < 5% pat AND Asymmetry ≥ 2.5:1 AND Component VaR < 15%

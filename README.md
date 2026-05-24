@@ -15,7 +15,7 @@
 
 Você informa quanto vai aportar. Um agente autônomo convoca uma **mesa de
 investimentos** (estilo Goldman Sachs GIR + Morgan Stanley GIC + Bridgewater +
-AQR), pesquisa o mercado ao vivo, debate em três reuniões encadeadas e devolve
+AQR), pesquisa o mercado ao vivo, debate em cinco etapas encadeadas e devolve
 **onde investir e quanto** — direto no seu Telegram. Você só registra o que comprou.
 
 O universo é restrito a **três classes**: CDB, ações da B3 e crypto. Tudo roda
@@ -31,7 +31,7 @@ local (FastAPI + SQLite + Next.js); nada de nuvem, login ou banco externo.
 - [Uso no dia a dia](#uso-no-dia-a-dia)
 - [Ciclos e automação](#ciclos-e-automação)
 - [Autonomia do agente](#autonomia-do-agente)
-- [Os 3 prompts](#os-3-prompts)
+- [As 5 etapas](#as-5-etapas)
 - [Configuração](#configuração)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Comandos úteis](#comandos-úteis)
@@ -45,14 +45,16 @@ local (FastAPI + SQLite + Next.js); nada de nuvem, login ou banco externo.
 ```mermaid
 flowchart LR
     A["Aporte em R$"] --> B["Snapshot de mercado<br/>BCB · Yahoo · CoinGecko"]
-    B --> C["Reunião 1 — GIC<br/>macro + alocação tática"]
-    C --> D["Reunião 2 — Research<br/>ações B3 · crypto · CDB"]
-    D --> E["Reunião 3 — IC Final<br/>risco · imposto · ordens"]
-    E --> F["Folha de ordens<br/>onde investir e quanto"]
-    F --> G(["Telegram"])
+    B --> C["1 · GIC<br/>macro + alocação"]
+    C --> D["2 · Seleção<br/>shortlist + CDB"]
+    D --> E["3 · DD Ações B3"]
+    E --> F["4 · DD Crypto"]
+    F --> G["5 · IC Final<br/>risco · ordens"]
+    G --> H["Folha de ordens"]
+    H --> I(["Telegram"])
 ```
 
-As três reuniões rodam **numa única sessão Claude encadeada** — cada uma herda o
+As cinco etapas rodam **numa única sessão Claude encadeada** — cada uma herda o
 contexto (e o JSON estruturado) da anterior, como num comitê de verdade. A folha
 de ordens final é agnóstica de corretora: você decide onde executar.
 
@@ -133,7 +135,7 @@ Com o `./start.sh` rodando, o bot sobe junto e responde **só ao seu chat**:
 `/aporte` → **"Adicionar aporte e rodar análise"** e acompanhe etapa por etapa.
 `/ativos` gerencia a carteira por lote; `/relatorios` guarda todo o histórico.
 
-> ⚠️ Cada run é Opus/max em ~92k caracteres × 3 reuniões + fechamento — custa
+> ⚠️ Cada run é Opus/max em 5 etapas + fechamento, com pesquisa ao vivo — custa
 > alguns dólares e leva dezenas de minutos. Use `--model haiku --effort low`
 > para testar o encanamento de graça.
 
@@ -143,7 +145,7 @@ Com o `./start.sh` rodando, o bot sobe junto e responde **só ao seu chat**:
 
 | Ciclo | Quando | O que faz |
 |---|---|---|
-| **Aporte** | Ad-hoc (quando você quiser) | 3 reuniões encadeadas → folha de ordens → Telegram |
+| **Aporte** | Ad-hoc (quando você quiser) | 5 etapas encadeadas → folha de ordens → Telegram |
 | **Revisão semanal** | A cada 7 dias (cron) | Macro + desempenho das posições + rotação de CDB para oportunidades |
 | **Maturidade** | Quando um lote de ação/crypto cruza 30 dias | Comitê reavalia manter / vender / aumentar |
 
@@ -177,18 +179,26 @@ No modo automático o agente roda num **workspace persistente próprio**
 
 ---
 
-## Os 3 prompts
+## As 5 etapas
 
-| # | Reunião | Personas | Foco |
+Cada aporte roda 5 etapas encadeadas + um fechamento, numa única sessão. A
+pesquisa (antes uma reunião só) foi dividida em **seleção → DD de ações → DD de
+crypto**, para que cada nome da shortlist receba um turno dedicado de análise
+profunda em vez de competir por espaço num único prompt gigante.
+
+| # | Etapa | Personas | Foco |
 |---|---|---:|---|
 | 1 | **GIC — Macro + Alocação Tática** | 12 | Top of Mind, macro BR + global, curva DI/CDB, setores B3, on-chain crypto, Black-Litterman, alocação por classe |
-| 2 | **Equity & Crypto Research + CDB Credit** | 12 + 2 | Due diligence por nome: tese, valuation triangulada, forense, on-chain, e crédito do banco emissor do CDB |
-| 3 | **Investment Committee Final** | 14 | Risco (VaR/CVaR/EVT), stress 8 cenários, sentimento, imposto, execução e **folha de ordens** |
+| 2 | **Universo, Filtros e Seleção** | 12 + 2 | Long lists, filtros (quant + forense), seleção da shortlist (5-8 ações + 3-5 cryptos) e **CDB final** com credit analysis |
+| 3 | **Due Diligence de Ações B3** | equity desk | Memo completo por ação: tese, valuation triangulada, forense, técnica, factor, bull/base/bear |
+| 4 | **Due Diligence de Crypto** | crypto desk | Memo completo por cripto: tokenomics + unlocks, on-chain, derivativos, dev activity, bull/base/bear |
+| 5 | **Investment Committee Final** | 14 | Risco (VaR/CVaR/EVT), stress 8 cenários, sentimento, imposto e **folha de ordens** |
 
-~1.730 linhas · ~92k caracteres · ~23k tokens no total. Cada prompt exige **JSON
-estruturado** ao final, com validações obrigatórias e fontes datadas (URL +
-data), e instrui o uso de `WebSearch`/`WebFetch`/`Bash` para checar tudo ao vivo
-(Glassnode, CryptoQuant, Coinglass, Fundamentus, StatusInvest, BCB, etc.).
+Cada etapa exige **JSON estruturado** ao final, com validações obrigatórias e
+fontes datadas (URL + data), e instrui o uso de `WebSearch`/`WebFetch`/`Bash`
+para checar tudo ao vivo (Glassnode, CryptoQuant, Coinglass, Fundamentus,
+StatusInvest, BCB, etc.). As etapas 3 e 4 podem despachar um subagente por nome
+para aprofundar cada análise em paralelo.
 
 **Frameworks institucionais aplicados:** GS Top of Mind · GS Asset Allocation ·
 MS Capital Market Assumptions · MS GIC On the Markets · Black-Litterman ·
@@ -268,7 +278,7 @@ Os três alvos de alocação devem somar 1.0. Reinicie o backend após editar.
 
 ```
 app/
-  agents_prompts/    # 3 templates Jinja2 (super prompts, ~92k chars no total)
+  agents_prompts/    # 5 templates Jinja2 (macro · seleção · DD ações · DD crypto · decisão)
   core/database.py   # SQLite + SQLModel (+ migração leve de colunas)
   models/            # Asset, Contribution, ContributionPrompt, Report
   routers/           # portfolio, contributions, macro, cadence, reports

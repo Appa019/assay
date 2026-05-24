@@ -1,0 +1,157 @@
+═══════════════════════════════════════════════════════════════════════════════
+DUE DILIGENCE DE CRYPTO · REUNIÃO Nº 4 DE 5
+TIER: MESSARI + GLASSNODE + TOKEN TERMINAL + COINGLASS
+PADRÃO: WORLD-CLASS · NO COMPROMISE · UM MEMO COMPLETO POR NOME
+MANDATO: CRYPTO AGRESSIVO (alto upside, risco controlado) — parte de 3 classes
+═══════════════════════════════════════════════════════════════════════════════
+
+# CONTINUIDADE
+
+Mesma sessão. A Reunião nº 2 SELECIONOU as cryptos finalistas (`selecao_crypto`,
+com narrativa e sizing-alvo) e a Reunião nº 3 fez a DD das ações. Agora é a **due
+diligence profunda de CADA cripto selecionada** — nível Messari/Glassnode.
+
+> **Releia da R2 o array `selecao_crypto`**: são EXATAMENTE esses ativos que
+> recebem o memo completo. BTC/ETH core sempre incluídos; alts conforme narrativa.
+
+> **Escopo crypto:** majors, L1/L2, DeFi, AI, RWA, restaking, BTC L2, memes
+> seletas, stable yield (USDC/USDe). Exposição a USD só via **stablecoin (USDC)**.
+> Mandato AGRESSIVO mas com gestão de risco e respeito à trava de 30 dias por lote.
+
+## CAST (crypto desk)
+
+**Rafael Lin** (On-Chain Lead, Glassnode power user), apoio de Sophia Brandt
+(cross-asset/factor) e Anderson Pires (técnica), com veto de Tiago Ribeiro (CRO).
+Júlia Reis valida tokenomics/contas.
+
+---
+
+# FERRAMENTAS
+
+| Capacidade | Onde |
+|---|---|
+| **Fundamentos** | `coingecko.com/en/coins/<id>`, `coinmarketcap.com/currencies/<id>/`, `messari.io/asset/<asset>` |
+| **On-chain (Glassnode)** | `studio.glassnode.com/` (MVRV-Z, NUPL, SOPR, Puell, Reserve Risk, HODL, CDD, RHODL, NVT, Dormancy) |
+| **CryptoQuant** | exchange flows, miner outflows, Coinbase premium |
+| **DefiLlama / Token Terminal** | `defillama.com/protocol/<p>`, `tokenterminal.com/terminal/projects/<p>` (P/F, P/S, revenue) |
+| **Derivativos** | `coinglass.com/` (funding, OI, CME basis, DVOL, liquidation heatmap) |
+| **Unlocks** | `tokenomist.ai/`, `tokenunlocks.app/` |
+| **Dev activity** | WebSearch `"Electric Capital Developer Report 2025"`, GitHub |
+
+`Bash` para P/F·P/S, FDV/MC, sizing Kelly, correlações. MCPs: sequential-thinking,
+fetch, playwright (Glassnode/dashboards JS), context7, memory.
+
+> **PROFUNDIDADE POR NOME (recomendado):** se a ferramenta **Task** estiver
+> disponível, despache **um subagente por cripto** — cada um faz o memo completo,
+> grava em `./dd/{{ contribution_id }}_<SIMBOLO>.md` e retorna os números-chave;
+> depois VOCÊ lê todos e consolida o JSON. Senão, faça sequencialmente, sem
+> comprimir. (Ao retomar, pule cryptos cujo memo já existe.)
+
+---
+
+# PROCESSO — MEMO COMPLETO PARA CADA CRYPTO SELECIONADA
+
+Para **CADA** cripto de `selecao_crypto`:
+
+1. **Investment Thesis 3 frases** + ligação à narrativa da R1
+2. **Identidade**: nome, símbolo, CoinGecko ID, chain, contract address, data lançamento, classificação (L1/L2/DeFi/AI/RWA/Meme/Restaking/Stable)
+3. **Tecnologia**: TPS, segurança, descentralização, competidores top 3
+4. **Equipe & Comunidade**: founders, VCs (a16z/Paradigm/Sequoia/Polychain/Multicoin), GitHub commits 90d, devs ativos, Discord/X/TG
+5. **Tokenomics**: circ/total/max supply · inflation anual · **unlock schedule 12m** (Tokenomist/TokenUnlocks): próximo unlock + cliffs · distribuição (team/VC/foundation/community/public) · burn/buyback · **FDV/MC** · insider lockups expiring
+6. **On-Chain (Rafael)**: TVL + Δ30d · active addrs 7d/30d · tx count · DAUs + Δ · revenue/fees 30d · **P/F + P/S** · **BTC**: MVRV-Z, Puell, HODL 1y+, STH-LTH, Realized Cap, CDD, Dormancy, RHODL, NVT, exchange net flow, hash rate, Reserve Risk · **ETH**: stake ratio, L2 TVL share, ETH burned, restaking TVL · **L1s**: TVL/MC, validators · cohort LTH vs STH
+7. **Derivatives (Coinglass)**: funding perp 7d (Binance/Bybit/OKX) · OI USD · **CME basis** · **DVOL** · long/short top accounts · liquidation heatmap
+8. **Correlação 90d** com BTC, ETH, Ibov
+9. **Catalyst path 31d**: mainnet upgrade, listing, governance, product, ETF news, unlocks
+10. **Riscos top 3**: regulatório, técnico, unlock, founder concentration
+11. **Coinbase premium** (CryptoQuant)
+12. **Position sizing %** do bolso de crypto (ancore no `sizing_alvo_pct_crypto` da R2; refine)
+13. **Technical (Anderson)**: tendência weekly, RSI weekly, suportes/resistências USD, Volume Profile, Wyckoff, Ichimoku
+14. **Bull/Base/Bear 31d USD** + **Asymmetry** ≥ 2:1
+15. **Stop USD + Target 31d/90d/12m USD**
+16. **Conviction 0-10**
+
+## CROSS-CHECK (Rafael + Tiago + Júlia)
+- Σ `position_sizing_pct_crypto` = 100 · **BTC + ETH ≥ 50%** do bolso (prudencial, mesmo agressivo)
+- Nenhuma cripto com unlock 90d > 10% do circulante sem desconto explícito no sizing
+- Asymmetry média ponderada ≥ 1.5:1 · overlap com a carteira atual
+- Σ R$ ≈ fatia de crypto da R1 (`final_tactical_brl.crypto`)
+
+---
+
+# OUTPUT FINAL — FORMATO OBRIGATÓRIO
+
+Markdown (os memos) + **JSON validável** entre ` ```json ` e ` ``` `:
+
+```json
+{
+  "schema_version": "5.0",
+  "escopo": "BR_3_classes_cdb_acoesB3_crypto",
+  "etapa": "crypto_diligence",
+  "shortlist_crypto": [
+    {
+      "coingecko_id": "", "simbolo": "", "chain": "", "contract_address": "",
+      "data_lancamento": null,
+      "classificacao": "L1|L2|DeFi|AI|RWA|Meme|Stable|Restaking|Other", "narrativa": "",
+      "investment_thesis_3_frases": "", "tecnologia": "", "throughput_tps": null,
+      "competidores_diretos": [], "equipe_e_comunidade": "", "vcs_notorios": [],
+      "github_commits_90d": 0, "devs_ativos": 0,
+      "tokenomics": {
+        "circ_supply": 0, "total_supply": 0, "max_supply": 0, "fdv_mc_ratio": 0,
+        "inflation_anual_pct": 0, "next_unlock_data": null, "next_unlock_pct_circ": 0,
+        "unlock_90d_total_pct_circ": 0, "cliff_dates": [],
+        "distribuicao_inicial": {"team_pct": 0, "vc_pct": 0, "foundation_pct": 0,
+                                  "community_pct": 0, "public_sale_pct": 0},
+        "burn_buyback": "", "insider_lockups_expiring_90d": false
+      },
+      "on_chain": {
+        "tvl_usd_mi": null, "tvl_30d_change_pct": null, "active_addrs_7d": 0,
+        "active_addrs_30d": 0, "tx_count_30d": 0, "daus": 0, "daus_30d_change_pct": 0,
+        "revenue_30d_usd_mi": 0, "fees_30d_usd_mi": 0, "p_fees_ratio": null, "p_sales_ratio": null,
+        "btc_specifics": {"mvrv_z": null, "nupl": null, "sopr": null, "puell_multiple": null,
+                           "hodl_1y_plus_pct": null, "sth_lth_cost_basis_ratio": null,
+                           "realized_cap_usd_bi": null, "cdd_spike_30d": null, "rhodl_ratio": null,
+                           "nvt_signal": null, "exchange_net_flow_30d_btc": null,
+                           "hash_rate_30d_pct": null, "reserve_risk": null},
+        "eth_specifics": {"stake_ratio_pct": null, "l2_tvl_share_30d_pct_change": null,
+                           "eth_burned_30d_eth": null, "restaking_tvl_usd_bi": null},
+        "other_l1_specifics": {"tvl_ratio_mc": null, "validator_count": null}
+      },
+      "derivatives": {"funding_rate_7d_avg_pct": 0, "open_interest_usd_bi": 0,
+                       "cme_basis_bps": null, "dvol": null,
+                       "long_short_ratio_top_accounts": 0, "liquidation_zones": ""},
+      "correlacao_btc_90d": "", "correlacao_eth_90d": "", "correlacao_ibov_90d": "",
+      "catalyst_path_31d": [], "riscos_top3": [], "coinbase_premium_pct": null,
+      "tecnica": {"tendencia_weekly": "", "rsi_weekly": 0, "suportes_usd": [],
+                   "resistencias_usd": [], "volume_profile_poc_usd": 0, "wyckoff_phase": "",
+                   "ichimoku_cloud_position": ""},
+      "bull_base_bear_31d": {"bull_price_usd": 0, "bull_prob_pct": 0, "base_price_usd": 0,
+                              "base_prob_pct": 0, "bear_price_usd": 0, "bear_prob_pct": 0,
+                              "asymmetry_ratio": 0},
+      "stop_loss_usd": 0, "target_31d_usd": 0, "target_90d_usd": 0, "target_12m_usd": 0,
+      "position_sizing_pct_crypto": 0, "conviction_tier": "HIGH|MEDIUM|LOW", "conviction_0_10": 0, "fontes": []
+    }
+  ],
+  "sanidade_crypto": {
+    "soma_position_sizing_100": true, "btc_eth_pct": 0,
+    "unlock_risk_descontado": true, "asymmetry_media_ponderada": 0,
+    "overlap_carteira_atual": [], "soma_usd_vs_fatia_crypto_r1_ok": true,
+    "nenhuma_recomendacao_fora_do_mandato": true
+  }
+}
+```
+
+> **VALIDAÇÕES OBRIGATÓRIAS:**
+>
+> 1. ✓ Um item em `shortlist_crypto` para CADA cripto de `selecao_crypto` (sem comprimir)
+> 2. ✓ Cada cripto: on-chain conforme tipo + derivatives + tokenomics/unlocks + dev activity
+> 3. ✓ Cada cripto: Bull/Base/Bear probs = 100% + asymmetry numérico
+> 4. ✓ Σ `position_sizing_pct_crypto` = 100 · **BTC + ETH ≥ 50%** · asymmetry média ≥ 1.5:1
+> 5. ✓ Unlock 90d > 10% circulante → sizing descontado (ou rejeição)
+> 6. ✓ ≥ 10 fontes verificáveis distintas (URL + data)
+> 7. ✓ **`nenhuma_recomendacao_fora_do_mandato=true`** — só crypto (USD via USDC)
+
+---
+
+**On-chain no nível Messari/Glassnode, derivativos via Coinglass, tokenomics com
+unlocks. Cada cripto selecionada merece um memo COMPLETO. A Reunião nº 5 junta
+ações + crypto + CDB, aplica risco/stress/imposto e gera a folha de ordens.**

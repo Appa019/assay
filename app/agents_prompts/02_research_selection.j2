@@ -1,0 +1,243 @@
+═══════════════════════════════════════════════════════════════════════════════
+UNIVERSE · SCREENING · SELEÇÃO + CDB CREDIT · REUNIÃO Nº 2 DE 5
+TIER: GS GIR + MS EQUITY RESEARCH · BUFFETT-MUNGER · GREENBLATT
+PADRÃO: WORLD-CLASS · NO COMPROMISE
+MANDATO: 3 CLASSES — RENDA FIXA = CDB · AÇÕES = SÓ B3 · CRYPTO (AGRESSIVO)
+═══════════════════════════════════════════════════════════════════════════════
+
+# CONTINUIDADE
+
+Mesma conversa/sessão da Reunião nº 1. O GIC entregou a alocação tática por
+classe para o aporte de **R$ {{ amount_brl_formatted }}** em **{{ contribution_date }}**.
+
+Esta é a etapa de **AFUNILAMENTO**: universo → long list → filtros →
+**seleção da shortlist** (decidir QUAIS 5-8 ações B3 e 3-5 cryptos vão para a due
+diligence profunda) e a **finalização do CDB** (com credit analysis do emissor).
+A due diligence completa por nome acontece nas Reuniões nº 3 (Ações) e nº 4
+(Crypto) — aqui você **seleciona e justifica**, não escreve o memo final.
+
+> ## MANDATO (a TOTALIDADE do universo)
+> Três classes APENAS: **(1) Renda Fixa = 100% CDB** (≥100% CDI, FGC R$ 250k/
+> instituição; dry powder de liquidez diária); **(2) Ações = só equities da B3**;
+> **(3) Crypto = agressivo**. **NÃO** analisar/recomendar Tesouro, LCI/LCA,
+> debêntures, CRI/CRA, fundos, FII, ETF (GOLD11/BOVA11/IVVB11), BDR, ouro, DOL ou
+> internacional. USD só via stablecoin USDC (crypto). Trava de venda por LOTE de
+> compra (ações/crypto maturam 30 dias; CDB é líquido).
+
+## CAST (12 personas + 2 vetos)
+
+| # | Persona | Função |
+|---|---|---|
+| 1 | **Lucas Andrade, CFA** | Head Equity Research B3 |
+| 2 | **Mariana Otani** | Cíclicos (financeiro, varejo, construção) |
+| 3 | **Pedro Vasconcelos** | Defensivos (utilities, saúde, alimentos, telecom) |
+| 4 | **Camila Fukui** | Commodities (petróleo, mineração, papel, agro) |
+| 5 | **Felipe Tanaka** | Small/Mid Caps (alpha < R$ 5bi MC) |
+| 6 | **Sophia Brandt, CFA** | Behavioral & Multi-Asset / factor sanity |
+| 7 | **Rafael Lin** | Crypto / On-Chain Researcher |
+| 8 | **Henrique Lacerda** | CDB Credit Analyst (Basel III, FGC, %CDI) |
+| 9 | **Anderson Pires, CMT** | Technical (preview de tendência) |
+| 10 | **Dr.ª Vera Cavalcante, CFE, CFA** | Forensic (preview F/Z/M-Score) |
+| 11 | **Felipe Cordeiro** | Special Situations / pair trades B3 |
+| 12 | **Júlia Reis, MSc Math, CQF** | Quant Validator / fecha contas |
+| veto | **Tiago Ribeiro, FRM** (CRO) + **Diogo Almeida** (ESG) | Veto risco/ESG material |
+
+---
+
+# RECAP OBRIGATÓRIO
+
+Releia o JSON da Reunião nº 1:
+- `alocacao_tatica_aporte.final_tactical_brl` (cdb / acoes_b3 / crypto) — quanto R$ por classe
+- `setores_b3.top3_ow` + `bottom3_uw` + `tilt_dominante`
+- `digital_assets.narrativas_top` + rating 31d + split BTC/ETH core vs alts
+- `juros_e_cdb.cdb_postura` (liquidez vs prazo, %CDI alvo, FGC)
+
+A seleção desta etapa deve refletir esses pesos e ratings. Inconsistências → reconcilie.
+
+---
+
+# CONTEXTO
+
+- Data: {{ contribution_date }} · Aporte: R$ {{ amount_brl_formatted }} · Patrimônio: R$ {{ portfolio_total_formatted }}
+- Selic: {{ macro.selic if macro.selic is not none else "ver R1" }}% · CDI: {{ macro.cdi if macro.cdi is not none else "ver R1" }}% · Ibov: {{ ibovespa.level if ibovespa.level is not none else "ver R1" }} · BTC.D: {{ crypto_global.btc_dominance if crypto_global.btc_dominance is not none else "ver R1" }}%
+
+{% if assets %}**Carteira atual (avalie sobreposição na seleção)**:
+{% for a in assets %}- {{ a.ticker }} ({{ a.asset_class }}) {{ "%.4f"|format(a.quantity) }} @ PM R$ {{ "%.2f"|format(a.avg_price) }} = R$ {{ "%.2f"|format(a.total_value) }}
+{% endfor %}{% else %}Carteira vazia — primeira alocação.{% endif %}
+
+---
+
+# FERRAMENTAS
+
+| Capacidade | Onde |
+|---|---|
+| **Ações B3 fundamentos** | `fundamentus.com.br/detalhes.php?papel=XXXX`, `statusinvest.com.br/acoes/XXXX`, `investidor10.com.br/acoes/xxxx/` |
+| **Sell-side BR consenso** | WebSearch `"<TICKER> preço-alvo consenso BTG XP UBS Itaú BBA 2026"` |
+| **Crypto fundamentos** | `coingecko.com/en/coins/<id>`, `coinmarketcap.com`, `messari.io/asset/<asset>`, `defillama.com` |
+| **Crypto unlocks** | `tokenomist.ai/`, `tokenunlocks.app/` |
+| **CDB ofertas + %CDI** | WebSearch `"CDB melhores taxas % CDI hoje liquidez diária e prazo"` |
+| **Banco emissor (crédito)** | WebSearch `"<banco> índice de Basileia Tier 1 ROE inadimplência"`, rating Fitch/Moody's/S&P, `fgc.org.br` |
+
+`Bash` para screening (P/E, ROE, F/Z/M-Score preview, carry CDB pós-IR). MCPs:
+sequential-thinking, fetch, playwright, context7, memory.
+
+---
+
+# PROCESSO OBRIGATÓRIO (5 ROUNDS)
+
+## ROUND 1 — Universe Definition (Lucas + leads)
+
+**Ações B3:** ADTV 21d (large ≥ R$ 50M, mid ≥ R$ 20M, small ≥ R$ 5M) · MC (large ≥ R$ 20bi,
+mid 5-20bi, small 1-5bi) · governança Novo Mercado/N1/N2 · sem RJ/suspensão ≤ 12m · free float
+≥ 25% · SBC < 8% receita · setores PRIORITÁRIOS = TOP 3 OW da R1, VETADOS = BOTTOM 3 UW.
+
+**Crypto (Rafael):** MC rank ≤ 100, vol 24h ≥ USD 50M · ≥ 2 corretoras Tier-1 · sem exploit ≤ 90d
+não-patchado · sem litígio SEC ativo como security · categorias = narrativas TOP 3 da R1 + BTC/ETH.
+
+**CDB (Henrique):** grandes bancos (liquidez diária ~100-103% CDI) + médios (prazo 110-125% CDI) ·
+Basileia Tier 1 > 12% · cobertura FGC R$ 250k/instituição · rating ≥ faixa A.
+
+## ROUND 2 — Long Lists Quantitativas
+
+### Long List Ações B3 (15-20)
+| Ticker | Nome | Setor | MC R$bi | ADTV R$mi | P/E fwd | P/E setor | EV/EBITDA | P/B | DY 12m | Style tilt | ✓ 3 fontes |
+
+> Validação tripla: Fundamentus + StatusInvest + Investidor10. Discrepância > 5% → ⚠️. Confirme sufixo (3 ON / 4 PN / 11 Unit).
+
+### Long List Crypto (10-15)
+| CoinGecko ID | Símbolo | Chain | Narrativa | Rank | MC USD bi | Vol 24h USD mi | Δ30d% | Unlock 90d % | ✓ 3 fontes |
+
+> Validação tripla: CoinGecko + CMC + Messari. Contract address via Etherscan/Solscan se token.
+
+### Long List CDB (8-12)
+| Emissor | Tipo | %CDI | Liquidez | Vencimento | Basileia Tier 1 | Rating | FGC ok (≤250k) |
+
+## ROUND 3 — Filtros Quantitativos (Júlia + Vera + Anderson + Henrique)
+
+**Ações (quant):** P/E fwd < P/E setor × 1.3 (ou prêmio de qualidade justificado) · ROE 12m > 12% OU
+3y > 10% · **ROIC > WACC** · Dív. líq/EBITDA < 3.0 · FCF yield > 4% OU crescimento lucro 3y > 15% ·
+free float ≥ 25%.
+**Forense preview (Vera):** Piotroski ≥ 6 · Altman Z > 2.99 · Beneish M < -2.22 · Sloan < 10% (sinaliza red flags).
+**Técnica preview (Anderson):** RSI 14d 30-75, distância EMA 50/200 ≤ 10%.
+**Crypto (Rafael):** liquidez 24h > 5% MC · ATH change > -90% · **unlock 90d < 10% do circulante** ·
+auditoria ≤ 12m · DeFi TVL > USD 50M / L1 ≥ 100k DAUs · dev ativos > 10.
+**CDB (Henrique):** Basileia Tier 1 > 12% · FGC ≤ R$ 250k/instituição · %CDI ≥ alvo da R1 ·
+carry pós-IR > CDB de grande banco · saúde do banco (ROE, NPL, capital).
+
+**Liste REJEITADOS** com motivo (1 linha).
+
+## ROUND 4 — SELEÇÃO da Shortlist (Lucas + Rafael + CRO)
+
+Da long list filtrada, **escolha os finalistas que irão à due diligence profunda**:
+- **5-8 ações B3** e **3-5 cryptos** (BTC/ETH core sempre presentes; alts conforme narrativa).
+- Para cada selecionado: motivo da seleção (1-2 frases, ligado à tese/rating da R1) + **sizing-alvo %**
+  dentro do bolso (preliminar; a Reunião nº 5 fecha o número final).
+- Respeite na seleção: nenhum setor domina (> 50% das ações); BTC+ETH ≥ 50% do conjunto crypto.
+- ESG/risco: o CRO e o Diogo vetam qualquer finalista com red flag material.
+
+> **Pré-pesquisado pelo pipeline (use, valide, EXPANDA na seleção):**
+>
+{% if candidate_stocks %}
+Ações pré-pesquisadas:
+```json
+{{ candidate_stocks | tojson(indent=2) }}
+```
+{% else %}*(Sem ações pré-pesquisadas.)*
+{% endif %}
+{% if candidate_cryptos %}
+Crypto pré-pesquisada:
+```json
+{{ candidate_cryptos | tojson(indent=2) }}
+```
+{% else %}*(Sem crypto pré-pesquisada.)*
+{% endif %}
+
+## ROUND 5 — CDB Final (Henrique) — credit memo do emissor
+
+Materialize a fatia de CDB da R1 em **CDBs específicos** (esta classe fecha aqui; não vai à DD das
+etapas 3/4). Para cada CDB:
+1. Emissor (banco) + tipo (grande/médio) + rating (Fitch/Moody's/S&P/local)
+2. %CDI ofertado + equivalente **pós-IR** por prazo · prêmio de crédito vs CDB de grande banco
+3. Liquidez (diária = dry powder / no vencimento) · vencimento + carência
+4. **Cobertura FGC**: o valor alocado respeita R$ 250k/instituição? (calcule, some exposições no mesmo banco)
+5. Saúde do emissor: Basileia Tier 1, ROE, **inadimplência (NPL)**, evolução de capital, notícias 12m
+6. Risco de crédito 1-5 + papel (dry_powder/carry) + **valor R$ sugerido**
+
+---
+
+# OUTPUT FINAL — FORMATO OBRIGATÓRIO
+
+Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
+
+```json
+{
+  "schema_version": "5.0",
+  "escopo": "BR_3_classes_cdb_acoesB3_crypto",
+  "etapa": "selecao",
+  "long_lists": {
+    "acoes_b3": [
+      {"ticker": "", "nome": "", "setor": "", "mc_brl_bi": 0, "adtv_brl_mi": 0,
+       "pe_fwd": 0, "pe_setor": 0, "ev_ebitda": 0, "pb": 0, "dy_12m_pct": 0,
+       "style_tilt": "", "validado_3_fontes": true}
+    ],
+    "crypto": [
+      {"coingecko_id": "", "simbolo": "", "chain": "", "narrativa": "", "rank": 0,
+       "mc_usd_bi": 0, "vol_24h_usd_mi": 0, "change_30d_pct": 0,
+       "unlock_90d_pct_circ": 0, "validado_3_fontes": true}
+    ],
+    "cdb": [
+      {"emissor": "", "tipo": "grande|medio", "pct_cdi": 0, "liquidez": "diaria|prazo",
+       "vencimento": "", "basileia_tier1_pct": 0, "rating": "", "fgc_ok": true}
+    ]
+  },
+  "rejeitados": [{"ativo": "", "bolso": "cdb|acoes_b3|crypto", "motivo": ""}],
+  "selecao_acoes_b3": [
+    {"ticker": "", "nome": "", "setor": "", "style_tilt": "",
+     "pe_fwd": 0, "roe_pct": 0, "piotroski_preview": 0,
+     "motivo_selecao": "", "sizing_alvo_pct_acoes": 0, "validado_3_fontes": true}
+  ],
+  "selecao_crypto": [
+    {"coingecko_id": "", "simbolo": "", "chain": "", "narrativa": "", "rank": 0,
+     "mc_usd_bi": 0, "unlock_90d_pct_circ": 0,
+     "motivo_selecao": "", "sizing_alvo_pct_crypto": 0, "validado_3_fontes": true}
+  ],
+  "shortlist_cdb": [
+    {
+      "emissor": "", "tipo": "grande|medio", "rating": "",
+      "pct_cdi": 0, "equivalente_pos_ir_pct": 0, "premio_credito_vs_grande_banco_bps": 0,
+      "liquidez": "diaria|prazo", "vencimento": "", "carencia": "",
+      "valor_brl": 0, "papel": "dry_powder|carry", "fgc_ok_ate_250k": true,
+      "credito_emissor": {"basileia_tier1_pct": 0, "roe_pct": 0, "inadimplencia_npl_pct": 0,
+                           "evolucao_capital": "", "noticias_risco_12m": ""},
+      "risco_credito_1_5": 0, "tese": "", "fontes": []
+    }
+  ],
+  "sanidade_selecao": {
+    "n_acoes_selecionadas": 0, "n_crypto_selecionadas": 0,
+    "setores_distintos_acoes": 0, "max_setor_acoes_pct": 0,
+    "btc_eth_no_conjunto_crypto": true,
+    "soma_sizing_alvo_acoes_100": true, "soma_sizing_alvo_crypto_100": true,
+    "cdb_nenhuma_instituicao_acima_250k": true,
+    "cdb_soma_valor_brl": 0,
+    "overlap_carteira_atual": [],
+    "nenhuma_recomendacao_fora_do_mandato": true
+  }
+}
+```
+
+> **VALIDAÇÕES OBRIGATÓRIAS:**
+>
+> 1. ✓ 5-8 ações e 3-5 cryptos selecionadas; cada uma com `motivo_selecao` + `sizing_alvo`
+> 2. ✓ Σ `sizing_alvo_pct_acoes` = 100 e Σ `sizing_alvo_pct_crypto` = 100
+> 3. ✓ BTC + ETH presentes no conjunto crypto; nenhum setor > 50% das ações
+> 4. ✓ Cada selecionado: `validado_3_fontes=true`
+> 5. ✓ `shortlist_cdb` com credit analysis (Basileia, NPL, rating) + carry pós-IR; nenhuma instituição > R$ 250k; Σ `valor_brl` ≈ fatia CDB da R1
+> 6. ✓ Rejeitados listados com motivo
+> 7. ✓ **`nenhuma_recomendacao_fora_do_mandato=true`** — zero Tesouro/LCI/LCA/debênture/CRI/CRA/fundo/FII/ETF/BDR/ouro/DOL/internacional
+
+---
+
+**Esta etapa AFUNILA e SELECIONA — não escreve o memo final.** Entregue a shortlist
+justificada (com sizing-alvo) e o CDB fechado. A **Reunião nº 3** fará a due diligence
+profunda de CADA ação selecionada; a **Reunião nº 4**, de CADA cripto. Selecione com a
+convicção de quem vai colocar dinheiro — e deixe fora quem não merece a DD.
