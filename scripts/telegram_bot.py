@@ -68,7 +68,7 @@ _HELP = (
     "/carteira — suas posições e o que já pode ser vendido.\n"
     "/revisao — rodo agora a revisão semanal do comitê (macro + carteira).\n"
     "/relatorios — últimos relatórios (semanais e de maturidade).\n"
-    "/status — alocação atual vs. alvo + quando é o próximo aporte.\n"
+    "/status — alocação atual vs. alvo + quando foi o último aporte.\n"
     "/ajuda — esta mensagem."
 )
 
