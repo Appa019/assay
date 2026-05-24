@@ -61,16 +61,32 @@ analista só. Rigor máximo institucional, sempre.
 - LIBERDADE TOTAL para pesquisar QUALQUER fonte: preços, notícias, relatórios
   sell-side, filings/CVM/RI, dados on-chain, derivativos, funding, macro, papers.
   Use WebSearch, WebFetch e seus MCPs à vontade.
-- Você TEM os melhores MCPs disponíveis (use-os quando ajudarem):
+- Você TEM os melhores MCPs já carregados (use-os quando ajudarem):
   · **sequential-thinking** — raciocínio estruturado profundo;
   · **playwright** — navegador real para sites com JS (dashboards, on-chain, RI);
   · **fetch** — extrair páginas/filings em markdown;
   · **filesystem** — navegar/ler/escrever em QUALQUER lugar da máquina ($HOME);
-  · **context7** — docs de bibliotecas quando você programar ferramentas.
+  · **context7** — docs atualizadas de bibliotecas quando você programar ferramentas;
+  · **memory** — grafo de conhecimento estruturado (complementa o ./MEMORY.md);
+  · **time** — fuso/datas (janelas COPOM/FOMC, agendamentos);
+  · **git** — versione as ferramentas que você cria (o workspace é um repo git).
 - Acesso TOTAL à máquina: rode QUALQUER comando (Bash), navegue o sistema, leia e
   CRIE ARQUIVOS onde precisar, escreva scripts e CRIE SUAS PRÓPRIAS FERRAMENTAS em
-  ./tools/ e reutilize nos próximos ciclos. Crie um venv local e instale libs se
-  precisar. Tudo é permitido em prol do MELHOR investimento.
+  ./tools/ e reutilize nos próximos ciclos. Crie um venv local e instale libs
+  (pip/uvx/npm) se precisar. Tudo é permitido em prol do MELHOR investimento.
+
+## Instale e configure as ferramentas/MCPs que quiser (auto-provisionamento)
+- Precisa de uma lib? Instale via Bash (pip/uvx/npm/npx) e use já neste ciclo.
+- Precisa de um MCP NOVO de forma permanente? Adicione-o ao arquivo
+  **./.mcp.agent.json** (mapa `mcpServers`). Ele é SEU: nunca é sobrescrito e é
+  mesclado ao baseline automaticamente — o servidor carrega no PRÓXIMO ciclo
+  (você tem prioridade se repetir um nome do baseline). Ex.:
+  `{{"mcpServers": {{"nome": {{"command": "npx", "args": ["-y", "pacote-mcp"]}}}}}}`.
+- MCPs carregam no INÍCIO do processo; um MCP recém-adicionado ao .mcp.agent.json
+  vale no PRÓXIMO ciclo. Para uso IMEDIATO neste ciclo, chame a ferramenta/CLI
+  diretamente via Bash (ou escreva um wrapper em ./tools/).
+- Se um MCP exigir chave de API, guarde a chave fora do git e referencie via env
+  no .mcp.agent.json. NUNCA exponha segredos no MEMORY.md nem em commits.
 
 ## Sua memória persistente (você a gerencia)
 - ./MEMORY.md é SUA memória entre ciclos. LEIA-a no início de TODO ciclo.
@@ -139,6 +155,13 @@ ciclo. Estrutura sugerida:
 (preencher)
 """
 
+_SEED_AGENT_MCP = """\
+{
+  "_comment": "MCPs que VOCE (agente) adiciona aqui sao mesclados ao baseline a cada ciclo e carregam no PROXIMO ciclo. Voce tem prioridade em conflito de nome. Ex.: adicione em mcpServers: \\"coingecko\\": {\\"command\\": \\"npx\\", \\"args\\": [\\"-y\\", \\"coingecko-mcp\\"]}",
+  "mcpServers": {}
+}
+"""
+
 _SYNTHESIS_PROMPT = """\
 Com base em TODA a análise do comitê acima (todas as reuniões), produza o \
 FECHAMENTO EXECUTIVO final para o cliente. Responda em português, de forma \
@@ -164,52 +187,122 @@ class AnalysisError(RuntimeError):
     """A Claude CLI step failed or returned an error result."""
 
 
-_MCP_FILENAME = ".mcp.json"
+_MCP_FILENAME = ".mcp.json"  # effective config Claude loads (regenerated each run)
+_AGENT_MCP_FILENAME = ".mcp.agent.json"  # agent-owned; merged in and NEVER overwritten
 
 
-def _mcp_config() -> dict[str, Any]:
-    """Curated MCP servers for the analyst — research-grade, machine-wide.
+def _baseline_mcp_servers() -> dict[str, Any]:
+    """Curated, research-grade MCP servers always available to the analyst.
 
-    Intentionally excludes the user's Gmail/Calendar/Drive MCPs (the agent runs
-    autonomously and must not act in those on its own); paired with
-    ``--strict-mcp-config`` so ONLY these load.
+    Intentionally excludes the user's personal Gmail/Calendar/Drive MCPs (the
+    agent runs autonomously and must not act in those on its own); paired with
+    ``--strict-mcp-config`` so ONLY the effective set loads. The agent can add
+    ANY extra server itself via ``.mcp.agent.json`` (see ``_effective_mcp_config``).
     """
     home = str(Path.home())
     return {
-        "mcpServers": {
-            # Deep, structured reasoning for institutional-grade analysis.
-            "sequential-thinking": {
-                "command": "npx",
-                "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
-            },
-            # Navigate the whole machine + create/read files anywhere under $HOME.
-            "filesystem": {
-                "command": "npx",
-                "args": ["-y", "@modelcontextprotocol/server-filesystem", home],
-            },
-            # Robust web page → markdown fetch (filings, data pages).
-            "fetch": {"command": "uvx", "args": ["mcp-server-fetch"]},
-            # Live library docs when the agent writes its own tools.
-            "context7": {"command": "npx", "args": ["-y", "@upstash/context7-mcp@latest"]},
-            # Full browser for JS-heavy research sites (dashboards, on-chain, RI).
-            "playwright": {"command": "npx", "args": ["@playwright/mcp@latest"]},
-        }
+        # Deep, structured reasoning for institutional-grade analysis.
+        "sequential-thinking": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+        },
+        # Navigate the whole machine + create/read files anywhere under $HOME.
+        "filesystem": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-filesystem", home],
+        },
+        # Robust web page → markdown fetch (filings, data pages).
+        "fetch": {"command": "uvx", "args": ["mcp-server-fetch"]},
+        # Live library docs when the agent writes its own tools.
+        "context7": {"command": "npx", "args": ["-y", "@upstash/context7-mcp@latest"]},
+        # Full browser for JS-heavy research sites (dashboards, on-chain, RI).
+        "playwright": {"command": "npx", "args": ["@playwright/mcp@latest"]},
+        # Structured knowledge graph, complementary to the file-based MEMORY.md.
+        "memory": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-memory"],
+            "env": {"MEMORY_FILE_PATH": str(WORKSPACE / "memory" / "graph.json")},
+        },
+        # Timezone/date math (COPOM/FOMC windows, usage-limit "resets at").
+        "time": {"command": "uvx", "args": ["mcp-server-time"]},
+        # Version-control the tools the agent builds in ./tools/.
+        "git": {"command": "uvx", "args": ["mcp-server-git", "--repository", str(WORKSPACE)]},
     }
 
 
+def _load_agent_mcp_servers(workspace: Path) -> dict[str, Any]:
+    """Servers the agent added itself, persisted in ``.mcp.agent.json``."""
+    path = workspace / _AGENT_MCP_FILENAME
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8") or "{}")
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("agent_mcp_config_unreadable", path=str(path), error=str(exc))
+        return {}
+    servers = data.get("mcpServers", {}) if isinstance(data, dict) else {}
+    return servers if isinstance(servers, dict) else {}
+
+
+def _effective_mcp_config(workspace: Path) -> dict[str, Any]:
+    """Baseline ∪ agent-added servers (the agent wins on key conflicts).
+
+    This is what lets the agent provision ANY MCP it wants and have it stick:
+    it edits ``.mcp.agent.json`` and the server loads on the next cycle.
+    """
+    servers = _baseline_mcp_servers()
+    servers.update(_load_agent_mcp_servers(workspace))
+    return {"mcpServers": servers}
+
+
 def _ensure_workspace(min_holding_days: int) -> Path:
-    """Create the agent workspace, refresh standing orders + MCP config, seed memory."""
+    """Create the agent workspace, refresh standing orders + MCP config, seed memory.
+
+    The effective ``.mcp.json`` is regenerated each run (so curated baseline
+    updates propagate) but MERGED with the agent-owned ``.mcp.agent.json``, which
+    is seeded once and never overwritten — so MCP servers the agent installs for
+    itself survive across cycles.
+    """
     WORKSPACE.mkdir(parents=True, exist_ok=True)
     (WORKSPACE / "tools").mkdir(exist_ok=True)
     (WORKSPACE / "memory").mkdir(exist_ok=True)
     (WORKSPACE / "CLAUDE.md").write_text(
         _STANDING_ORDERS.format(min_holding_days=min_holding_days), encoding="utf-8"
     )
-    (WORKSPACE / _MCP_FILENAME).write_text(json.dumps(_mcp_config(), indent=2), encoding="utf-8")
+    # Agent-owned MCP file: seed once, then it's the agent's to extend.
+    agent_mcp = WORKSPACE / _AGENT_MCP_FILENAME
+    if not agent_mcp.exists():
+        agent_mcp.write_text(_SEED_AGENT_MCP, encoding="utf-8")
+    # Effective config Claude loads = curated baseline ∪ whatever the agent added.
+    (WORKSPACE / _MCP_FILENAME).write_text(
+        json.dumps(_effective_mcp_config(WORKSPACE), indent=2), encoding="utf-8"
+    )
     memory = WORKSPACE / "MEMORY.md"
     if not memory.exists():
         memory.write_text(_SEED_MEMORY, encoding="utf-8")
+    _ensure_git_repo(WORKSPACE)
     return WORKSPACE
+
+
+def _ensure_git_repo(workspace: Path) -> None:
+    """Best-effort: make the workspace a git repo so the agent can version tools."""
+    if (workspace / ".git").exists():
+        return
+    try:
+        subprocess.run(
+            ["git", "init", "-q"], cwd=str(workspace), capture_output=True, timeout=30, check=False
+        )
+        # Local identity so the agent's commits don't fail (never references Claude).
+        for key, val in (("user.name", "Investment Agent"), ("user.email", "agent@localhost")):
+            subprocess.run(
+                ["git", "config", key, val],
+                cwd=str(workspace),
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.warning("workspace_git_init_failed", error=str(exc))
 
 
 def _build_preamble(*, amount_brl: float, when: str, min_holding_days: int) -> str:
