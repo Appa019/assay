@@ -73,7 +73,7 @@ Inconsistências → **reconcilie**. NÃO sobrescreva R1 — refine.
 
 - Data: {{ contribution_date }} · Aporte: R$ {{ amount_brl_formatted }}
 - Patrimônio: R$ {{ portfolio_total_formatted }}
-- Próximo aporte: {{ next_contribution_date }} (cadência mensal)
+- Aportes são AD-HOC (sem cadência fixa); o comitê revisa a carteira toda semana
 
 ---
 
@@ -168,7 +168,7 @@ Aplique à posição agregada pós-aporte:
 - **Worst case**: viola 25%?
 - **Probability-weighted expected return 31d**
 - **Conditional probability of 5% loss**
-- **Time to recover** se hit worst case (com aporte mensal + retorno esperado)
+- **Time to recover** se hit worst case (com aportes futuros + retorno esperado)
 
 ## ROUND 3 — Sentiment Overlay (Sofia)
 
@@ -307,7 +307,7 @@ Tributação dividendos chegando — posição estratégica.
 - Dynamic withdrawal: maior em anos bons
 
 **Sequence-of-returns risk**:
-- Aporte mensal mitiga (DCA effect)
+- Aportes recorrentes (quando houver) mitigam (DCA effect)
 - Piores são primeiros anos negativos
 
 ## ROUND 7 — FX & USD Overlay (Marina)
@@ -487,13 +487,13 @@ Slippage = f(size, ADTV, vol, spread). Size > 5% ADTV = WARNING.
 
 ### Coluna **Asymmetry**: ratio numérico (e.g., 2.5)
 
-## ROUND 14 — Plano Monitoramento + Próximo Aporte
+## ROUND 14 — Plano de Monitoramento (revisão semanal do comitê)
 
 ### Monitoring weekly
 **Semana 1 (D+0 a D+7)**: foco confirmação técnica, gatilhos < stop −5%, earnings calls da janela
 **Semana 2 (D+8 a D+14)**: earnings empresas carteira, CPI/PCE US
 **Semana 3 (D+15 a D+21)**: PMI BR/US, dados inflação
-**Semana 4 (D+22 a D+30)**: preparação próximo aporte, rebalanceamento se desvio > 10pp, tax-loss harvesting, registro PnL
+**Semana 4 (D+22 a D+30)**: lotes de ação/crypto liberam da trava (≥30d); rebalanceamento se desvio > 10pp, tax-loss harvesting, registro PnL. Aporte novo só quando o cliente quiser (ad-hoc)
 
 ### Panic Review Triggers
 - COPOM ±100 bps surpresa
@@ -527,7 +527,7 @@ Estrutura:
 8. **Próximas 4 semanas** — eventos no radar (top 5)
 9. **Confiança média do comitê**: X / 10
 10. **Expected return 31d** (probability-weighted)
-11. **Próximo ciclo**: data + ajustes esperados
+11. **Próxima revisão semanal**: o que observar + gatilhos (aporte novo é ad-hoc)
 
 ---
 

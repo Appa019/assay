@@ -19,10 +19,8 @@ class Settings(BaseSettings):
     target_stocks: float = 0.40
     target_crypto: float = 0.25
 
-    # Cadence of recommended contributions (informational widget only)
-    contribution_interval_days: int = 30
-
-    # Investment agent (autonomous Claude runs)
+    # Investment agent (autonomous Claude runs). Contributions are ad-hoc (no
+    # fixed cadence); min_holding_days is the per-lot sell lock for stocks/crypto.
     min_holding_days: int = 30
     agent_model: str = "opus"
     agent_effort: str = "max"
@@ -46,13 +44,6 @@ class Settings(BaseSettings):
     def _validate_target_range(cls, v: float) -> float:
         if not 0.0 <= v <= 1.0:
             raise ValueError(f"Target deve estar em [0, 1], recebido {v}")
-        return v
-
-    @field_validator("contribution_interval_days")
-    @classmethod
-    def _validate_interval(cls, v: int) -> int:
-        if v <= 0:
-            raise ValueError(f"contribution_interval_days deve ser > 0, recebido {v}")
         return v
 
     @model_validator(mode="after")

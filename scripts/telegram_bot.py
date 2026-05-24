@@ -111,15 +111,11 @@ def _cmd_status() -> str:
     ]
     if last is not None:
         days = (date.today() - last.created_at.date()).days
-        restante = settings.contribution_interval_days - days
         lines.append("")
-        lines.append(
-            f"Último aporte há {days} dias."
-            + (f" Próximo em {restante} dias." if restante > 0 else " Aporte já está na hora! 📅")
-        )
+        lines.append(f"Último aporte há {days} dia(s). Faça outro quando quiser (/aporte).")
     else:
         lines.append("")
-        lines.append("Nenhum aporte ainda. Mande /aporte <valor> para começar.")
+        lines.append("Nenhum aporte ainda. Mande /aporte <valor> quando quiser começar.")
     return "\n".join(lines)
 
 

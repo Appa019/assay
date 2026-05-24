@@ -129,11 +129,8 @@ export type MacroSnapshot = {
 
 export type CadenceStatus = {
   last_contribution_date: string | null;
-  next_contribution_date: string;
-  days_until_next: number;
-  interval_days: number;
-  is_due: boolean;
-  is_overdue: boolean;
+  days_since_last: number | null;
+  total_contributions: number;
 };
 
 const json = async <T>(res: Response): Promise<T> => {

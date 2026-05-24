@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Daily cadence job (idempotent — safe to run every day via cron).
+"""Daily maturity job (idempotent — safe to run every day via cron).
 
-- Newly matured lots (crossed the 30-day lock) → run a committee maturity
-  review (saved + sent to Telegram).
-- Contribution cadence due → Telegram nudge to make a new aporte.
+Newly matured stock/crypto lots (crossed the 30-day lock) → run a committee
+maturity review (saved + sent to Telegram). Contributions are ad-hoc, so there
+is no scheduled aporte reminder — the recurring touchpoint is the weekly review.
 
 Install with ``scripts/install_cron.sh``.
 
@@ -41,10 +41,6 @@ def main() -> int:
             print("  análise de maturidade enviada e marcada.")
         else:
             print("Nenhum lote novo liberado.")
-
-        # 2) Contribution cadence nudge.
-        due = notification_service.notify_contribution_due(session)
-        print("Aviso de aporte enviado." if due else "Aporte não está vencido.")
         return 0
     finally:
         gen.close()

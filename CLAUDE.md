@@ -1,9 +1,10 @@
 # Investimentos Manual
 
-Gestão de aportes mensais com comitê multipersona de IA padrão **Goldman
-Sachs GIR + Morgan Stanley GIC + Bridgewater + AQR**. Cada ciclo de 30
-dias, o backend gera prompts extensos (~110k chars total) rodados no Claude
-Code (Opus 4.7 + max reasoning + dangerously-skip-permissions). 100% local.
+Gestão de aportes (AD-HOC, sem ciclo fixo) com comitê multipersona de IA padrão
+**Goldman Sachs GIR + Morgan Stanley GIC + Bridgewater + AQR**. A cada aporte o
+backend gera prompts extensos (~110k chars total) rodados no Claude Code (Opus
+4.7 + max reasoning + dangerously-skip-permissions). 100% local. A carteira é
+revisada toda semana; aporte novo só quando o cliente quiser.
 
 Há dois modos de execução:
 - **Automático (padrão)**: o orquestrador (`app/services/analysis_runner.py`)
@@ -19,8 +20,9 @@ O agente roda autônomo: workspace persistente próprio
 (`storage/agent_workspace/` com CLAUDE.md de ordens permanentes + MEMORY.md
 que ele mesmo gerencia entre ciclos), carta branca (web + Bash + criar
 ferramentas via `--dangerously-skip-permissions`), effort sempre `max`, e
-respeita a trava de venda de `MIN_HOLDING_DAYS` (30) dias. Ao concluir, manda
-a recomendação no **Telegram**; a cada vencimento de 30 dias um cron avisa.
+respeita a trava de venda de `MIN_HOLDING_DAYS` (30) dias (só ações/crypto). Ao
+concluir, manda a recomendação no **Telegram**; quando um lote de ação/crypto
+completa 30 dias, um cron roda a análise de maturidade. Aporte é ad-hoc.
 
 ### Ciclos e mandato (2026-05)
 - **Aporte (30d)**: 3 prompts encadeados + fechamento → folha de ordens.
@@ -67,8 +69,8 @@ sem Playwright.
   ao bot antes) e grava em `.env`
 - `.venv/bin/python scripts/telegram_bot.py`: bot interativo (também sobe no
   start.sh se Telegram configurado)
-- `.venv/bin/python scripts/check_cadence.py`: maturidade (roda análise) +
-  aviso de aporte vencido (cron diário)
+- `.venv/bin/python scripts/check_cadence.py`: roda análise de maturidade dos
+  lotes de ação/crypto que cruzaram 30d (cron diário). Sem nag de aporte (ad-hoc)
 - `.venv/bin/python scripts/weekly_review.py [--force]`: revisão semanal do
   comitê (macro + carteira + maturidade); auto-regula a 7 dias
 - `scripts/install_cron.sh [hora]`: instala os crons diários (`--uninstall` remove)

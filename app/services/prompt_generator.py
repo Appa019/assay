@@ -1,13 +1,12 @@
 """Render the 3-prompt sequence for a contribution, based on captured context."""
 
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 from typing import Any
 
 import structlog
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
-from app.config import settings
 from app.models.contribution import PromptKey
 
 logger = structlog.get_logger()
@@ -97,11 +96,9 @@ def build_render_context(
     if not captured_at:
         raise ValueError("captured_at é obrigatório no render context")
 
-    next_date = contribution_date + timedelta(days=settings.contribution_interval_days)
     return {
         "contribution_id": contribution_id,
         "contribution_date": contribution_date.isoformat(),
-        "next_contribution_date": next_date.isoformat(),
         "amount_brl": amount_brl,
         "amount_brl_formatted": _format_brl(amount_brl),
         "portfolio_total": portfolio_total,

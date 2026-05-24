@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CalendarDays, AlertTriangle, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import { usePortfolio } from "@/hooks/use-portfolio";
 import { useCadence } from "@/hooks/use-cadence";
 import { useMacro } from "@/hooks/use-macro";
@@ -37,8 +37,8 @@ const DashboardPage = () => {
             className="text-base mt-4 max-w-xl leading-relaxed"
             style={{ color: "var(--text-secondary)" }}
           >
-            Cada ciclo de 30 dias, o comitê (multipersona) gera 3 prompts extensos
-            que você cola no Claude Code. Decisão fica registrada no histórico.
+            Aporte quando quiser — sem ciclo fixo. O comitê autônomo aloca a
+            cada aporte e revisa a carteira toda semana. Decisões ficam no histórico.
           </p>
         </div>
         <Link
@@ -47,12 +47,10 @@ const DashboardPage = () => {
           style={{ background: "var(--accent)", color: "white" }}
         >
           <Sparkles size={14} />
-          Iniciar ciclo
+          Novo aporte
           <ArrowRight size={14} />
         </Link>
       </header>
-
-      <CadenceBanner />
 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <SummaryCard
@@ -74,18 +72,20 @@ const DashboardPage = () => {
           sub="RF · Ações · Crypto (%)"
         />
         <SummaryCard
-          title="Próximo aporte"
+          title="Último aporte"
           value={
             cadence
-              ? cadence.days_until_next <= 0
-                ? "Hoje"
-                : `${cadence.days_until_next}d`
+              ? cadence.days_since_last === null
+                ? "—"
+                : cadence.days_since_last === 0
+                  ? "Hoje"
+                  : `há ${cadence.days_since_last}d`
               : "..."
           }
           sub={
             cadence?.last_contribution_date
-              ? `desde ${new Date(cadence.last_contribution_date).toLocaleDateString("pt-BR")}`
-              : "primeiro ciclo"
+              ? `${new Date(cadence.last_contribution_date).toLocaleDateString("pt-BR")} · ${cadence.total_contributions} no total`
+              : "nenhum ainda · aporte quando quiser"
           }
         />
       </section>
@@ -156,64 +156,6 @@ const DashboardPage = () => {
           )}
         </div>
       </section>
-    </div>
-  );
-};
-
-const CadenceBanner = () => {
-  const { data } = useCadence();
-  if (!data) return null;
-
-  const tone = data.is_overdue
-    ? "var(--danger)"
-    : data.is_due
-      ? "var(--accent)"
-      : "var(--border)";
-  const bg = data.is_overdue
-    ? "var(--danger-light)"
-    : data.is_due
-      ? "var(--accent-light)"
-      : "var(--bg-card)";
-
-  return (
-    <div
-      className="p-5 rounded-md flex items-center justify-between"
-      style={{ background: bg, border: `1px solid ${tone}` }}
-    >
-      <div className="flex items-center gap-3">
-        {data.is_overdue ? (
-          <AlertTriangle size={18} style={{ color: tone }} />
-        ) : (
-          <CalendarDays size={18} style={{ color: tone }} />
-        )}
-        <div>
-          <p
-            className="text-sm font-semibold"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {data.is_overdue
-              ? `Aporte atrasado há ${Math.abs(data.days_until_next)} dias`
-              : data.is_due
-                ? "Janela do aporte mensal aberta"
-                : `Próximo aporte em ${data.days_until_next} dias`}
-          </p>
-          <p className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>
-            {data.last_contribution_date
-              ? `Último ciclo: ${new Date(data.last_contribution_date).toLocaleDateString("pt-BR")}`
-              : "Sem ciclos anteriores · primeiro aporte da casa"}
-          </p>
-        </div>
-      </div>
-      {data.is_due && (
-        <Link
-          href="/aporte"
-          className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-md"
-          style={{ background: "var(--accent)", color: "white" }}
-        >
-          Abrir ciclo
-          <ArrowRight size={13} />
-        </Link>
-      )}
     </div>
   );
 };

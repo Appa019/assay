@@ -1,16 +1,16 @@
-"""Detect 30-day milestones (idempotent state) for the daily cadence job.
+"""Detect per-lot 30-day maturity milestones (idempotent state).
 
-Two triggers:
-- A purchase LOT crosses ``min_holding_days`` since its entry → now sellable,
-  fires a committee maturity review.
-- The contribution cadence is due → a Telegram nudge to make a new aporte.
+When a stock/crypto LOT crosses ``min_holding_days`` since its entry it becomes
+sellable, which fires a committee maturity review. Contributions are ad-hoc
+(no fixed cycle), so there is NO scheduled "time to invest" nag — the recurring
+touchpoint is the weekly review.
 
 State is persisted so a milestone is never handled twice. Keys are only marked
 done AFTER the action succeeds, so a failed run is retried next day.
 """
 
 import json
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -19,8 +19,6 @@ from sqlmodel import Session, select
 
 from app.config import settings
 from app.models.asset import Asset, AssetClass
-from app.models.contribution import Contribution
-from app.services import telegram_service
 
 logger = structlog.get_logger()
 
@@ -34,7 +32,7 @@ def _load_state() -> dict[str, Any]:
             return json.loads(_STATE_PATH.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             logger.warning("notifications_state_corrupt_reset")
-    return {"asset_unlocks": [], "contribution_due": []}
+    return {"asset_unlocks": []}
 
 
 def _save_state(state: dict[str, Any]) -> None:
@@ -95,31 +93,3 @@ def mark_maturities(keys: list[str]) -> None:
     existing.update(keys)
     state["asset_unlocks"] = sorted(existing)
     _save_state(state)
-
-
-def notify_contribution_due(session: Session, *, today: date | None = None) -> str | None:
-    """Send the cadence nudge if a new aporte is due. Returns the message sent."""
-    today = today or date.today()
-    interval = settings.contribution_interval_days
-    state = _load_state()
-    dues = set(state.get("contribution_due", []))
-
-    last = session.exec(
-        select(Contribution).order_by(Contribution.created_at.desc()).limit(1)
-    ).first()
-    next_date = (last.created_at.date() + timedelta(days=interval)) if last else today
-    if next_date > today or next_date.isoformat() in dues:
-        return None
-
-    last_str = last.created_at.date().isoformat() if last else "—"
-    msg = (
-        f"📅 Já se passaram {interval} dias desde o último aporte ({last_str}). "
-        "Hora de um novo aporte — me mande o valor com /aporte <valor> ou use o app, "
-        "que eu rodo o comitê inteiro e te devolvo onde investir e quanto."
-    )
-    if telegram_service.notify(msg):
-        dues.add(next_date.isoformat())
-        state["contribution_due"] = sorted(dues)
-        _save_state(state)
-        return msg
-    return None

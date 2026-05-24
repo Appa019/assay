@@ -1,16 +1,17 @@
 # Investimentos Manual
 
-Gestão de aportes mensais com **comitê multipersona de IA padrão Goldman
-Sachs GIR + Morgan Stanley GIC + Bridgewater + AQR**. Cada ciclo de 30
-dias gera prompts extensos (~110k chars · ~28k tokens) e roda o comitê no
+Gestão de aportes **ad-hoc (sem ciclo fixo)** com **comitê multipersona de IA
+padrão Goldman Sachs GIR + Morgan Stanley GIC + Bridgewater + AQR**. A cada
+aporte gera prompts extensos (~110k chars · ~28k tokens) e roda o comitê no
 Claude Code (Opus · max reasoning).
 
-**Modo automático (padrão):** você só informa o aporte — um agente autônomo
-roda todas as reuniões encadeadas no `claude` headless (carta branca de
-pesquisa, cria ferramentas, gerencia a própria memória, respeita a trava de
-venda de 30 dias) e te entrega **onde investir e quanto**. A recomendação
-chega no **Telegram**; a cada 30 dias um lembrete avisa o próximo aporte e
-quais ativos já podem ser vendidos. Você só registra o que comprou.
+**Modo automático (padrão):** você informa o aporte quando quiser — um agente
+autônomo roda todas as reuniões encadeadas no `claude` headless (carta branca de
+pesquisa, cria ferramentas, gerencia a própria memória) e te entrega **onde
+investir e quanto**. A recomendação chega no **Telegram**. A carteira é revisada
+**toda semana** (macro + posições + rotação de CDB para oportunidades); quando um
+lote de ação/crypto completa **30 dias** (trava de venda), o comitê reavalia
+manter/vender. CDB tem liquidez diária. Você só registra o que comprou.
 
 **Modo manual (fallback):** o app gera os 3 prompts para você colar à mão.
 
@@ -52,7 +53,7 @@ Configuração única do Telegram:
 # 1. defina TELEGRAM_BOT_TOKEN no .env (pegue no @BotFather)
 # 2. mande /start ao seu bot e capture o chat_id:
 .venv/bin/python scripts/telegram_setup.py
-# 3. (opcional) lembretes de 30 dias via cron diário:
+# 3. (opcional) maturidade dos lotes + revisão semanal via cron diário:
 scripts/install_cron.sh
 ```
 
@@ -208,8 +209,8 @@ app/
   services/          # portfolio, market_data, prompt_generator
 frontend/
   src/app/(dashboard)/
-    page.tsx            # dashboard + widget próximo aporte
-    aporte/             # fluxo de 3 prompts
+    page.tsx            # dashboard + widget último aporte
+    aporte/             # fluxo de aporte (auto-run)
     ativos/             # CRUD carteira
     relatorios/         # histórico
     configuracoes/      # leitura do .env
