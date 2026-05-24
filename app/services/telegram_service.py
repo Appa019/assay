@@ -48,9 +48,14 @@ def _is_table_row(line: str) -> bool:
 
 
 def _render_table(block: list[str]) -> str:
-    """Render markdown table rows as an aligned monospace <pre> block."""
+    """Render a markdown table as mobile-friendly Telegram blocks.
+
+    Wide tables (a long 'Racional' column) overflow Telegram's narrow mobile
+    view as monospace. Instead, transpose each data row into a labeled stanza
+    using the header as field names — reads cleanly on a phone, no scrolling.
+    """
+
     def _clean(cell: str) -> str:
-        # Tables are monospace; drop bold/code markers so they don't show literal.
         return cell.strip().replace("**", "").replace("`", "")
 
     rows = [[_clean(c) for c in ln.strip().strip("|").split("|")] for ln in block]
@@ -59,9 +64,27 @@ def _render_table(block: list[str]) -> str:
         return ""
     ncol = max(len(r) for r in data)
     data = [r + [""] * (ncol - len(r)) for r in data]
-    widths = [max(len(r[i]) for r in data) for i in range(ncol)]
-    lines = ["  ".join(r[i].ljust(widths[i]) for i in range(ncol)).rstrip() for r in data]
-    return "<pre>" + _html.escape("\n".join(lines), quote=False) + "</pre>"
+    header, records = data[0], data[1:]
+    if not records:  # header-only → single line
+        return _inline(" · ".join(c for c in header if c))
+
+    def esc(s: str) -> str:
+        return _html.escape(s, quote=False)
+
+    blocks: list[str] = []
+    for rec in records:
+        if ncol == 2:  # two columns → "label: value"
+            label, value = rec[0], rec[1]
+            blocks.append(f"<b>{esc(label)}</b>: {esc(value)}" if label else esc(value))
+            continue
+        lines = [f"<b>{esc(rec[0])}</b>"] if rec[0] else []
+        for i in range(1, ncol):
+            if rec[i]:
+                lines.append(f"• {esc(header[i])}: {esc(rec[i])}")
+        blocks.append("\n".join(lines))
+    # Blank line between multi-line stanzas; compact for 2-col rows.
+    joiner = "\n" if ncol == 2 else "\n\n"
+    return joiner.join(blocks)
 
 
 def format_for_telegram(text: str) -> str:
