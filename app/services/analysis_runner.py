@@ -12,6 +12,7 @@ observable step by step via the normal contribution read endpoint.
 """
 
 import json
+import re
 import shutil
 import subprocess
 import time
@@ -327,6 +328,11 @@ _LIMIT_PATTERNS = (
     "service unavailable",
     "5-hour",
     "resets at",
+    "resets",
+    "session limit",
+    "hit your",
+    "usage limit reached",
+    "limit will reset",
 )
 _HARD_PATTERNS = (
     "prompt is too long",
@@ -434,6 +440,36 @@ def _run_claude_step(
     )
 
 
+def _seconds_until_reset(message: str, *, cap: int = 6 * 3600) -> int | None:
+    """Parse a usage-limit reset time (e.g. 'resets 8:20pm') → seconds to wait.
+
+    Lets the agent wait exactly until the window reopens instead of guessing,
+    which is the right behavior for Claude session limits. Returns None if no
+    reset time is present. Assumes the machine's local timezone.
+    """
+    m = re.search(
+        r"reset[s]?(?:\s+at)?\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", message, re.IGNORECASE
+    )
+    if not m:
+        return None
+    hour = int(m.group(1))
+    minute = int(m.group(2) or 0)
+    ampm = (m.group(3) or "").lower()
+    if ampm == "pm" and hour != 12:
+        hour += 12
+    elif ampm == "am" and hour == 12:
+        hour = 0
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        return None
+    now = datetime.now()
+    target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    # Session limits reset within hours (same day, future). If the parsed time
+    # already passed, the window has reopened — fall back to short backoff.
+    if target <= now:
+        return None
+    return min(int((target - now).total_seconds()) + 60, cap)  # +60s buffer
+
+
 def _run_step_resilient(
     prompt: str,
     *,
@@ -447,7 +483,11 @@ def _run_step_resilient(
     total: int,
     title: str,
 ) -> StepResult:
-    """Run one step, auto-resuming on limit/transient errors with backoff."""
+    """Run one step, auto-resuming on limit/transient errors.
+
+    Rate/usage limits wait until the parsed reset time (or escalating backoff);
+    transient blips get a few quick retries.
+    """
     attempt = 0
     while True:
         try:
@@ -464,7 +504,9 @@ def _run_step_resilient(
             schedule = _LIMIT_BACKOFF if is_limit else _TRANSIENT_BACKOFF
             if attempt >= len(schedule):
                 raise
-            wait = schedule[attempt]
+            # For usage limits, wait until the announced reset; else backoff.
+            reset_wait = _seconds_until_reset(str(exc)) if is_limit else None
+            wait = reset_wait if reset_wait is not None else schedule[attempt]
             attempt += 1
             _emit(
                 on_event,
