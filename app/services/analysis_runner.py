@@ -12,6 +12,7 @@ observable step by step via the normal contribution read endpoint.
 """
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -710,6 +711,81 @@ def run_chain(
     return summary
 
 
+# --- per-contribution run lock (prevents double-runs across processes) -------
+_RUN_LOCK_DIR = _PROJECT_ROOT / "storage" / "analysis_runs"
+_RUN_LOCK_MAX_AGE_S = 8 * 3600  # reclaim a lock older than this (hung run / PID reuse)
+
+
+def _lock_path(contribution_id: UUID) -> Path:
+    return _RUN_LOCK_DIR / f"{contribution_id}.lock"
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _lock_is_active(path: Path) -> bool:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    pid = data.get("pid")
+    if not isinstance(pid, int) or not _pid_alive(pid):
+        return False
+    try:
+        age = (datetime.now(UTC) - datetime.fromisoformat(data["started_at"])).total_seconds()
+    except (KeyError, TypeError, ValueError):
+        age = 0.0
+    return age < _RUN_LOCK_MAX_AGE_S
+
+
+def _acquire_run_lock(contribution_id: UUID) -> bool:
+    """True if we now hold the lock; False if a live run already holds it."""
+    _RUN_LOCK_DIR.mkdir(parents=True, exist_ok=True)
+    path = _lock_path(contribution_id)
+    if path.exists() and _lock_is_active(path):
+        return False
+    try:
+        path.write_text(
+            json.dumps({"pid": os.getpid(), "started_at": datetime.now(UTC).isoformat()}),
+            encoding="utf-8",
+        )
+    except OSError:
+        return False
+    return True
+
+
+def _release_run_lock(contribution_id: UUID) -> None:
+    path = _lock_path(contribution_id)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    if data.get("pid") == os.getpid():
+        path.unlink(missing_ok=True)
+
+
+def pending_resumable_ids(session: Session) -> list[UUID]:
+    """Contributions whose automatic run started but never produced the report.
+
+    Identified by a captured ``claude_session_id`` (so manual-mode and never-run
+    contributions are left alone) and a missing ``final_summary``. Oldest first.
+    """
+    rows = session.exec(
+        select(Contribution)
+        .where(Contribution.claude_session_id.is_not(None))
+        .where(Contribution.final_summary.is_(None))
+        .order_by(Contribution.created_at)
+    ).all()
+    return [c.id for c in rows]
+
+
 def run_analysis(
     session: Session,
     contribution_id: UUID,
@@ -727,14 +803,46 @@ def run_analysis(
     auto-loaded), persists each prompt response as it completes, stores the
     consolidated summary and pushes it to Telegram. Raises ``AnalysisError`` on
     failure (and marks the contribution back to READY so it can be retried).
-    """
-    min_holding_days = (
-        min_holding_days if min_holding_days is not None else settings.min_holding_days
-    )
 
+    A per-contribution PID lock prevents two processes (e.g. a live run and the
+    resume watcher) from running the same analysis at once.
+    """
     contribution = session.get(Contribution, contribution_id)
     if contribution is None:
         raise AnalysisError(f"Contribution {contribution_id} not found")
+
+    if not _acquire_run_lock(contribution_id):
+        raise AnalysisError(f"Já existe uma execução ativa para o aporte {contribution_id}.")
+    try:
+        return _run_analysis_locked(
+            session,
+            contribution,
+            model=model,
+            effort=effort,
+            step_timeout=step_timeout,
+            min_holding_days=min_holding_days,
+            notify=notify,
+            on_event=on_event,
+        )
+    finally:
+        _release_run_lock(contribution_id)
+
+
+def _run_analysis_locked(
+    session: Session,
+    contribution: Contribution,
+    *,
+    model: str,
+    effort: str,
+    step_timeout: int,
+    min_holding_days: int | None,
+    notify: bool,
+    on_event: EventCallback | None,
+) -> RunSummary:
+    contribution_id = contribution.id
+    min_holding_days = (
+        min_holding_days if min_holding_days is not None else settings.min_holding_days
+    )
 
     prompts = list(
         session.exec(

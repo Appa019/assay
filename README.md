@@ -85,9 +85,11 @@ acompanha etapa por etapa)…
   salva em `/relatorios` e é consultada nos aportes.
 - **Maturidade**: quando um lote completa 30 dias, o comitê analisa manter/vender.
 - **Auto-resume**: se bater limite de uso, o agente espera o reset e retoma
-  sozinho. E se o processo cair no meio (créditos/queda), ao re-rodar o mesmo
-  aporte (`run_analysis.py --contribution-id <uuid>`) ele **retoma de onde
-  parou** — não refaz as reuniões já concluídas.
+  sozinho. E se o processo cair no meio (créditos/queda), **o próprio sistema
+  retoma**: `scripts/resume_pending.py` (no cron a cada 15 min via
+  `install_cron.sh`) detecta a análise incompleta e a conclui assim que o limite
+  voltar, continuando de onde parou — sem refazer as reuniões já feitas. Dá pra
+  forçar à mão também: `run_analysis.py --contribution-id <uuid>`.
 
 > ⚠️ Cada run é Opus/max em ~110k chars × N reuniões — custa alguns dólares e
 > leva dezenas de minutos. Teste barato: `--model haiku --effort low`.

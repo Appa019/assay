@@ -50,6 +50,13 @@ completa 30 dias, um cron roda a análise de maturidade. Aporte é ad-hoc.
   encadeada — não refaz as reuniões já feitas. Se a sessão expirou
   (`SessionNotFoundError`), recomeça do zero sozinho. Migração da coluna em
   `core/database._ensure_sqlite_columns`.
+- **Retomada AUTOMÁTICA (sem você re-rodar)**: `scripts/resume_pending.py` acha
+  análises automáticas incompletas (`claude_session_id` set + `final_summary`
+  null) e as retoma; roda no cron a cada 15 min (`install_cron.sh`) ou em loop
+  (`--watch [s]`). Assim, se o limite/créditos acabarem e o processo morrer, o
+  sistema conclui sozinho quando o limite voltar. Um **lock PID por aporte**
+  (`analysis_runner._acquire_run_lock`, arquivos em `storage/analysis_runs/`)
+  impede rodar em dobro com um run vivo (CLI/API/bot). Avisa no Telegram ao retomar.
 - **MCPs + acesso total + auto-provisionamento**: cada run usa
   `--mcp-config storage/agent_workspace/.mcp.json` + `--strict-mcp-config` e
   `--add-dir $HOME` + `--dangerously-skip-permissions` → navega a máquina toda,
@@ -85,7 +92,11 @@ sem Playwright.
   lotes de ação/crypto que cruzaram 30d (cron diário). Sem nag de aporte (ad-hoc)
 - `.venv/bin/python scripts/weekly_review.py [--force]`: revisão semanal do
   comitê (macro + carteira + maturidade); auto-regula a 7 dias
-- `scripts/install_cron.sh [hora]`: instala os crons diários (`--uninstall` remove)
+- `.venv/bin/python scripts/resume_pending.py [--watch [s]]`: retoma análises de
+  aporte interrompidas (limite/queda), continuando de onde pararam; roda no cron
+  a cada 15 min
+- `scripts/install_cron.sh [hora]`: instala os crons (maturidade + revisão
+  semanal + retomada a cada 15 min; `--uninstall` remove)
 - `.venv/bin/uvicorn app.main:app --reload`: backend dev (porta 8000)
 - `cd frontend && pnpm dev`: frontend dev (porta 3000)
 - `cd frontend && pnpm lint && pnpm type-check && pnpm build`: validação
@@ -104,7 +115,8 @@ sem Playwright.
     maturidade via run_chain → Report), telegram_service (Bot API),
     notification_service (marcos de 30 dias por lote)
 - `/scripts/`: run_analysis (aporte→análise), telegram_setup, telegram_bot,
-  check_cadence, weekly_review, install_cron
+  check_cadence, weekly_review, resume_pending (retoma análises interrompidas),
+  install_cron
 - `/storage/agent_workspace/`: workspace persistente do agente (gitignored) —
   CLAUDE.md (ordens permanentes, reescrito a cada run), MEMORY.md (memória do
   agente), tools/ (ferramentas que ele cria)
