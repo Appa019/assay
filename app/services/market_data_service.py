@@ -21,7 +21,9 @@ logger = structlog.get_logger()
 # Brazilian Central Bank time-series codes
 BCB_SELIC_META = 432
 BCB_IPCA_12M = 13522
-BCB_CDI = 4391
+# 4389 = CDI annualized (% a.a., ~Selic). NOT 4391, which is the *monthly* CDI
+# (% a.m.) and was injecting a wrong ~0.75 into the prompts.
+BCB_CDI = 4389
 BCB_USD_BRL = 1
 
 
