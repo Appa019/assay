@@ -181,6 +181,19 @@ def get_updates(
     return data["result"]
 
 
+def _redact(token: str, message: str) -> str:
+    """Never let the bot token leak into logs via httpx URLs in exceptions."""
+    return message.replace(token, "***") if token else message
+
+
+_TAG = re.compile(r"</?(?:b|i|code|pre|u|s)>")
+
+
+def _strip_html(chunk: str) -> str:
+    """Plain-text version of an already-formatted HTML chunk."""
+    return _html.unescape(_TAG.sub("", chunk))
+
+
 def send_message(
     text: str,
     *,
@@ -188,6 +201,11 @@ def send_message(
     token: str | None = None,
 ) -> bool:
     """Send a (possibly chunked) message to the configured chat.
+
+    The whole text is converted to Telegram HTML FIRST and only then chunked:
+    chunking raw markdown used to split a table mid-way, and each half no
+    longer parsed as a table — the order sheet arrived mangled. Formatting
+    first means chunks split between already-rendered lines.
 
     Returns False (and logs) when Telegram isn't configured, so callers can
     fire-and-forget without guarding every call site.
@@ -199,32 +217,51 @@ def send_message(
         return False
 
     url = f"{_base(token)}/sendMessage"
+    html_full = format_for_telegram(text)
     try:
         with httpx.Client(timeout=_TIMEOUT) as client:
-            for chunk in chunk_text(text):
-                html_text = format_for_telegram(chunk)
+            for chunk in chunk_text(html_full):
                 resp = client.post(
                     url,
                     json={
                         "chat_id": chat_id,
-                        "text": html_text,
+                        "text": chunk,
                         "parse_mode": "HTML",
                         "disable_web_page_preview": True,
                     },
                 )
                 if resp.json().get("ok"):
                     continue
-                # HTML rejected → never lose the message: resend as plain text.
+                # HTML rejected → never lose the message: strip the tags from
+                # THIS chunk and resend it as plain text (content-identical).
                 logger.warning("telegram_html_rejected_fallback_plain")
                 resp = client.post(
                     url,
-                    json={"chat_id": chat_id, "text": chunk, "disable_web_page_preview": True},
+                    json={
+                        "chat_id": chat_id,
+                        "text": _strip_html(chunk),
+                        "disable_web_page_preview": True,
+                    },
                 )
                 if not resp.json().get("ok"):
                     raise TelegramError(f"sendMessage falhou: {resp.json()}")
         return True
     except (httpx.HTTPError, TelegramError) as exc:
-        logger.error("telegram_send_failed", error=str(exc))
+        logger.error("telegram_send_failed", error=_redact(token, str(exc)))
+        return False
+
+
+def set_my_commands(commands: list[dict[str, str]], *, token: str | None = None) -> bool:
+    """Register the bot's command menu (shown by Telegram's / button)."""
+    token = token or settings.telegram_bot_token
+    if not token:
+        return False
+    try:
+        with httpx.Client(timeout=_TIMEOUT) as client:
+            resp = client.post(f"{_base(token)}/setMyCommands", json={"commands": commands})
+        return bool(resp.json().get("ok"))
+    except httpx.HTTPError as exc:
+        logger.warning("telegram_set_commands_failed", error=_redact(token, str(exc)))
         return False
 
 

@@ -24,7 +24,7 @@ from sqlmodel import select  # noqa: E402
 
 from app.core.database import get_session, init_db  # noqa: E402
 from app.models.report import Report, ReportKind  # noqa: E402
-from app.services import analysis_runner, review_service  # noqa: E402
+from app.services import analysis_runner, review_service, telegram_service  # noqa: E402
 
 
 def _is_due(session, interval_days: int = 7) -> bool:
@@ -64,6 +64,17 @@ def main() -> int:
         if not args.force and not _is_due(session):
             print("Revisão semanal ainda não venceu (menos de 7 dias). Use --force.")
             return 0
+        print("Atualizando preços…")
+        try:
+            from sqlmodel import Session
+
+            from app.core.database import engine
+            from app.services import price_refresh_service
+
+            with Session(engine) as ps:
+                asyncio.run(price_refresh_service.refresh_prices(ps))
+        except Exception as exc:  # noqa: BLE001 — stale prices beat no review
+            print(f"  aviso: refresh de preços falhou ({exc}); usando os últimos salvos.")
         print("Capturando macro…")
         macro = asyncio.run(review_service.fetch_macro())
         report = review_service.run_weekly_review(
@@ -79,6 +90,15 @@ def main() -> int:
         print(report.content)
         return 0
     except analysis_runner.AnalysisError as exc:
+        # "another run holds the global lock" is a normal defer, not a failure.
+        if "em andamento" in str(exc):
+            print(f"Adiada: {exc}")
+            return 0
+        telegram_service.notify(f"✖ Revisão semanal falhou: {exc}")
+        print(f"Erro na revisão semanal: {exc}")
+        return 1
+    except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
+        telegram_service.notify(f"✖ Revisão semanal falhou: {exc}")
         print(f"Erro na revisão semanal: {exc}")
         return 1
     finally:

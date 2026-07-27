@@ -3,7 +3,15 @@
 #   - check_cadence.py   : per-lot maturity reviews (daily)
 #   - weekly_review.py   : weekly committee review (daily, self-gated to 7 days)
 #   - resume_pending.py  : resume interrupted analyses (every 15 min)
+#   - refresh_prices.py  : mark lots to market (every 6h)
+#   - daily_snapshot.py  : equity-curve datapoint (daily, after market close)
+#   - backup_db.sh       : SQLite backup with rotation (daily)
+#   - log rotation       : trim cron logs monthly
 # Idempotent: re-running replaces the previous entries. Remove with --uninstall.
+#
+# Every entry runs under flock so a slow run never stacks on top of itself,
+# and PATH includes ~/.local/bin + node/uv shims so the headless Claude CLI
+# and npx/uvx MCP servers work under cron's minimal environment.
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -22,17 +30,47 @@ if [[ ! -x "$PY" ]]; then
   exit 1
 fi
 
-mkdir -p "${PROJECT_ROOT}/storage/logs"
+LOGS="${PROJECT_ROOT}/storage/logs"
+LOCKS="${PROJECT_ROOT}/storage/cron_locks"
+mkdir -p "$LOGS" "$LOCKS"
 
-CADENCE="0 ${HOUR} * * * cd '${PROJECT_ROOT}' && '${PY}' scripts/check_cadence.py >> '${PROJECT_ROOT}/storage/logs/cadence.log' 2>&1 # ${MARKER}"
-WEEKLY="30 ${HOUR} * * * cd '${PROJECT_ROOT}' && '${PY}' scripts/weekly_review.py >> '${PROJECT_ROOT}/storage/logs/weekly.log' 2>&1 # ${MARKER}"
-RESUME="*/15 * * * * cd '${PROJECT_ROOT}' && '${PY}' scripts/resume_pending.py >> '${PROJECT_ROOT}/storage/logs/resume.log' 2>&1 # ${MARKER}"
+CRON_PATH="PATH=${HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin # ${MARKER}"
+
+entry() { # entry <schedule> <lockname> <command> <logname>
+  local sched="$1" lock="$2" cmd="$3" log="$4"
+  echo "${sched} cd '${PROJECT_ROOT}' && flock -n '${LOCKS}/${lock}.lock' ${cmd} >> '${LOGS}/${log}.log' 2>&1 # ${MARKER}"
+}
+
+CADENCE="$(entry "0 ${HOUR} * * *"   cadence  "'${PY}' scripts/check_cadence.py"   cadence)"
+WEEKLY="$(entry  "30 ${HOUR} * * *"  weekly   "'${PY}' scripts/weekly_review.py"   weekly)"
+RESUME="$(entry  "*/15 * * * *"      resume   "'${PY}' scripts/resume_pending.py"  resume)"
+PRICES="$(entry  "15 */6 * * *"      prices   "'${PY}' scripts/refresh_prices.py"  prices)"
+SNAPSHOT="$(entry "45 18 * * *"      snapshot "'${PY}' scripts/daily_snapshot.py"  snapshot)"
+BACKUP="$(entry  "0 3 * * *"         backup   "bash scripts/backup_db.sh"          backup)"
+LOGTRIM="0 4 1 * * find '${LOGS}' -name '*.log' -size +5M -exec truncate -s 1M {} \; # ${MARKER}"
 
 # Drop any previous entries, then append the fresh ones.
-( crontab -l 2>/dev/null | grep -v "$MARKER" || true; echo "$CADENCE"; echo "$WEEKLY"; echo "$RESUME" ) | crontab -
+(
+  crontab -l 2>/dev/null | grep -v "$MARKER" || true
+  echo "$CRON_PATH"
+  echo "$CADENCE"
+  echo "$WEEKLY"
+  echo "$RESUME"
+  echo "$PRICES"
+  echo "$SNAPSHOT"
+  echo "$BACKUP"
+  echo "$LOGTRIM"
+) | crontab -
 
 echo "Crons instalados:"
 echo "  · check_cadence.py   → maturidade dos lotes (diário ~${HOUR}h)"
 echo "  · weekly_review.py   → revisão semanal (diário, dispara a cada 7 dias)"
 echo "  · resume_pending.py  → retoma análises interrompidas (a cada 15 min)"
+echo "  · refresh_prices.py  → marcação a mercado (a cada 6h)"
+echo "  · daily_snapshot.py  → curva de patrimônio (diário 18h45)"
+echo "  · backup_db.sh       → backup do SQLite com rotação (diário 3h)"
+echo "  · rotação de logs    → mensal"
 echo "Ver: crontab -l   ·   Remover: scripts/install_cron.sh --uninstall"
+echo
+echo "Dica: para máquinas que ficam desligadas, prefira scripts/install_systemd.sh"
+echo "(timers persistentes recuperam janelas perdidas ao ligar)."

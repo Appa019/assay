@@ -42,25 +42,37 @@ if [ ! -d "frontend/node_modules" ]; then
   (cd frontend && pnpm install)
 fi
 
-# ── 4. Libera portas ─────────────────────────────────────────────
+# ── 4. Libera portas (só processos DESTE projeto) ────────────────
 free_port() {
   local port=$1
   local pids
   pids="$(ss -ltnp 2>/dev/null | awk -v p=":$port" 'index($4,p){print $0}' | grep -oP 'pid=\K[0-9]+' | sort -u || true)"
   for pid in $pids; do
-    warn "Encerrando processo na porta $port (pid $pid)"
-    kill -9 "$pid" 2>/dev/null || true
+    # Never kill an unrelated app that happens to hold the port — only our own
+    # uvicorn/next/bot (identified by the project path in the cmdline).
+    if tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -qF "$PROJECT_DIR"; then
+      warn "Encerrando processo do projeto na porta $port (pid $pid)"
+      kill "$pid" 2>/dev/null || true
+      sleep 1
+      kill -9 "$pid" 2>/dev/null || true
+    else
+      fail "Porta $port ocupada por um processo de OUTRO app (pid $pid). Encerre-o ou use BACKEND_PORT/FRONTEND_PORT."
+    fi
   done
 }
 free_port "$BACKEND_PORT"
 free_port "$FRONTEND_PORT"
 
 # ── 5. Backend ───────────────────────────────────────────────────
+# No --reload by default: a file save would restart uvicorn and kill any
+# in-flight committee analysis. Opt in with START_RELOAD=1 while developing.
+RELOAD_FLAG=""
+[ "${START_RELOAD:-0}" = "1" ] && RELOAD_FLAG="--reload"
 info "Iniciando backend FastAPI na porta $BACKEND_PORT"
 .venv/bin/uvicorn app.main:app \
   --host 127.0.0.1 \
   --port "$BACKEND_PORT" \
-  --reload \
+  $RELOAD_FLAG \
   > "$LOG_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 echo "$BACKEND_PID" > "$LOG_DIR/backend.pid"

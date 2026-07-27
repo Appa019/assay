@@ -20,13 +20,12 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from app.config import settings  # noqa: E402
 from app.core.database import get_session, init_db  # noqa: E402
-from app.services import notification_service, review_service  # noqa: E402
+from app.services import notification_service, review_service, telegram_service  # noqa: E402
 
 
 def main() -> int:
-    if not settings.telegram_enabled:
-        print("Telegram não configurado (rode scripts/telegram_setup.py). Nada a fazer.")
-        return 0
+    # No Telegram? Still run: the Report is saved and consulted by future
+    # aportes — only the push notification is skipped.
     init_db()
     gen = get_session()
     session = next(gen)
@@ -35,13 +34,26 @@ def main() -> int:
         matured, keys = notification_service.pending_maturities(session)
         if matured:
             print(f"Lotes recém-liberados: {len(matured)} — rodando análise de maturidade…")
+            try:
+                from app.services import price_refresh_service
+
+                asyncio.run(price_refresh_service.refresh_prices(session))
+                matured, keys = notification_service.pending_maturities(session)
+            except Exception as exc:  # noqa: BLE001 — stale prices beat no review
+                print(f"  aviso: refresh de preços falhou ({exc}).")
             macro = asyncio.run(review_service.fetch_macro())
-            review_service.run_maturity_review(session, matured, macro_ctx=macro)
+            review_service.run_maturity_review(
+                session, matured, macro_ctx=macro, notify=settings.telegram_enabled
+            )
             notification_service.mark_maturities(keys)
-            print("  análise de maturidade enviada e marcada.")
+            print("  análise de maturidade concluída e marcada.")
         else:
             print("Nenhum lote novo liberado.")
         return 0
+    except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
+        telegram_service.notify(f"✖ check_cadence (maturidade) falhou: {exc}")
+        print(f"check_cadence falhou: {exc}")
+        return 1
     finally:
         gen.close()
 
