@@ -1,15 +1,24 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, RefreshCw, Sparkles, WifiOff } from "lucide-react";
 import { usePortfolio } from "@/hooks/use-portfolio";
 import { useCadence } from "@/hooks/use-cadence";
 import { useMacro } from "@/hooks/use-macro";
 import { usePortfolioHistory } from "@/hooks/use-portfolio-history";
+import {
+  fetchBenchmark,
+  fetchOrders,
+  type BenchmarkResponse,
+  type Order,
+} from "@/lib/api";
 import { formatBRLCompact, formatDate } from "@/lib/format";
+import { OrdersPanel } from "@/components/orders-panel";
 import {
   AllocationDonut,
   AllocationVsTargetChart,
+  BenchmarkChart,
   EquityCurveChart,
 } from "@/components/portfolio-charts";
 
@@ -18,8 +27,35 @@ const DashboardPage = () => {
   const { data: cadence } = useCadence();
   const { data: macro } = useMacro();
   const { data: history } = usePortfolioHistory(365);
+  const [benchmark, setBenchmark] = useState<BenchmarkResponse | null>(null);
+  const [pendingOrders, setPendingOrders] = useState<Order[] | null>(null);
+
+  const loadPendingOrders = useCallback(async () => {
+    try {
+      setPendingOrders(await fetchOrders("pending"));
+    } catch {
+      // Network error: hide the block instead of breaking the dashboard.
+      setPendingOrders(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Defer to a task so no state update runs synchronously in the effect.
+    const timer = setTimeout(() => {
+      void loadPendingOrders();
+      void (async () => {
+        try {
+          setBenchmark(await fetchBenchmark(365));
+        } catch {
+          setBenchmark(null);
+        }
+      })();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [loadPendingOrders]);
 
   const backendDown = !pLoading && !portfolio && pError !== null;
+  const hasBenchmark = benchmark !== null && benchmark.series.length > 0;
 
   return (
     <div className="space-y-12 max-w-6xl">
@@ -123,6 +159,15 @@ const DashboardPage = () => {
         </section>
       )}
 
+      {!backendDown && pendingOrders !== null && pendingOrders.length > 0 && (
+        <OrdersPanel
+          orders={pendingOrders}
+          title="Ordens pendentes"
+          subtitle="Folha de ordens do comitê aguardando execução — registre o que você executou ou pule"
+          onChanged={loadPendingOrders}
+        />
+      )}
+
       {!backendDown && portfolio && (
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <ChartCard
@@ -137,14 +182,21 @@ const DashboardPage = () => {
         </section>
       )}
 
-      {!backendDown && history && history.length > 0 && (
+      {!backendDown && hasBenchmark && benchmark ? (
+        <ChartCard
+          title="Carteira vs benchmarks"
+          sub="Retorno acumulado (TWR, base 100) contra CDI, Ibovespa e BTC — clique na legenda para ocultar séries"
+        >
+          <BenchmarkChart series={benchmark.series} />
+        </ChartCard>
+      ) : !backendDown && history && history.length > 0 ? (
         <ChartCard
           title="Curva de patrimônio"
           sub="Valor total da carteira nos snapshots diários"
         >
           <EquityCurveChart history={history} />
         </ChartCard>
-      )}
+      ) : null}
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div

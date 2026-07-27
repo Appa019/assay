@@ -276,6 +276,134 @@ export const fetchTrades = async (): Promise<Trade[] | null> => {
   }
 };
 
+/* ── Orders (folha de ordens do comitê) ────────────────────────────── */
+
+export type OrderStatus = "pending" | "executed" | "skipped";
+
+export type Order = {
+  id: string;
+  contribution_id: string;
+  ticker: string;
+  asset_class: AssetClass;
+  amount_brl: number;
+  pct_of_contribution: number | null;
+  target_price: number | null;
+  stop_price: number | null;
+  thesis: string | null;
+  status: OrderStatus;
+  executed_quantity: number | null;
+  executed_price: number | null;
+  executed_at: string | null;
+  created_at: string;
+};
+
+/** Order sheet. Returns null on 404 so callers can hide the panel gracefully. */
+export const fetchOrders = async (status?: OrderStatus): Promise<Order[] | null> => {
+  const qs = status ? `?status=${status}` : "";
+  try {
+    return await json<Order[]>(await fetch(`${API_BASE}/api/orders${qs}`));
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
+};
+
+export const executeOrder = async (
+  id: string,
+  quantity: number,
+  price: number
+): Promise<Order> =>
+  json<Order>(
+    await fetch(`${API_BASE}/api/orders/${id}/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quantity, price }),
+    })
+  );
+
+export const skipOrder = async (id: string, reason?: string): Promise<Order> =>
+  json<Order>(
+    await fetch(`${API_BASE}/api/orders/${id}/skip`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: reason || undefined }),
+    })
+  );
+
+/* ── Benchmark (TWR vs CDI · IBOV · BTC, rebased 100) ──────────────── */
+
+export type BenchmarkPoint = {
+  date: string;
+  portfolio: number;
+  cdi: number | null;
+  ibov: number | null;
+  btc: number | null;
+};
+
+export type BenchmarkResponse = {
+  series: BenchmarkPoint[];
+  note?: string;
+};
+
+/** Benchmark series. Returns null on 404 so callers can hide it gracefully. */
+export const fetchBenchmark = async (
+  days = 365
+): Promise<BenchmarkResponse | null> => {
+  try {
+    return await json<BenchmarkResponse>(
+      await fetch(`${API_BASE}/api/portfolio/benchmark?days=${days}`)
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
+};
+
+/* ── Tax (mapa simplificado de IR) ─────────────────────────────────── */
+
+export type TaxMonthClass = {
+  sales_brl: number;
+  net_gain_brl: number;
+  exempt: boolean;
+  loss_carry_used_brl: number;
+  tax_due_brl: number;
+  darf_below_minimum: boolean;
+};
+
+export type FixedIncomeTaxInfo = {
+  ticker: string;
+  income_brl: number;
+  days_held: number | null;
+  withheld_rate_pct: number | null;
+};
+
+export type TaxMonth = {
+  month: string;
+  stocks: TaxMonthClass;
+  crypto: TaxMonthClass;
+  fixed_income_info?: FixedIncomeTaxInfo[];
+};
+
+export type YearEndPosition = {
+  ticker: string;
+  asset_class: AssetClass;
+  quantity: number;
+  cost_basis_brl: number;
+};
+
+export type TaxReport = {
+  year: number;
+  months: TaxMonth[];
+  total_darf_brl: number;
+  loss_carryforward_brl: { stocks: number; crypto: number };
+  year_end_positions: YearEndPosition[];
+  notes: string[];
+};
+
+/** Throws ApiError (422 for out-of-range years) — caller shows the detail. */
+export const fetchTaxReport = async (year: number): Promise<TaxReport> =>
+  json<TaxReport>(await fetch(`${API_BASE}/api/tax/${year}`));
+
 export const fetchMacro = async (): Promise<MacroSnapshot> =>
   json<MacroSnapshot>(await fetch(`${API_BASE}/api/macro`));
 

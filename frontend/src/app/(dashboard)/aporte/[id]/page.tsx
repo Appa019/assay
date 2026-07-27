@@ -7,18 +7,32 @@ import { ArrowLeft, FileQuestion, Loader2 } from "lucide-react";
 import {
   ApiError,
   fetchContribution,
+  fetchOrders,
   runContribution,
   type Contribution,
+  type Order,
 } from "@/lib/api";
 import { AnalysisFlow } from "@/components/analysis-flow";
+import { OrdersPanel } from "@/components/orders-panel";
 
 const AporteDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const [contribution, setContribution] = useState<Contribution | null>(null);
+  const [orders, setOrders] = useState<Order[] | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [resuming, setResuming] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
+
+  const loadOrders = useCallback(async () => {
+    try {
+      const all = await fetchOrders();
+      // Endpoint missing (404) → null → the panel stays hidden.
+      setOrders(all ? all.filter((o) => o.contribution_id === id) : null);
+    } catch {
+      // Network blip: keep whatever is on screen.
+    }
+  }, [id]);
 
   const reload = useCallback(async () => {
     try {
@@ -31,6 +45,9 @@ const AporteDetailPage = () => {
         setResuming(false);
         setRetryError(null);
       }
+      // The order sheet materializes when the run completes; refreshing it
+      // alongside the poll keeps the panel in sync without extra timers.
+      void loadOrders();
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
         setNotFound(true);
@@ -39,7 +56,7 @@ const AporteDetailPage = () => {
       // Network blip: keep the last snapshot on screen, polling will retry.
       setLoadError(err instanceof Error ? err.message : "Erro ao carregar aporte");
     }
-  }, [id]);
+  }, [id, loadOrders]);
 
   useEffect(() => {
     // Defer to a task so no state update runs synchronously in the effect.
@@ -120,6 +137,15 @@ const AporteDetailPage = () => {
         resuming={resuming}
         retryError={retryError}
       />
+      {orders !== null && orders.length > 0 && (
+        <div className="max-w-5xl">
+          <OrdersPanel
+            orders={orders}
+            subtitle="Recomendações do fechamento — registre a execução real ou pule o que não fizer"
+            onChanged={loadOrders}
+          />
+        </div>
+      )}
     </div>
   );
 };

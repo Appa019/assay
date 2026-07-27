@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -8,6 +8,8 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -17,7 +19,11 @@ import {
   type TooltipContentProps,
   type TooltipValueType,
 } from "recharts";
-import type { PortfolioHistoryPoint, PortfolioSummary } from "@/lib/api";
+import type {
+  BenchmarkPoint,
+  PortfolioHistoryPoint,
+  PortfolioSummary,
+} from "@/lib/api";
 import { formatBRL, formatDate, parseLocalDate } from "@/lib/format";
 
 /**
@@ -400,6 +406,173 @@ export const EquityCurveChart = ({
           />
         </AreaChart>
       </ResponsiveContainer>
+    </div>
+  );
+};
+
+/* ── Benchmark: portfolio TWR vs CDI · IBOV · BTC (rebased 100) ────── */
+
+type BenchKey = "portfolio" | "cdi" | "ibov" | "btc";
+
+/**
+ * Portfolio/IBOV/BTC reuse the validated categorical trio; CDI is the
+ * risk-free reference and wears a deliberate de-emphasis gray (identity via
+ * legend + tooltip), keeping the colored series within the all-pairs-safe cap.
+ */
+const BENCH_SERIES: {
+  key: BenchKey;
+  label: string;
+  color: string;
+  width: number;
+}[] = [
+  { key: "portfolio", label: "Carteira", color: CLASS_COLORS.fixed_income, width: 2.5 },
+  { key: "cdi", label: "CDI", color: "#6e695f", width: 1.5 },
+  { key: "ibov", label: "IBOV", color: CLASS_COLORS.stocks, width: 1.5 },
+  { key: "btc", label: "BTC", color: CLASS_COLORS.crypto, width: 1.5 },
+];
+
+type BenchDatum = {
+  ts: number;
+  date: string;
+  portfolio: number;
+  cdi: number | null;
+  ibov: number | null;
+  btc: number | null;
+};
+
+const BenchmarkTooltip = ({ active, payload }: ChartTooltipProps) => {
+  if (!active || !payload || payload.length === 0) return null;
+  const datum = payload[0].payload as BenchDatum;
+  return (
+    <TooltipShell>
+      <p className="mb-1" style={{ color: "var(--text-muted)" }}>
+        {formatDate(datum.date)}
+      </p>
+      {BENCH_SERIES.map((series) => {
+        const value = datum[series.key];
+        if (value === null || value === undefined) return null;
+        if (!payload.some((entry) => entry.dataKey === series.key)) return null;
+        return (
+          <SwatchRow
+            key={series.key}
+            color={series.color}
+            label={series.label}
+            value={value.toFixed(1)}
+          />
+        );
+      })}
+    </TooltipShell>
+  );
+};
+
+export const BenchmarkChart = ({ series }: { series: BenchmarkPoint[] }) => {
+  const [hidden, setHidden] = useState<Partial<Record<BenchKey, boolean>>>({});
+
+  const data: BenchDatum[] = useMemo(
+    () =>
+      [...series]
+        .map((point) => ({
+          ts: parseLocalDate(point.date).getTime(),
+          date: point.date,
+          portfolio: point.portfolio,
+          cdi: point.cdi,
+          ibov: point.ibov,
+          btc: point.btc,
+        }))
+        .sort((a, b) => a.ts - b.ts),
+    [series]
+  );
+
+  const toggle = (key: BenchKey) =>
+    setHidden((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  return (
+    <div className="space-y-3">
+      {/* Clickable legend: toggles each series on/off. */}
+      <div className="flex items-center gap-4 flex-wrap text-xs">
+        {BENCH_SERIES.map((entry) => {
+          const off = hidden[entry.key] === true;
+          return (
+            <button
+              key={entry.key}
+              type="button"
+              onClick={() => toggle(entry.key)}
+              aria-pressed={!off}
+              title={off ? `Mostrar ${entry.label}` : `Ocultar ${entry.label}`}
+              className="flex items-center gap-1.5 px-1.5 py-1 rounded-md transition-opacity"
+              style={{ opacity: off ? 0.35 : 1 }}
+            >
+              <span
+                className="inline-block w-3.5 rounded-full"
+                style={{ background: entry.color, height: entry.width }}
+              />
+              <span
+                style={{
+                  color: "var(--text-secondary)",
+                  textDecoration: off ? "line-through" : "none",
+                }}
+              >
+                {entry.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ width: "100%", height: 280 }}>
+        <ResponsiveContainer>
+          <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
+            <CartesianGrid stroke="var(--border)" strokeWidth={1} vertical={false} />
+            <XAxis
+              dataKey="ts"
+              type="number"
+              scale="time"
+              domain={["dataMin", "dataMax"]}
+              tickFormatter={(ts: number) =>
+                new Date(ts).toLocaleDateString("pt-BR", {
+                  day: "2-digit",
+                  month: "short",
+                })
+              }
+              tick={AXIS_TICK}
+              tickLine={false}
+              axisLine={{ stroke: "var(--border-strong)" }}
+              minTickGap={48}
+            />
+            <YAxis
+              tick={AXIS_TICK}
+              tickLine={false}
+              axisLine={false}
+              width={48}
+              domain={["auto", "auto"]}
+            />
+            <Tooltip
+              content={BenchmarkTooltip}
+              cursor={{ stroke: "var(--border-strong)", strokeWidth: 1 }}
+            />
+            {BENCH_SERIES.map((entry) => (
+              <Line
+                key={entry.key}
+                dataKey={entry.key}
+                hide={hidden[entry.key] === true}
+                type="monotone"
+                stroke={entry.color}
+                strokeWidth={entry.width}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                dot={false}
+                connectNulls={false}
+                activeDot={{
+                  r: 4,
+                  fill: entry.color,
+                  stroke: "var(--bg-card)",
+                  strokeWidth: 2,
+                }}
+                isAnimationActive={false}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 };

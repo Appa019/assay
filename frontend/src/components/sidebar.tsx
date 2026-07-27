@@ -7,6 +7,7 @@ import {
   PlusCircle,
   Briefcase,
   FileBarChart,
+  Receipt,
   Settings,
 } from "lucide-react";
 
@@ -15,6 +16,7 @@ const NAV_ITEMS = [
   { href: "/aporte", label: "Novo aporte", icon: PlusCircle },
   { href: "/ativos", label: "Carteira", icon: Briefcase },
   { href: "/relatorios", label: "Histórico", icon: FileBarChart },
+  { href: "/ir", label: "Imposto de renda", icon: Receipt },
   { href: "/configuracoes", label: "Ajustes", icon: Settings },
 ] as const;
 
