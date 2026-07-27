@@ -13,6 +13,7 @@ from app.models.contribution import (
     ContributionStatus,
     PromptKey,
 )
+from app.models.order import Order
 from app.schemas.contribution import (
     ContributionCreate,
     ContributionFinalize,
@@ -217,12 +218,15 @@ async def delete_contribution(
     contribution = session.get(Contribution, contribution_id)
     if contribution is None:
         raise HTTPException(status_code=404, detail="Contribution not found")
-    prompts = list(
-        session.exec(
-            select(ContributionPrompt).where(ContributionPrompt.contribution_id == contribution_id)
-        ).all()
-    )
-    for prompt in prompts:
+    # Children first, with an explicit flush: the models define no ORM
+    # relationships, so SQLAlchemy won't order these deletes on its own — and
+    # with PRAGMA foreign_keys=ON an unordered flush violates the FK.
+    for prompt in session.exec(
+        select(ContributionPrompt).where(ContributionPrompt.contribution_id == contribution_id)
+    ).all():
         session.delete(prompt)
+    for order in session.exec(select(Order).where(Order.contribution_id == contribution_id)).all():
+        session.delete(order)
+    session.flush()
     session.delete(contribution)
     session.commit()

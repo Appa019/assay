@@ -13,6 +13,17 @@ from app.models.asset import Asset, AssetClass
 @pytest.fixture()
 def session() -> Iterator[Session]:
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False})
+
+    # Mirror production PRAGMAs: FK enforcement changes delete semantics, and a
+    # test engine without it would hide ordering bugs (it did, once).
+    from sqlalchemy import event
+
+    @event.listens_for(engine, "connect")
+    def _fk_on(dbapi_connection, _record):  # noqa: ANN001
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     SQLModel.metadata.create_all(engine)
     with Session(engine) as s:
         yield s
