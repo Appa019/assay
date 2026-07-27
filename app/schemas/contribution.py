@@ -22,6 +22,9 @@ class PromptRead(BaseModel):
     content: str
     response: str | None
     responded_at: datetime | None
+    cost_usd: float | None = None
+    duration_s: float | None = None
+    num_turns: int | None = None
 
 
 class ContributionRead(BaseModel):

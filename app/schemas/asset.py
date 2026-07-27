@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 from app.models.asset import AssetClass
+from app.models.trade import TradeSide
 
 
 class AssetCreate(BaseModel):
@@ -27,6 +28,9 @@ class AssetUpdate(BaseModel):
     quantity: Decimal | None = Field(default=None, gt=0)
     avg_price: Decimal | None = Field(default=None, gt=0)
     current_price: Decimal | None = Field(default=None, ge=0)
+    thesis: str | None = Field(default=None, max_length=2000)
+    target_price: Decimal | None = Field(default=None, ge=0)
+    stop_price: Decimal | None = Field(default=None, ge=0)
 
 
 class AssetRead(BaseModel):
@@ -37,6 +41,9 @@ class AssetRead(BaseModel):
     quantity: float
     avg_price: float
     current_price: float | None
+    thesis: str | None = None
+    target_price: float | None = None
+    stop_price: float | None = None
     entry_date: date
     created_at: datetime
     updated_at: datetime
@@ -67,3 +74,31 @@ class SaleResult(BaseModel):
     sale_value: float
     asset_class: AssetClass
     message: str
+
+
+class TradeRead(BaseModel):
+    id: UUID
+    ticker: str
+    name: str | None
+    asset_class: AssetClass
+    side: TradeSide
+    quantity: float
+    price: float
+    total_brl: float
+    realized_pnl_brl: float | None
+    realized_pnl_pct: float | None
+    lot_entry_date: date | None
+    executed_at: datetime
+
+
+class SnapshotRead(BaseModel):
+    snapshot_date: date
+    total_value: float
+    fixed_income: float
+    stocks: float
+    crypto: float
+
+
+class RefreshResult(BaseModel):
+    updated: int
+    warnings: list[str]

@@ -30,6 +30,11 @@ class Asset(SQLModel, table=True):
     quantity: Decimal = Field(default=Decimal("0"), decimal_places=8, max_digits=24)
     avg_price: Decimal = Field(default=Decimal("0"), decimal_places=8, max_digits=24)
     current_price: Decimal | None = Field(default=None, decimal_places=8, max_digits=24)
+    # Committee context for this lot: why it was bought and its exit levels.
+    # Injected into weekly/maturity reviews so theses are re-evaluated, not lost.
+    thesis: str | None = Field(default=None, max_length=2000)
+    target_price: Decimal | None = Field(default=None, decimal_places=8, max_digits=24)
+    stop_price: Decimal | None = Field(default=None, decimal_places=8, max_digits=24)
     entry_date: date = Field(default_factory=_today)
     created_at: datetime = Field(default_factory=_now_utc)
     updated_at: datetime = Field(default_factory=_now_utc)

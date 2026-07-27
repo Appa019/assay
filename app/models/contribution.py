@@ -44,6 +44,9 @@ class Contribution(SQLModel, table=True):
     # Claude Code session id of the chained analysis run. Persisted so an
     # interrupted run (limit/crash) can be resumed from where it stopped.
     claude_session_id: str | None = Field(default=None)
+    # Consecutive failed automatic runs; caps the auto-resume retry loop so a
+    # permanently broken analysis stops burning money. Reset to 0 on success.
+    run_attempts: int = Field(default=0)
 
     created_at: datetime = Field(default_factory=_now_utc, index=True)
     completed_at: datetime | None = Field(default=None)
@@ -64,5 +67,10 @@ class ContributionPrompt(SQLModel, table=True):
 
     response: str | None = Field(default=None, sa_column=Column(Text))
     responded_at: datetime | None = Field(default=None)
+
+    # Per-step run telemetry, persisted as each step completes.
+    cost_usd: float | None = Field(default=None)
+    duration_s: float | None = Field(default=None)
+    num_turns: int | None = Field(default=None)
 
     created_at: datetime = Field(default_factory=_now_utc)
