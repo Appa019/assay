@@ -21,8 +21,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Investimentos Manual",
-    description="Manual portfolio + 3-prompt research cycle, fully local.",
-    version="0.3.0",
+    description="Ad-hoc contributions with a 5-meeting AI investment committee, fully local.",
+    version="0.4.0",
     lifespan=lifespan,
 )
 
@@ -51,4 +51,4 @@ app.include_router(reports.router)
 
 @app.get("/api/health")
 async def health_check() -> dict[str, str]:
-    return {"status": "ok", "version": "0.3.0"}
+    return {"status": "ok", "version": "0.4.0"}

@@ -83,9 +83,60 @@ TypeScript + Tailwind v4 (frontend) · pnpm (JS) · pip + venv (Python) ·
 Telegram Bot API (notificações + controle). Sem Supabase, sem auth, sem nuvem,
 sem Playwright.
 
+### Dados & confiabilidade (2026-07)
+- **Marcação a mercado**: `price_refresh_service` atualiza `current_price` de
+  TODO lote (ações via Yahoo, crypto via CoinGecko, CDB por CDI acumulado —
+  série 12 BCB × `CDB_PCT_CDI`). Roda por cron/systemd, `POST /api/portfolio/
+  refresh`, `/atualizar` no bot e antes das revisões.
+- **Ledger `Trade`**: toda compra/venda vira linha imutável com P&L realizado
+  (`GET /api/portfolio/trades`); a venda continua removendo o `Asset`, mas o
+  histórico é permanente (base de track record e IR).
+- **Trava de 30d é enforced no service** (`portfolio_service.sell_asset` →
+  `SellLockedError` → API 409). O bot pede confirmação em 2 passos no /vender.
+- **Snapshot diário** (`portfolio_snapshot`, upsert) → curva de patrimônio em
+  `GET /api/portfolio/history` (cron `daily_snapshot.py`).
+- **SQLite em WAL** + busy_timeout (API + bot + crons concorrentes) e backup
+  diário com rotação (`backup_db.sh`).
+- **Locks**: por aporte E global (1 execução pesada de Claude por vez, entre
+  processos), criação atômica + identidade de PID via /proc (sem reclaim por
+  idade). `IN_PROGRESS` órfão não trava mais o re-run (409 só com lock vivo).
+- **Retry**: contadores independentes p/ limite × transiente; reset pós-meia-
+  noite tratado; `run_attempts` limita retomadas (`MAX_RUN_ATTEMPTS`, aviso ao
+  desistir); `resume_pending` roda fail-fast (re-tenta no próximo pass).
+- **Transcripts**: stdout/stderr brutos de cada invocação do CLI em
+  `storage/analysis_runs/transcripts/` (flight recorder); custo/duração/turnos
+  por etapa persistidos em `ContributionPrompt`.
+- **Track record**: contexto com vendas realizadas (P&L, hit-rate) é injetado
+  na 1ª reunião de todo aporte; teses/alvo/stop por lote (`Asset.thesis`,
+  `target_price`, `stop_price`) entram na revisão semanal.
+- **Encadeamento por arquivos**: cada reunião salva seu JSON em
+  `workspace/out/<contribution_id>/etapa_NN.json` e lê os anteriores se o
+  contexto truncar; notas em `./notes/` (não /tmp). Fechamento exige bloco
+  ```json {"orders": [...]}``` (máquina-legível p/ track record futuro).
+- **Datas dinâmicas nos prompts**: tenores DI, trimestres de earnings e anos de
+  preço-alvo vêm de `prompt_generator._date_context` (nada de DI jan/26 morto);
+  regra fiscal de dividendos é VERIFICADA ao vivo, PGBL/holding viraram
+  observação fora do mandato.
+- **Alertas de falha**: todo cron avisa no Telegram quando QUEBRA, não só o
+  sucesso. Bot é single-instance (pidfile), sobrevive a qualquer exceção de
+  rede, drena o backlog inteiro no boot e registra o menu via setMyCommands.
+- **Pareamento seguro**: `telegram_setup.py` exige código de 6 dígitos — o
+  primeiro chat aleatório não vira mais dono do bot.
+- **systemd (preferido)**: `scripts/install_systemd.sh` instala backend + bot
+  (Restart=always) e timers persistentes (recuperam janelas perdidas com a
+  máquina desligada). Cron continua disponível via `install_cron.sh` (flock +
+  PATH corretos).
+
 ## Commands
-- `./start.sh`: Inicia backend + frontend, abre browser (uso diário)
+- `./start.sh`: Inicia backend + frontend, abre browser (uso diário; sem
+  --reload por padrão — `START_RELOAD=1` p/ dev)
 - `./install.sh`: Setup inicial (venv, deps, atalho Desktop)
+- `make check`: ruff + pytest + lint/type-check/build do frontend (o que a CI roda)
+- `.venv/bin/python -m pytest`: suíte de testes do backend (tests/)
+- `.venv/bin/python scripts/refresh_prices.py`: marcação a mercado agora
+- `.venv/bin/python scripts/daily_snapshot.py`: snapshot da curva de patrimônio
+- `bash scripts/backup_db.sh`: backup do SQLite com rotação
+- `bash scripts/install_systemd.sh [--uninstall]`: units + timers persistentes
 - `.venv/bin/python scripts/run_analysis.py --amount 5000`: cria o aporte e
   roda a análise inteira no terminal, etapa por etapa (opus/max por padrão).
   Flags úteis: `--notes`, `--contribution-id <uuid>` (re-rodar), `-y` (sem
