@@ -41,6 +41,7 @@ Description=$2
 [Service]
 WorkingDirectory=${PROJECT_ROOT}
 Environment=${PATH_LINE}
+Environment=PYTHONUNBUFFERED=1
 ExecStart=$3
 Restart=always
 RestartSec=5
@@ -59,6 +60,7 @@ Description=$2
 Type=oneshot
 WorkingDirectory=${PROJECT_ROOT}
 Environment=${PATH_LINE}
+Environment=PYTHONUNBUFFERED=1
 ExecStart=$3
 UNIT
   cat > "${UNIT_DIR}/${PREFIX}-$1.timer" <<UNIT

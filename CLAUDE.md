@@ -127,6 +127,24 @@ sem Playwright.
   máquina desligada). Cron continua disponível via `install_cron.sh` (flock +
   PATH corretos).
 
+### Produto (2026-07, camada sobre o ledger)
+- **Ordens estruturadas**: o fechamento emite bloco ```json {"orders": []}```
+  que vira linhas `Order` (ingest idempotente pós-run). `/ordens` mostra a
+  folha pendente; `/executei <ticker> <qtd> <preço>` confirma a execução e o
+  lote criado HERDA tese/alvo/stop do comitê. API: `/api/orders` (+ execute/
+  skip). Base do track record recomendação × realidade.
+- **Benchmark**: `GET /api/portfolio/benchmark` — TWR da carteira
+  (neutralizando fluxos via ledger) vs CDI/IBOV/BTC, rebased 100.
+- **Alertas de nível**: `check_alerts.py` (3x/dia) avisa no Telegram quando o
+  preço cruza o alvo/stop registrado no lote; um alerta por cruzamento
+  (rearma quando volta à banda). Estado em `storage/alerts_state.json`.
+- **IR**: `GET /api/tax/{ano}` + `/ir` no bot — apuração SIMPLIFICADA mensal
+  (isenções 20k ações / 35k crypto, carryforward de prejuízo, DARF mínima,
+  CDB informativo retido na fonte, posição 31/12). Não substitui contador.
+- **Relatório mensal**: `monthly_report.py` (dias 1-2) → Report(monthly) +
+  Telegram (texto + anexo .md): patrimônio, operações, IR do mês, custo de
+  análise. `--force` gera do mês corrente.
+
 ## Commands
 - `./start.sh`: Inicia backend + frontend, abre browser (uso diário; sem
   --reload por padrão — `START_RELOAD=1` p/ dev)
