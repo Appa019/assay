@@ -10,6 +10,7 @@ from sqlmodel import Field, SQLModel
 class ReportKind(StrEnum):
     WEEKLY = "weekly"
     MATURITY = "maturity"
+    MONTHLY = "monthly"
 
 
 def _now_utc() -> datetime:

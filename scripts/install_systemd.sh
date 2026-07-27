@@ -16,7 +16,7 @@ PATH_LINE="PATH=${HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin"
 
 if [[ "${1:-}" == "--uninstall" ]]; then
   systemctl --user disable --now "${PREFIX}-backend.service" "${PREFIX}-bot.service" 2>/dev/null || true
-  for t in cadence weekly resume prices snapshot backup; do
+  for t in cadence weekly resume prices snapshot alerts monthly backup; do
     systemctl --user disable --now "${PREFIX}-${t}.timer" 2>/dev/null || true
   done
   rm -f "${UNIT_DIR}/${PREFIX}"-*.service "${UNIT_DIR}/${PREFIX}"-*.timer
@@ -85,11 +85,13 @@ oneshot_pair weekly   "revisão semanal do comitê"    "${PY} ${PROJECT_ROOT}/sc
 oneshot_pair resume   "retomada de análises"         "${PY} ${PROJECT_ROOT}/scripts/resume_pending.py" "*:0/15"
 oneshot_pair prices   "marcação a mercado"           "${PY} ${PROJECT_ROOT}/scripts/refresh_prices.py" "*-*-* 00/6:15"
 oneshot_pair snapshot "snapshot diário da carteira"  "${PY} ${PROJECT_ROOT}/scripts/daily_snapshot.py" "*-*-* 18:45"
+oneshot_pair alerts   "alertas de alvo/stop"         "${PY} ${PROJECT_ROOT}/scripts/check_alerts.py"   "*-*-* 11,15,19:05"
+oneshot_pair monthly  "relatório mensal"             "${PY} ${PROJECT_ROOT}/scripts/monthly_report.py" "*-*-01,02 10:00"
 oneshot_pair backup   "backup do SQLite"             "/usr/bin/env bash ${PROJECT_ROOT}/scripts/backup_db.sh" "*-*-* 03:00"
 
 systemctl --user daemon-reload
 systemctl --user enable --now "${PREFIX}-backend.service" "${PREFIX}-bot.service"
-for t in cadence weekly resume prices snapshot backup; do
+for t in cadence weekly resume prices snapshot alerts monthly backup; do
   systemctl --user enable --now "${PREFIX}-${t}.timer"
 done
 

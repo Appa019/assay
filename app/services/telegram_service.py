@@ -251,6 +251,35 @@ def send_message(
         return False
 
 
+def send_document(
+    filename: str,
+    content: bytes,
+    *,
+    caption: str = "",
+    chat_id: str | None = None,
+    token: str | None = None,
+) -> bool:
+    """Send a file attachment (e.g. the monthly report) to the configured chat."""
+    token = token or settings.telegram_bot_token
+    chat_id = chat_id or settings.telegram_chat_id
+    if not token or not chat_id:
+        logger.warning("telegram_not_configured", has_token=bool(token), has_chat=bool(chat_id))
+        return False
+    try:
+        with httpx.Client(timeout=60.0) as client:
+            resp = client.post(
+                f"{_base(token)}/sendDocument",
+                data={"chat_id": chat_id, "caption": caption[:1000]},
+                files={"document": (filename, content)},
+            )
+        if not resp.json().get("ok"):
+            raise TelegramError(f"sendDocument falhou: {resp.json()}")
+        return True
+    except (httpx.HTTPError, TelegramError) as exc:
+        logger.error("telegram_send_document_failed", error=_redact(token, str(exc)))
+        return False
+
+
 def set_my_commands(commands: list[dict[str, str]], *, token: str | None = None) -> bool:
     """Register the bot's command menu (shown by Telegram's / button)."""
     token = token or settings.telegram_bot_token

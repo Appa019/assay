@@ -14,7 +14,7 @@ from app.schemas.asset import (
     SnapshotRead,
     TradeRead,
 )
-from app.services import portfolio_service, price_refresh_service
+from app.services import benchmark_service, portfolio_service, price_refresh_service
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
@@ -82,6 +82,15 @@ async def portfolio_history(
 ) -> list[SnapshotRead]:
     snapshots = portfolio_service.get_portfolio_history(session, days=days)
     return [SnapshotRead.model_validate(s, from_attributes=True) for s in snapshots]
+
+
+@router.get("/benchmark")
+async def portfolio_benchmark(
+    days: int = Query(default=365, ge=7, le=3650),
+    session: Session = Depends(get_session),
+) -> dict:
+    """TWR of the portfolio vs CDI, IBOV and BTC, all rebased to 100."""
+    return await benchmark_service.build_benchmark(session, days=days)
 
 
 @router.get("/trades", response_model=list[TradeRead])
