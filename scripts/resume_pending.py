@@ -65,11 +65,19 @@ def run_once() -> int:
     for contribution_id in pending:
         with Session(engine) as session:
             try:
-                analysis_runner.run_analysis(session, contribution_id, on_event=_notify_on_resume)
+                # fail_fast_on_limit: don't camp for hours inside a cron pass —
+                # the next 15-min pass retries as soon as the window reopens.
+                analysis_runner.run_analysis(
+                    session,
+                    contribution_id,
+                    on_event=_notify_on_resume,
+                    fail_fast_on_limit=True,
+                )
                 completed += 1
                 logger.info("resume_pending_completed", contribution_id=str(contribution_id))
             except analysis_runner.AnalysisError as exc:
                 # Still rate-limited, or a live run holds the lock — retry next pass.
+                # (run_analysis caps consecutive failures via max_run_attempts.)
                 logger.info(
                     "resume_pending_deferred",
                     contribution_id=str(contribution_id),

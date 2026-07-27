@@ -40,16 +40,7 @@ def _to_read(contribution: Contribution, prompts: list[ContributionPrompt]) -> C
         created_at=contribution.created_at,
         completed_at=contribution.completed_at,
         prompts=[
-            PromptRead(
-                id=p.id,
-                prompt_order=p.prompt_order,
-                prompt_key=p.prompt_key,
-                title=p.title,
-                description=p.description,
-                content=p.content,
-                response=p.response,
-                responded_at=p.responded_at,
-            )
+            PromptRead.model_validate(p, from_attributes=True)
             for p in sorted(prompts, key=lambda x: x.prompt_order)
         ],
     )
@@ -130,7 +121,9 @@ async def run_contribution_analysis(
     contribution = session.get(Contribution, contribution_id)
     if contribution is None:
         raise HTTPException(status_code=404, detail="Contribution not found")
-    if contribution.status == ContributionStatus.IN_PROGRESS:
+    # 409 only when a LIVE process holds the run lock. A stale IN_PROGRESS row
+    # (crash mid-run) must stay re-runnable, or the contribution bricks forever.
+    if analysis_runner.is_run_active(contribution_id):
         raise HTTPException(status_code=409, detail="Analysis already running")
 
     background_tasks.add_task(_run_analysis_bg, contribution_id)
@@ -188,16 +181,7 @@ async def save_prompt_response(
     session.commit()
     session.refresh(prompt)
 
-    return PromptRead(
-        id=prompt.id,
-        prompt_order=prompt.prompt_order,
-        prompt_key=prompt.prompt_key,
-        title=prompt.title,
-        description=prompt.description,
-        content=prompt.content,
-        response=prompt.response,
-        responded_at=prompt.responded_at,
-    )
+    return PromptRead.model_validate(prompt, from_attributes=True)
 
 
 @router.post("/{contribution_id}/finalize", response_model=ContributionRead)
