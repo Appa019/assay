@@ -83,7 +83,7 @@ Inconsistências → **reconcilie**. NÃO sobrescreva as etapas anteriores — r
 
 | Tema | Onde |
 |---|---|
-| Sell-side BR | WebSearch `"<TICKER> preço-alvo BTG XP UBS Itaú BBA 2026"` |
+| Sell-side BR | WebSearch `"<TICKER> preço-alvo BTG XP UBS Itaú BBA {{ target_years_search }}"` |
 | Mídia BR 30d | InfoMoney, Valor, Brazil Journal, Suno, Estadão |
 | Crypto sentiment | LunarCrush, Reddit, X consensus, Galaxy Score |
 | Insider BR | CVM Comunicados Form-B, Suno Insider |
@@ -207,8 +207,8 @@ A fatia de CDB **já foi materializada na Reunião nº 2** (`shortlist_cdb`: emi
 | Isenção/Regra | R$ / efeito |
 |---|---|
 | Vendas ≤ R$ 20k/mês (ganho isento) | |
-| Dividendos isentos (até 2026) | |
-| JCP retém 15% (recalibrar pós-reforma 2026) | |
+| Dividendos: regra VIGENTE verificada ao vivo (reforma) | |
+| JCP: alíquota vigente verificada (pós-reforma) | |
 - **DARF projetado 31d** se houver venda de ações > R$ 20k/mês (15%)
 - **Tax-loss harvesting**: ações com perda > 10% (wash-sale 30d check)
 
@@ -216,9 +216,9 @@ A fatia de CDB **já foi materializada na Reunião nº 2** (`shortlist_cdb`: emi
 - Isenção até R$ 35k/mês de vendas · acima: 15-22.5% · DARF projetado se vender > R$ 35k/mês
 - Tax-loss harvesting em crypto perdedora
 
-### 6.4 Estruturais
-- **PGBL**: se declara IR completo, até 12% da renda bruta → benefício = dedução × alíquota marginal
-- **Holding**: vale se patrimônio > R$ 1-2M e aporte > R$ 100k/ano (breakeven em meses)
+### 6.4 Estruturais (contexto informativo APENAS)
+- PGBL, previdência e holding estão **FORA do mandato** (só CDB · ações B3 · crypto):
+  NÃO recomende nem aloque. Se material, 1 linha de observação, sem valores.
 
 ### 6.5 Bucket Strategy (Edson)
 - **Bucket 1 (Liquidez/Defesa)**: CDB liquidez diária (dry powder, 6-12 meses de despesas)
@@ -339,6 +339,12 @@ Estrutura: 1. Tese macro 3 frases · 2. Top of Mind (3-5 questões 1 linha) · 3
 
 # OUTPUT FINAL — FORMATO OBRIGATÓRIO
 
+> **Persistência entre reuniões**: além de responder, SALVE o JSON completo
+> desta reunião em `./out/{{ contribution_id }}/etapa_05.json` (crie a pasta
+> se preciso). Se algum dado das reuniões anteriores parecer truncado ou
+> ausente no contexto, LEIA os JSONs anteriores em `./out/{{ contribution_id }}/`
+> — eles são a fonte canônica.
+
 Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
 
 ```json
@@ -429,16 +435,16 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
   ],
   "tax_strategy_maxima": {
     "cdb_alongar_720d_trava_15pct": false, "cdb_rendimento_liquido_pos_ir_pct": 0,
-    "acoes_isencao_20k_mes": true, "dividendos_isentos_ate_2026": true,
+    "acoes_isencao_20k_mes": true,
+    "dividendos_tributacao_vigente_verificada": "",
     "crypto_isencao_35k_mes": true,
     "darf_projetado_31d_brl": 0, "darf_breakdown": {"crypto": 0, "acoes": 0},
-    "jcp_vs_div_hoje": "", "jcp_vs_div_pos_2026": "",
+    "jcp_vs_div_regra_vigente": "",
     "tax_loss_harvesting": [
       {"ativo": "", "classe": "acao|crypto", "perda_atual_pct": 0, "prejuizo_brl": 0,
        "vender": false, "wash_sale_30d_safe": false}
     ],
-    "pgbl_recomendado_brl": 0, "pgbl_beneficio_anual_brl": 0,
-    "holding_recomendada": false, "holding_breakeven_meses": null
+    "obs_estruturais_fora_do_mandato": ""
   },
   "wealth_planning": {
     "bucket_strategy": {
@@ -510,10 +516,10 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
 >
 > 1. ✓ Σ `ordens_finais.valor_brl` + `troco_brl` ≈ {{ amount_brl }} (±R$ 5) · Σ `pct_aporte` = 100 (±0.5)
 > 2. ✓ Todo `bolso` ∈ {cdb, acoes_b3, crypto}; toda `tax` ∈ lista válida (sem isento_lci_lca/ir15_etf_br/ir20_fii_ganho)
-> 3. ✓ Nenhum `vetado=true` em `ordens_finais`
+> 3. ✓ Nenhum ativo com `vetado=true` em `risk_overlay`/`cdb_risk` aparece em `ordens_finais`
 > 4. ✓ Toda ordem de ação/crypto: stop_loss + target_31d/90d/12m numéricos; CDB usa "—" onde não se aplica
 > 5. ✓ `stress_test_8_cenarios.viola_tolerancia_25pct` avaliado; cenário H confirma FGC (≤ R$ 250k/instituição)
-> 6. ✓ `portfolio_risk_aggregate` completo (VaR + CVaR + EVT + CDaR + HHI) · `effective_n_positions` ≥ 12
+> 6. ✓ `portfolio_risk_aggregate` completo (VaR + CVaR + EVT + CDaR + HHI) · `effective_n_positions` ≥ 6 (universo máx. ~14 nomes — 12 era impossível)
 > 7. ✓ `cdb_final` respeita FGC (nenhuma instituição > R$ 250k) e separa dry powder de carry
 > 8. ✓ `pre_mortem_final.fator_risco_dominante` identificado · `resumo_executivo` legível sozinho
 > 9. ✓ `confianca_media_ponderada_0_10` calibrada (≠ 5) · Asymmetry média ponderada ≥ 1.5:1

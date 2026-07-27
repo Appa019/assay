@@ -175,7 +175,7 @@ Vieram via API. Onde `null`/`⚠️`, pesquisem. **Não inventem. URL + data.**
 | Classe | Subcategorias | Tax PF |
 |---|---|---|
 | **1. CDB** | Liquidez diária ~100-103% CDI (grandes bancos: Itaú/BB/Bradesco/Santander/Caixa) · prazo 105-125% CDI (bancos médios: BTG, Daycoval, ABC, Sofisa, BMG, Pine, Master, etc.) · escada de vencimentos. Limite FGC R$ 250k por instituição/CPF (R$ 1M teto 4 anos). | IR regressivo 22.5%→15% (>720d) sobre o rendimento |
-| **2. Ações B3** | Large (PETR/VALE/ITUB/BBAS/BBDC/WEGE/RENT/VIVT/EQTL/PRIO) · mid (RDOR/RADL/LREN/TOTS/SUZB) · small (alpha < R$ 5bi MC) · 14 setores | 15% ganho · isento até R$ 20k vendas/mês · dividendos isentos (até 2026) |
+| **2. Ações B3** | Large (PETR/VALE/ITUB/BBAS/BBDC/WEGE/RENT/VIVT/EQTL/PRIO) · mid (RDOR/RADL/LREN/TOTS/SUZB) · small (alpha < R$ 5bi MC) · 14 setores | 15% ganho · isento até R$ 20k vendas/mês · tributação de dividendos: VERIFICAR regra vigente (reforma) |
 | **3. Crypto + DeFi** | BTC, ETH cores · L1 alts (SOL/AVAX/SUI/APT/NEAR/INJ/TON) · L2 (ARB/OP/BASE/STRK/ZK) · DeFi (UNI/AAVE/MKR/HYPE/CRV/LDO/JTO/MORPHO/PENDLE) · AI (FET/RNDR/TAO/WLD/ARKM) · RWA (ONDO/MKR/HBAR) · Restaking/LRT (EIGEN/ETHFI) · BTC L2 (STX/CORE) · Memes seletas (DOGE/PEPE/WIF/BONK) · Stable yield USDC/USDe via Aave/Pendle/Spark/Morpho | PF 15-22.5% sobre ganho > R$ 35k/mês de vendas |
 
 > **Vetado (repetir): NADA de Tesouro, LCI/LCA, debêntures, CRI/CRA, fundos,
@@ -220,9 +220,14 @@ Vieram via API. Onde `null`/`⚠️`, pesquisem. **Não inventem. URL + data.**
 3. **`Bash`** — calcular Sharpe, Sortino, Calmar, VaR, CVaR, β, correlações,
    Black-Litterman implícito, risk parity, HRP, Markowitz, Kelly fracional,
    ERP BR via DDM/Damodaran, carry de CDB líquido pós-IR.
-4. **`Read`/`Write`** — `/tmp/gic_{{ contribution_id }}_round_N.md`.
-5. **MCPs** — sequential-thinking (raciocínio), fetch (markdown), playwright
-   (sites JS: Glassnode/dashboards), context7, memory, time. Use à vontade.
+4. **`Read`/`Write`** — notas de round em `./notes/gic_{{ contribution_id }}_round_N.md`
+   e o JSON final desta reunião em `./out/{{ contribution_id }}/etapa_01.json`.
+5. **MCPs** — DADOS: **yahoo-finance** (B3 `.SA`, índices, FX), **coingecko**
+   (preços/mcap/ids de cripto), **defillama** (TVL/yields), **exa** (busca
+   semântica em research); premium quando disponíveis: glassnode, coinglass,
+   messari, firecrawl, tavily. RUNTIME: sequential-thinking (raciocínio), fetch
+   (markdown), playwright (sites JS), context7, memory, time. PREFIRA MCPs a
+   scrapar HTML à mão. Use à vontade.
 
 ---
 
@@ -258,7 +263,7 @@ WebSearch obrigatório com URL + data:
 
 ### 1.3 Política fiscal
 - Meta primário + projeção · Dívida bruta/PIB + trajetória · Calendário Congresso 30d
-- Reforma tributária 2026: cronograma + impactos JCP/dividendos
+- Reforma tributária: status VIGENTE em {{ current_year }} (verificar ao vivo) + impactos JCP/dividendos
 - Risco político 31d (3 eventos com janela)
 
 ### 1.4 Atividade
@@ -318,7 +323,7 @@ A curva DI é **sinal** (para onde vai o CDI), não produto. Materialize a fatia
 de Renda Fixa como **CDB**:
 
 ### 3.1 Curva DI BR (sinal de CDI futuro)
-- DI jan/26, jan/27, jan/29, jan/31 · Inclinação 1y-10y · Forward implícita próximos COPOM
+- {{ di_tenors }} · Inclinação 1y-10y · Forward implícita próximos COPOM
 - Mercado precifica corte/alta? → o CDI de hoje (~100% CDI ≈ Selic) cai/sobe quando?
 
 ### 3.2 Estratégia de CDB (o dry powder)
@@ -460,15 +465,17 @@ principal; muda só taxa de reinvestimento). Compare vs tolerância 25% DD 99%.
 - IR regressivo: 22.5% (≤180d) → 15% (>720d). Alongar parte do CDB > 720d trava 15%.
 
 ### 8.2 Ações B3
-- Isenção R$ 20k vendas/mês (ganho) · Dividendos isentos até 2026 · JCP retém 15% (recalibrar pós-reforma 2026)
+- Isenção R$ 20k vendas/mês (ganho) · Dividendos e JCP: VERIFIQUE ao vivo a regra
+  vigente em {{ current_year }} (reforma tributária) — NÃO assuma isenção de memória
 - Tax-loss harvesting em ações com perda > 10% (wash-sale 30d check)
 
 ### 8.3 Crypto
 - Isenção até R$ 35k/mês de vendas · acima: 15-22.5% sobre ganho · DeC RFB/declaração anual
 
-### 8.4 Estruturais
-- PGBL: se declara IR completo, aporte até 12% renda bruta → **benefício** = dedução × alíquota marginal.
-- Holding: vale se patrimônio > R$ 1-2M e aporte > R$ 100k/ano (custo setup + anual).
+### 8.4 Estruturais (contexto informativo APENAS)
+- PGBL, previdência, holding e afins estão **FORA do mandato** (só CDB · ações B3 ·
+  crypto): NÃO recomende nem aloque neles. Se algo estrutural for material para o
+  cliente, registre em 1 linha como observação — sem valores, sem ordem.
 
 ## ROUND 9 — Behavioral Checklist (Tiago + Bruno)
 
@@ -560,7 +567,7 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
     "cenario_base":      {"tese": "", "probabilidade": 0, "gatilho_chave": ""},
     "cenario_otimista":  {"tese": "", "probabilidade": 0, "gatilho_chave": ""},
     "cenario_pessimista":{"tese": "", "probabilidade": 0, "gatilho_chave": ""},
-    "risco_fiscal": "", "risco_politico_31d": [], "reforma_2026_dividendos_status": ""
+    "risco_fiscal": "", "risco_politico_31d": [], "reforma_dividendos_status_verificado": ""
   },
   "macro_global_impacto_br": {
     "fed_taxa": null, "fed_proximo_fomc_data": null, "fed_prob_cut_proximo": null,
@@ -649,12 +656,13 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
   },
   "tax_overlay": {
     "cdb_alongar_720d_trava_15pct": false,
-    "acoes_isencao_20k_mes": true, "dividendos_isentos_ate_2026": true,
+    "acoes_isencao_20k_mes": true,
+    "dividendos_tributacao_vigente_verificada": "",
     "crypto_isencao_35k_mes": true,
     "tax_loss_harvesting_oportunidades": [
       {"ativo": "", "classe": "acao|crypto", "perda_atual_pct": 0, "vender": false, "wash_sale_30d_ok": false}
     ],
-    "pgbl_recomendado_brl": 0, "pgbl_beneficio_anual_brl": 0, "holding_recomendada": false
+    "obs_estruturais_fora_do_mandato": ""
   },
   "behavioral_check": {
     "anchoring": "", "loss_aversion": "", "recency": "",

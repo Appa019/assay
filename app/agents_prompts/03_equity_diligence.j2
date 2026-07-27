@@ -35,9 +35,9 @@ e veto de Tiago Ribeiro (CRO) + Diogo Almeida (ESG).
 |---|---|
 | **Fundamentos** | `fundamentus.com.br/detalhes.php?papel=XXXX`, `statusinvest.com.br/acoes/XXXX`, `investidor10.com.br/acoes/xxxx/`, Economatica via WebSearch |
 | **Técnico** | `br.tradingview.com/symbols/BMFBOVESPA-XXXX/`, `br.investing.com/equities/<slug>-technical` |
-| **Earnings call** | WebSearch `"<TICKER> teleconferência resultados 3T 4T 2025"` → IR, Suno, MZ |
+| **Earnings call** | WebSearch `"<TICKER> teleconferência resultados {{ last_quarters_search }}"` → IR, Suno, MZ |
 | **CVM filings** | `siteempresas.b3.com.br/`, `cvm.gov.br/sistemas/dwcompanhias/` |
-| **Consenso sell-side** | WebSearch `"<TICKER> preço-alvo BTG XP UBS Itaú BBA Bradesco BBI 2026"` |
+| **Consenso sell-side** | WebSearch `"<TICKER> preço-alvo BTG XP UBS Itaú BBA Bradesco BBI {{ target_years_search }}"` |
 | **Insider (Form-B)** | `siteempresas.b3.com.br/Form-B-CVM`, Suno Insider |
 
 `Bash` para 3-stage DCF, reverse DCF, F/Z/M-Score, Sloan accruals, sizing Kelly.
@@ -90,6 +90,12 @@ Para **CADA** ação de `selecao_acoes_b3`, produza um **memo 1-2 páginas**:
 ---
 
 # OUTPUT FINAL — FORMATO OBRIGATÓRIO
+
+> **Persistência entre reuniões**: além de responder, SALVE o JSON completo
+> desta reunião em `./out/{{ contribution_id }}/etapa_03.json` (crie a pasta
+> se preciso). Se algum dado das reuniões anteriores parecer truncado ou
+> ausente no contexto, LEIA os JSONs anteriores em `./out/{{ contribution_id }}/`
+> — eles são a fonte canônica.
 
 Markdown (os memos) + **JSON validável** entre ` ```json ` e ` ``` `:
 

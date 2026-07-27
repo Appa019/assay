@@ -92,6 +92,38 @@ def _format_brl(value: Any) -> str:
     return f"{integer.replace(',', '.')},{decimals}"
 
 
+def _date_context(ref: date) -> dict[str, Any]:
+    """Dynamic calendar variables for the templates.
+
+    Templates used to hardcode DI tenors, fiscal years and earnings quarters;
+    those fossilize (e.g. asking to quote an already-expired DI jan/26). All
+    date-anchored references now derive from the contribution date.
+    """
+    year = ref.year
+    quarter = (ref.month - 1) // 3 + 1
+    # Two most recently COMPLETED quarters (earnings that actually exist).
+    completed: list[str] = []
+    q, y = quarter - 1, year
+    for _ in range(2):
+        if q < 1:
+            q, y = 4, y - 1
+        completed.append(f"{q}T{y}")
+        q -= 1
+    completed.reverse()
+    # Liquid DI futures: Jan maturities 1, 2, 3 and 5 years out.
+    di_years = (year + 1, year + 2, year + 3, year + 5)
+    di_tenors = " · ".join(f"DI jan/{y % 100:02d}" for y in di_years)
+    return {
+        "current_year": year,
+        "next_year": year + 1,
+        "last_year": year - 1,
+        "current_quarter": f"{quarter}T{year}",
+        "last_quarters_search": " ".join(completed),
+        "di_tenors": di_tenors,
+        "target_years_search": f"{year} {year + 1}",
+    }
+
+
 def build_render_context(
     *,
     contribution_id: str,
@@ -123,6 +155,7 @@ def build_render_context(
     return {
         "contribution_id": contribution_id,
         "contribution_date": contribution_date.isoformat(),
+        **_date_context(contribution_date),
         "amount_brl": amount_brl,
         "amount_brl_formatted": _format_brl(amount_brl),
         "portfolio_total": portfolio_total,

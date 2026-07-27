@@ -36,7 +36,7 @@ Júlia Reis valida tokenomics/contas.
 | **DefiLlama / Token Terminal** | `defillama.com/protocol/<p>`, `tokenterminal.com/terminal/projects/<p>` (P/F, P/S, revenue) |
 | **Derivativos** | `coinglass.com/` (funding, OI, CME basis, DVOL, liquidation heatmap) |
 | **Unlocks** | `tokenomist.ai/`, `tokenunlocks.app/` |
-| **Dev activity** | WebSearch `"Electric Capital Developer Report 2025"`, GitHub |
+| **Dev activity** | WebSearch `"Electric Capital Developer Report {{ last_year }}"` (o mais recente publicado), GitHub |
 
 `Bash` para P/F·P/S, FDV/MC, sizing Kelly, correlações. MCPs: **coingecko**
 (identidade/preço/MC), **defillama** (TVL/yields/fees), **exa** (research);
@@ -82,6 +82,12 @@ Para **CADA** cripto de `selecao_crypto`:
 ---
 
 # OUTPUT FINAL — FORMATO OBRIGATÓRIO
+
+> **Persistência entre reuniões**: além de responder, SALVE o JSON completo
+> desta reunião em `./out/{{ contribution_id }}/etapa_04.json` (crie a pasta
+> se preciso). Se algum dado das reuniões anteriores parecer truncado ou
+> ausente no contexto, LEIA os JSONs anteriores em `./out/{{ contribution_id }}/`
+> — eles são a fonte canônica.
 
 Markdown (os memos) + **JSON validável** entre ` ```json ` e ` ``` `:
 
@@ -137,7 +143,7 @@ Markdown (os memos) + **JSON validável** entre ` ```json ` e ` ``` `:
   "sanidade_crypto": {
     "soma_position_sizing_100": true, "btc_eth_pct": 0,
     "unlock_risk_descontado": true, "asymmetry_media_ponderada": 0,
-    "overlap_carteira_atual": [], "soma_usd_vs_fatia_crypto_r1_ok": true,
+    "overlap_carteira_atual": [], "soma_brl_vs_fatia_crypto_r1_ok": true,
     "nenhuma_recomendacao_fora_do_mandato": true
   }
 }

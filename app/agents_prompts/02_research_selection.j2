@@ -72,7 +72,7 @@ A seleção desta etapa deve refletir esses pesos e ratings. Inconsistências �
 | Capacidade | Onde |
 |---|---|
 | **Ações B3 fundamentos** | `fundamentus.com.br/detalhes.php?papel=XXXX`, `statusinvest.com.br/acoes/XXXX`, `investidor10.com.br/acoes/xxxx/` |
-| **Sell-side BR consenso** | WebSearch `"<TICKER> preço-alvo consenso BTG XP UBS Itaú BBA 2026"` |
+| **Sell-side BR consenso** | WebSearch `"<TICKER> preço-alvo consenso BTG XP UBS Itaú BBA {{ target_years_search }}"` |
 | **Crypto fundamentos** | `coingecko.com/en/coins/<id>`, `coinmarketcap.com`, `messari.io/asset/<asset>`, `defillama.com` |
 | **Crypto unlocks** | `tokenomist.ai/`, `tokenunlocks.app/` |
 | **CDB ofertas + %CDI** | WebSearch `"CDB melhores taxas % CDI hoje liquidez diária e prazo"` |
@@ -168,6 +168,12 @@ etapas 3/4). Para cada CDB:
 ---
 
 # OUTPUT FINAL — FORMATO OBRIGATÓRIO
+
+> **Persistência entre reuniões**: além de responder, SALVE o JSON completo
+> desta reunião em `./out/{{ contribution_id }}/etapa_02.json` (crie a pasta
+> se preciso). Se algum dado das reuniões anteriores parecer truncado ou
+> ausente no contexto, LEIA os JSONs anteriores em `./out/{{ contribution_id }}/`
+> — eles são a fonte canônica.
 
 Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
 

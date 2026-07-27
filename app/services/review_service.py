@@ -32,15 +32,21 @@ def _positions_block(rows: list[dict[str, Any]], min_days: int) -> str:
     if not rows:
         return "(carteira vazia)"
     lines = [
-        "ticker | classe | qtd | preço médio | preço atual | valor | P&L% | dias | status",
+        "ticker | classe | qtd | preço médio | preço atual | valor | P&L% | dias | status"
+        " | alvo | stop | tese registrada",
     ]
     for r in rows:
         days = r.get("days_in_portfolio", 0)
-        status = "LIBERADO" if days >= min_days else f"travado ({min_days - days}d)"
+        if r.get("asset_class") == "fixed_income":
+            status = "liquidez diária"
+        else:
+            status = "LIBERADO" if days >= min_days else f"travado ({min_days - days}d)"
+        thesis = (r.get("thesis") or "—").replace("\n", " ")[:160]
         lines.append(
             f"{r['ticker']} | {r['asset_class']} | {r['quantity']} | "
             f"{r['avg_price']} | {r.get('current_price')} | {r['total_value']} | "
-            f"{r.get('pnl_pct')} | {days} | {status}"
+            f"{r.get('pnl_pct')} | {days} | {status} | "
+            f"{r.get('target_price') or '—'} | {r.get('stop_price') or '—'} | {thesis}"
         )
     return "\n".join(lines)
 
@@ -80,8 +86,12 @@ def _weekly_steps(
         "Como uma MESA COMPLETA nível Goldman Sachs / J.P. Morgan (economista-chefe, "
         "estrategista de alocação, equity research B3, crypto on-chain, head de RF, "
         "quant, CRO, forensic, CIO), com carta branca de pesquisa (WebSearch/WebFetch "
-        "+ seus MCPs: sequential-thinking, playwright, fetch), produza uma REVISÃO "
-        "SEMANAL COMPLETA e profissional, com debate e decisão do CIO:\n"
+        "+ seus MCPs: yahoo-finance p/ B3 `.SA`, coingecko, defillama, exa, "
+        "sequential-thinking, playwright, fetch — e glassnode/coinglass/messari se "
+        "disponíveis), produza uma REVISÃO SEMANAL COMPLETA e profissional, com "
+        "debate e decisão do CIO. Cada posição traz a TESE registrada na compra e "
+        "os níveis de alvo/stop — reavalie a tese explicitamente (tese intacta / "
+        "enfraquecida / quebrada):\n"
         "1. Macro completo (Brasil + global) e o que mudou na semana — com dados ao vivo.\n"
         "2. Desempenho de CADA posição: busque o preço atual real, calcule P&L, e diga "
         "se a tese segue válida.\n"
@@ -152,7 +162,15 @@ def _persist_report(
         session_id=summary.session_id,
         macro_snapshot=macro_ctx,
         portfolio_snapshot={"assets": portfolio_rows},
-        steps=[{"title": s.label, "response": s.result} for s in summary.steps],
+        steps=[
+            {
+                "title": s.label,
+                "response": s.result,
+                "cost_usd": s.cost_usd,
+                "duration_s": s.duration_s,
+            }
+            for s in summary.steps
+        ],
     )
     session.add(report)
     session.commit()
