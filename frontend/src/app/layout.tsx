@@ -18,7 +18,8 @@ const body = Manrope({
 
 export const metadata: Metadata = {
   title: "Mesa de aportes",
-  description: "Comitê mensal de investimentos — 3 prompts manuais",
+  description:
+    "Aportes ad-hoc com comitê autônomo de investimentos — 5 reuniões encadeadas + fechamento",
 };
 
 const RootLayout = ({

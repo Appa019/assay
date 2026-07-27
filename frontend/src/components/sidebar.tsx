@@ -40,7 +40,7 @@ export const Sidebar = () => {
           className="text-[11px] mt-1.5 uppercase tracking-[0.18em]"
           style={{ color: "var(--text-muted)" }}
         >
-          Comitê mensal · 3 prompts
+          Aporte ad-hoc · comitê autônomo
         </p>
       </div>
 

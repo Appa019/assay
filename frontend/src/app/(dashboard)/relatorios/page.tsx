@@ -4,12 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  ChevronRight,
-  ChevronDown,
-  ChevronUp,
-  Trash2,
-  FileBarChart,
+  ArrowUpRight,
   CalendarClock,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  FileBarChart,
+  Trash2,
   Unlock,
 } from "lucide-react";
 import {
@@ -24,13 +25,17 @@ import {
   type ReportListItem,
   type ReportRead,
 } from "@/lib/api";
+import { MarkdownViewer } from "@/components/markdown-viewer";
+import { formatDateLong, formatDateTime } from "@/lib/format";
 
 const RelatoriosPage = () => {
   const [items, setItems] = useState<ContributionListItem[]>([]);
   const [reports, setReports] = useState<ReportListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<Contribution | null>(null);
+  // Details cached by id: out-of-order responses can never render under the
+  // wrong item, and revisiting an item is instant.
+  const [details, setDetails] = useState<Record<string, Contribution>>({});
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -54,13 +59,15 @@ const RelatoriosPage = () => {
   const handleExpand = async (id: string) => {
     if (expandedId === id) {
       setExpandedId(null);
-      setDetail(null);
       return;
     }
     setExpandedId(id);
-    setDetail(null);
+    if (details[id]) return;
     try {
-      setDetail(await fetchContribution(id));
+      const detail = await fetchContribution(id);
+      // Key by the response's own id — a late response for another item
+      // fills its own slot instead of clobbering the active one.
+      setDetails((prev) => ({ ...prev, [detail.id]: detail }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar");
     }
@@ -70,10 +77,12 @@ const RelatoriosPage = () => {
     if (!confirm("Apagar este aporte e todas as respostas?")) return;
     try {
       await deleteContribution(id);
-      if (expandedId === id) {
-        setExpandedId(null);
-        setDetail(null);
-      }
+      if (expandedId === id) setExpandedId(null);
+      setDetails((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao apagar");
@@ -90,7 +99,8 @@ const RelatoriosPage = () => {
           Histórico
         </h2>
         <p className="text-sm mt-3" style={{ color: "var(--text-secondary)" }}>
-          Todos os ciclos do comitê. Clique para revisitar os prompts e as respostas.
+          Todos os aportes analisados e os relatórios do comitê. Clique para
+          revisitar as reuniões e as folhas de ordens.
         </p>
       </header>
 
@@ -137,7 +147,7 @@ const RelatoriosPage = () => {
             className="inline-flex items-center gap-2 mt-5 px-5 py-2.5 rounded-md text-sm font-semibold"
             style={{ background: "var(--accent)", color: "white" }}
           >
-            Iniciar primeiro ciclo
+            Fazer o primeiro aporte
             <ChevronRight size={13} />
           </Link>
         </div>
@@ -145,6 +155,7 @@ const RelatoriosPage = () => {
         <div className="space-y-3">
           {items.map((item) => {
             const expanded = expandedId === item.id;
+            const detail = details[item.id];
             const tone =
               item.status === "completed"
                 ? "var(--success)"
@@ -171,11 +182,7 @@ const RelatoriosPage = () => {
                         className="text-xs uppercase tracking-[0.16em] font-medium"
                         style={{ color: "var(--text-muted)" }}
                       >
-                        {new Date(item.created_at).toLocaleDateString("pt-BR", {
-                          day: "2-digit",
-                          month: "long",
-                          year: "numeric",
-                        })}
+                        {formatDateLong(item.created_at)}
                       </p>
                       <p
                         className="text-2xl tracking-tight mt-1 tabular"
@@ -200,6 +207,16 @@ const RelatoriosPage = () => {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Link
+                      href={`/aporte/${item.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-md"
+                      style={{ background: "var(--bg-secondary)", color: "var(--accent-strong)" }}
+                      title="Abrir a página da análise (acompanhar ou reler)"
+                    >
+                      <ArrowUpRight size={12} />
+                      Abrir análise
+                    </Link>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -223,7 +240,7 @@ const RelatoriosPage = () => {
                     className="px-6 py-5"
                     style={{ borderTop: "1px solid var(--border)" }}
                   >
-                    {detail && detail.id === item.id ? (
+                    {detail ? (
                       <DetailView contribution={detail} />
                     ) : (
                       <div
@@ -244,20 +261,23 @@ const RelatoriosPage = () => {
 
 const AgentReports = ({ reports }: { reports: ReportListItem[] }) => {
   const [openId, setOpenId] = useState<string | null>(null);
-  const [full, setFull] = useState<ReportRead | null>(null);
+  // Same stale-response guard as the contributions list: cache by id.
+  const [fullById, setFullById] = useState<Record<string, ReportRead>>({});
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const toggle = async (id: string) => {
     if (openId === id) {
       setOpenId(null);
-      setFull(null);
       return;
     }
     setOpenId(id);
-    setFull(null);
+    setLoadError(null);
+    if (fullById[id]) return;
     try {
-      setFull(await fetchReport(id));
-    } catch {
-      // silent
+      const full = await fetchReport(id);
+      setFullById((prev) => ({ ...prev, [full.id]: full }));
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Erro ao carregar relatório");
     }
   };
 
@@ -277,6 +297,7 @@ const AgentReports = ({ reports }: { reports: ReportListItem[] }) => {
       <div className="space-y-2">
         {reports.map((r) => {
           const open = openId === r.id;
+          const full = fullById[r.id];
           const weekly = r.kind === "weekly";
           return (
             <article
@@ -302,7 +323,7 @@ const AgentReports = ({ reports }: { reports: ReportListItem[] }) => {
                       {r.title}
                     </p>
                     <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                      {new Date(r.created_at).toLocaleString("pt-BR")} ·{" "}
+                      {formatDateTime(r.created_at)} ·{" "}
                       {weekly ? "Semanal" : "Maturidade"} · US$ {r.cost_usd.toFixed(2)}
                     </p>
                   </div>
@@ -315,13 +336,12 @@ const AgentReports = ({ reports }: { reports: ReportListItem[] }) => {
               </header>
               {open && (
                 <div className="px-5 py-4" style={{ borderTop: "1px solid var(--border)" }}>
-                  {full && full.id === r.id ? (
-                    <pre
-                      className="text-[13px] leading-relaxed whitespace-pre-wrap"
-                      style={{ color: "var(--text-primary)", fontFamily: "var(--font-body)" }}
-                    >
-                      {full.content}
-                    </pre>
+                  {full ? (
+                    <MarkdownViewer content={full.content} maxHeight={560} />
+                  ) : loadError ? (
+                    <p className="text-xs" style={{ color: "var(--danger)" }}>
+                      {loadError}
+                    </p>
                   ) : (
                     <div
                       className="animate-pulse h-20 rounded"
@@ -424,25 +444,21 @@ const DetailView = ({ contribution }: { contribution: Contribution }) => {
               className="text-[11px] uppercase tracking-[0.16em] font-medium mb-2"
               style={{ color: "var(--text-muted)" }}
             >
-              Resposta do Claude
+              Resposta do comitê
             </p>
             {active.response ? (
-              <pre
-                className="p-4 rounded-md text-[13px] leading-relaxed whitespace-pre-wrap font-mono max-h-[480px] overflow-auto"
-                style={{
-                  background: "var(--bg-secondary)",
-                  color: "var(--text-primary)",
-                  border: "1px solid var(--border)",
-                }}
+              <div
+                className="p-4 rounded-md"
+                style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
               >
-                {active.response}
-              </pre>
+                <MarkdownViewer content={active.response} maxHeight={480} />
+              </div>
             ) : (
               <p
                 className="text-sm italic"
                 style={{ color: "var(--text-muted)" }}
               >
-                Resposta ainda não colada
+                Sem resposta ainda — reunião não concluída
               </p>
             )}
           </div>
@@ -455,26 +471,21 @@ const DetailView = ({ contribution }: { contribution: Contribution }) => {
           style={{ background: "var(--accent-light)", border: "1px solid var(--accent)" }}
         >
           <p
-            className="text-[11px] uppercase tracking-[0.16em] font-medium mb-2"
+            className="text-[11px] uppercase tracking-[0.16em] font-medium mb-3"
             style={{ color: "var(--accent-strong)" }}
           >
             Resumo executivo
           </p>
-          <p
-            className="text-sm leading-relaxed whitespace-pre-wrap"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {contribution.final_summary}
-          </p>
+          <MarkdownViewer content={contribution.final_summary} withToc={false} />
         </div>
       )}
 
       <Link
-        href={`/aporte`}
+        href={`/aporte/${contribution.id}`}
         className="inline-flex items-center gap-1.5 text-xs font-medium"
         style={{ color: "var(--accent)" }}
       >
-        Iniciar próximo ciclo
+        Abrir a página completa da análise
         <ChevronRight size={12} />
       </Link>
     </div>

@@ -26,6 +26,9 @@ export type Asset = {
   avg_price: number;
   current_price: number | null;
   entry_date: string;
+  thesis: string | null;
+  target_price: number | null;
+  stop_price: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -82,6 +85,9 @@ export type Prompt = {
   content: string;
   response: string | null;
   responded_at: string | null;
+  cost_usd: number | null;
+  duration_s: number | null;
+  num_turns: number | null;
 };
 
 export type Contribution = {
@@ -139,6 +145,17 @@ export type CadenceStatus = {
   total_contributions: number;
 };
 
+/** API error carrying the HTTP status so callers can branch on 404/409. */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, detail: string) {
+    super(detail);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 const json = async <T>(res: Response): Promise<T> => {
   if (!res.ok) {
     let detail = "Erro na API";
@@ -146,9 +163,13 @@ const json = async <T>(res: Response): Promise<T> => {
       const body = await res.json();
       detail = (body as { detail?: string }).detail ?? detail;
     } catch {
-      detail = await res.text();
+      try {
+        detail = (await res.text()) || detail;
+      } catch {
+        // keep default detail
+      }
     }
-    throw new Error(detail);
+    throw new ApiError(res.status, detail);
   }
   return (await res.json()) as T;
 };
@@ -193,6 +214,67 @@ export const deleteAsset = async (id: string): Promise<Asset> =>
       method: "DELETE",
     })
   );
+
+export type RefreshResult = {
+  updated: number;
+  warnings: string[];
+};
+
+export const refreshPortfolioPrices = async (): Promise<RefreshResult> =>
+  json<RefreshResult>(
+    await fetch(`${API_BASE}/api/portfolio/refresh`, { method: "POST" })
+  );
+
+export type PortfolioHistoryPoint = {
+  snapshot_date: string;
+  total_value: number;
+  fixed_income: number;
+  stocks: number;
+  crypto: number;
+};
+
+/**
+ * Equity-curve snapshots. Returns null when the endpoint is not available yet
+ * (404) so callers can hide the section gracefully.
+ */
+export const fetchPortfolioHistory = async (
+  days = 365
+): Promise<PortfolioHistoryPoint[] | null> => {
+  try {
+    return await json<PortfolioHistoryPoint[]>(
+      await fetch(`${API_BASE}/api/portfolio/history?days=${days}`)
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
+};
+
+export type TradeSide = "buy" | "sell";
+
+export type Trade = {
+  id: string;
+  ticker: string;
+  asset_class: AssetClass;
+  side: TradeSide;
+  quantity: number;
+  price: number;
+  total_brl: number;
+  realized_pnl_brl: number | null;
+  realized_pnl_pct: number | null;
+  lot_entry_date: string | null;
+  executed_at: string;
+};
+
+/** Trade log. Returns null on 404 so callers can hide the section gracefully. */
+export const fetchTrades = async (): Promise<Trade[] | null> => {
+  try {
+    return await json<Trade[]>(await fetch(`${API_BASE}/api/portfolio/trades`));
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
+};
 
 export const fetchMacro = async (): Promise<MacroSnapshot> =>
   json<MacroSnapshot>(await fetch(`${API_BASE}/api/macro`));

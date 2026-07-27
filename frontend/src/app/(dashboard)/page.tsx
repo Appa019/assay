@@ -1,16 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, RefreshCw, Sparkles, WifiOff } from "lucide-react";
 import { usePortfolio } from "@/hooks/use-portfolio";
 import { useCadence } from "@/hooks/use-cadence";
 import { useMacro } from "@/hooks/use-macro";
-import { formatBRLCompact } from "@/lib/format";
+import { usePortfolioHistory } from "@/hooks/use-portfolio-history";
+import { formatBRLCompact, formatDate } from "@/lib/format";
+import {
+  AllocationDonut,
+  AllocationVsTargetChart,
+  EquityCurveChart,
+} from "@/components/portfolio-charts";
 
 const DashboardPage = () => {
-  const { data: portfolio, loading: pLoading } = usePortfolio();
+  const { data: portfolio, loading: pLoading, error: pError, refresh } = usePortfolio();
   const { data: cadence } = useCadence();
   const { data: macro } = useMacro();
+  const { data: history } = usePortfolioHistory(365);
+
+  const backendDown = !pLoading && !portfolio && pError !== null;
 
   return (
     <div className="space-y-12 max-w-6xl">
@@ -52,43 +61,90 @@ const DashboardPage = () => {
         </Link>
       </header>
 
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <SummaryCard
-          title="Patrimônio"
-          value={
-            pLoading
-              ? "..."
-              : formatBRLCompact(portfolio?.total_value ?? 0)
-          }
-          sub={`${portfolio?.assets.length ?? 0} ativos`}
-        />
-        <SummaryCard
-          title="Alocação atual"
-          value={
-            pLoading
-              ? "..."
-              : `${(portfolio?.allocation.fixed_income_pct ?? 0).toFixed(0)} / ${(portfolio?.allocation.stocks_pct ?? 0).toFixed(0)} / ${(portfolio?.allocation.crypto_pct ?? 0).toFixed(0)}`
-          }
-          sub="RF · Ações · Crypto (%)"
-        />
-        <SummaryCard
-          title="Último aporte"
-          value={
-            cadence
-              ? cadence.days_since_last === null
-                ? "—"
-                : cadence.days_since_last === 0
-                  ? "Hoje"
-                  : `há ${cadence.days_since_last}d`
-              : "..."
-          }
-          sub={
-            cadence?.last_contribution_date
-              ? `${new Date(cadence.last_contribution_date).toLocaleDateString("pt-BR")} · ${cadence.total_contributions} no total`
-              : "nenhum ainda · aporte quando quiser"
-          }
-        />
-      </section>
+      {backendDown ? (
+        <section
+          className="p-8 rounded-md flex items-center justify-between gap-6"
+          style={{ background: "var(--danger-light)", border: "1px solid var(--danger)" }}
+        >
+          <div className="flex items-start gap-4">
+            <WifiOff size={20} style={{ color: "var(--danger)" }} className="mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                Backend indisponível
+              </p>
+              <p className="text-xs mt-1 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                Não foi possível carregar a carteira ({pError}). Verifique se o
+                backend está rodando (<code>./start.sh</code>) e tente de novo.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => void refresh()}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-md text-sm font-semibold shrink-0"
+            style={{ background: "var(--accent)", color: "white" }}
+          >
+            <RefreshCw size={13} />
+            Tentar de novo
+          </button>
+        </section>
+      ) : (
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <SummaryCard
+            title="Patrimônio"
+            value={pLoading ? "..." : formatBRLCompact(portfolio?.total_value ?? 0)}
+            sub={pLoading ? "carregando…" : `${portfolio?.assets.length ?? 0} ativos`}
+          />
+          <SummaryCard
+            title="Alocação atual"
+            value={
+              pLoading
+                ? "..."
+                : `${(portfolio?.allocation.fixed_income_pct ?? 0).toFixed(0)} / ${(portfolio?.allocation.stocks_pct ?? 0).toFixed(0)} / ${(portfolio?.allocation.crypto_pct ?? 0).toFixed(0)}`
+            }
+            sub="RF · Ações · Crypto (%)"
+          />
+          <SummaryCard
+            title="Último aporte"
+            value={
+              cadence
+                ? cadence.days_since_last === null
+                  ? "—"
+                  : cadence.days_since_last === 0
+                    ? "Hoje"
+                    : `há ${cadence.days_since_last}d`
+                : "..."
+            }
+            sub={
+              cadence?.last_contribution_date
+                ? `${formatDate(cadence.last_contribution_date)} · ${cadence.total_contributions} no total`
+                : "nenhum ainda · aporte quando quiser"
+            }
+          />
+        </section>
+      )}
+
+      {!backendDown && portfolio && (
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ChartCard
+            title="Alocação vs alvo"
+            sub="Percentual atual de cada classe contra a meta do mandato"
+          >
+            <AllocationVsTargetChart portfolio={portfolio} />
+          </ChartCard>
+          <ChartCard title="Composição da carteira" sub="Distribuição por classe, em R$">
+            <AllocationDonut portfolio={portfolio} />
+          </ChartCard>
+        </section>
+      )}
+
+      {!backendDown && history && history.length > 0 && (
+        <ChartCard
+          title="Curva de patrimônio"
+          sub="Valor total da carteira nos snapshots diários"
+        >
+          <EquityCurveChart history={history} />
+        </ChartCard>
+      )}
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div
@@ -126,7 +182,7 @@ const DashboardPage = () => {
             className="text-2xl tracking-tight mb-4"
             style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
           >
-            Alocação vs target
+            Desvio do mandato
           </h3>
           {portfolio ? (
             <div className="space-y-4">
@@ -151,7 +207,7 @@ const DashboardPage = () => {
             </div>
           ) : (
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              ...
+              {backendDown ? "Sem dados — backend fora do ar" : "..."}
             </p>
           )}
         </div>
@@ -159,6 +215,32 @@ const DashboardPage = () => {
     </div>
   );
 };
+
+const ChartCard = ({
+  title,
+  sub,
+  children,
+}: {
+  title: string;
+  sub: string;
+  children: React.ReactNode;
+}) => (
+  <div
+    className="p-7 rounded-md"
+    style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
+  >
+    <h3
+      className="text-2xl tracking-tight"
+      style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
+    >
+      {title}
+    </h3>
+    <p className="text-xs mt-1 mb-5" style={{ color: "var(--text-muted)" }}>
+      {sub}
+    </p>
+    {children}
+  </div>
+);
 
 const SummaryCard = ({
   title,
@@ -180,7 +262,7 @@ const SummaryCard = ({
       {title}
     </p>
     <p
-      className="text-3xl mt-3 tabular tracking-tight"
+      className="text-3xl mt-3 tracking-tight"
       style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
     >
       {value}
@@ -206,7 +288,7 @@ const AllocBar = ({
     <div className="flex items-center justify-between text-xs mb-1.5">
       <span style={{ color: "var(--text-secondary)" }}>{label}</span>
       <span className="tabular" style={{ color: "var(--text-primary)" }}>
-        {actual.toFixed(1)}% / target {target.toFixed(0)}%{" "}
+        {actual.toFixed(1)}% / alvo {target.toFixed(0)}%{" "}
         <span
           style={{ color: Math.abs(deviation) > 5 ? "var(--warning)" : "var(--text-muted)" }}
           className="font-medium ml-2"

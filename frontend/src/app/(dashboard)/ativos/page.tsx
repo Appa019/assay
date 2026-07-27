@@ -1,29 +1,45 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Plus,
-  Minus,
+  ArrowUpDown,
   ChevronDown,
   ChevronUp,
-  ArrowUpDown,
-  PackageOpen,
   DollarSign,
+  History,
+  Lock,
+  LockOpen,
+  Minus,
+  PackageOpen,
   Pencil,
+  Plus,
+  RefreshCw,
 } from "lucide-react";
 import {
   createAsset,
   deleteAsset,
+  fetchTrades,
+  refreshPortfolioPrices,
   sellAsset,
   updateAsset,
   type Asset,
   type AssetClass,
   type AssetCreate,
   type SaleResult,
+  type Trade,
 } from "@/lib/api";
 import { usePortfolio } from "@/hooks/use-portfolio";
-import { formatBRL, formatNumber } from "@/lib/format";
+import {
+  daysSince,
+  formatBRL,
+  formatDate,
+  formatDateTime,
+  formatNumber,
+  parseLocalDate,
+} from "@/lib/format";
+
+const MIN_HOLDING_DAYS = 30;
 
 const ASSET_CLASSES: { value: AssetClass; label: string }[] = [
   { value: "fixed_income", label: "Renda Fixa" },
@@ -44,6 +60,21 @@ const FILTER_TABS = [
   { value: "fixed_income", label: "Renda Fixa" },
 ] as const;
 
+type LockInfo =
+  | { kind: "daily_liquidity" }
+  | { kind: "locked"; remainingDays: number; unlockDate: Date }
+  | { kind: "unlocked" };
+
+/** 30-day sell lock per LOT — stocks/crypto only; CDB has daily liquidity. */
+const lockInfoFor = (asset: Asset): LockInfo => {
+  if (asset.asset_class === "fixed_income") return { kind: "daily_liquidity" };
+  const held = daysSince(asset.entry_date);
+  if (held >= MIN_HOLDING_DAYS) return { kind: "unlocked" };
+  const unlockDate = parseLocalDate(asset.entry_date);
+  unlockDate.setDate(unlockDate.getDate() + MIN_HOLDING_DAYS);
+  return { kind: "locked", remainingDays: MIN_HOLDING_DAYS - held, unlockDate };
+};
+
 type SortField =
   | "ticker"
   | "asset_class"
@@ -51,7 +82,8 @@ type SortField =
   | "avg_price"
   | "current_price"
   | "pnl"
-  | "total_value";
+  | "total_value"
+  | "lock";
 
 type SortDirection = "asc" | "desc";
 
@@ -66,14 +98,28 @@ const AtivosPage = () => {
   });
   const [editPrice, setEditPrice] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState<
     { type: "success" | "error"; text: string } | null
   >(null);
   const [filter, setFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("total_value");
   const [sortDir, setSortDir] = useState<SortDirection>("desc");
+  const [trades, setTrades] = useState<Trade[] | null>(null);
   const sellDialog = useRef<HTMLDialogElement>(null);
   const editDialog = useRef<HTMLDialogElement>(null);
+
+  const loadTrades = useCallback(async () => {
+    try {
+      setTrades(await fetchTrades());
+    } catch {
+      // Network error: keep whatever was on screen, section hides when null.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTrades();
+  }, [loadTrades]);
 
   useEffect(() => {
     if (sellTarget) sellDialog.current?.showModal();
@@ -91,7 +137,7 @@ const AtivosPage = () => {
 
   useEffect(() => {
     if (!message) return;
-    const t = setTimeout(() => setMessage(null), 4000);
+    const t = setTimeout(() => setMessage(null), 6000);
     return () => clearTimeout(t);
   }, [message]);
 
@@ -132,6 +178,8 @@ const AtivosPage = () => {
         }
         case "total_value":
           return dir * (a.quantity * priceA - b.quantity * priceB);
+        case "lock":
+          return dir * (daysSince(a.entry_date) - daysSince(b.entry_date));
         default:
           return 0;
       }
@@ -155,7 +203,7 @@ const AtivosPage = () => {
       setMessage({ type: "success", text: `${formData.ticker} adicionado à carteira` });
       setFormData({ asset_class: "stocks" });
       setShowBuyForm(false);
-      await refresh();
+      await Promise.all([refresh(), loadTrades()]);
     } catch (err) {
       setMessage({
         type: "error",
@@ -176,15 +224,37 @@ const AtivosPage = () => {
         type: "success",
         text: `${result.ticker} vendido por ${formatBRL(result.sale_value)}`,
       });
-      setSellTarget(null);
-      await refresh();
+      await Promise.all([refresh(), loadTrades()]);
     } catch (err) {
+      // A 409 carries the pt-BR lock message from the backend — show it as-is.
       setMessage({
         type: "error",
         text: err instanceof Error ? err.message : "Erro ao vender",
       });
     } finally {
+      setSellTarget(null);
       setSubmitting(false);
+    }
+  };
+
+  const handleRefreshPrices = async () => {
+    setRefreshing(true);
+    try {
+      const result = await refreshPortfolioPrices();
+      const warningSuffix =
+        result.warnings.length > 0 ? ` · avisos: ${result.warnings.join(" · ")}` : "";
+      setMessage({
+        type: result.warnings.length > 0 ? "error" : "success",
+        text: `${result.updated} preço(s) atualizado(s)${warningSuffix}`,
+      });
+      await refresh();
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Erro ao atualizar preços",
+      });
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -225,6 +295,8 @@ const AtivosPage = () => {
     }
   };
 
+  const sellLock = sellTarget ? lockInfoFor(sellTarget) : null;
+
   return (
     <div className="space-y-10 max-w-6xl">
       <div className="flex items-end justify-between">
@@ -239,17 +311,30 @@ const AtivosPage = () => {
             className="text-sm mt-3"
             style={{ color: "var(--text-secondary)" }}
           >
-            Os ativos abaixo viram &quot;Carteira atual&quot; nos prompts do comitê.
+            Cada compra é um lote com trava própria de {MIN_HOLDING_DAYS} dias
+            (ações e crypto). Os ativos abaixo viram &quot;Carteira atual&quot; nos
+            prompts do comitê.
           </p>
         </div>
-        <button
-          onClick={() => setShowBuyForm((v) => !v)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold"
-          style={{ background: "var(--accent)", color: "white" }}
-        >
-          {showBuyForm ? <ChevronUp size={14} /> : <Plus size={14} />}
-          {showBuyForm ? "Fechar" : "Adicionar ativo"}
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => void handleRefreshPrices()}
+            disabled={refreshing || loading}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium disabled:opacity-40"
+            style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)" }}
+          >
+            <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
+            {refreshing ? "Atualizando..." : "Atualizar preços"}
+          </button>
+          <button
+            onClick={() => setShowBuyForm((v) => !v)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold"
+            style={{ background: "var(--accent)", color: "white" }}
+          >
+            {showBuyForm ? <ChevronUp size={14} /> : <Plus size={14} />}
+            {showBuyForm ? "Fechar" : "Adicionar ativo"}
+          </button>
+        </div>
       </div>
 
       <AnimatePresence>
@@ -484,7 +569,7 @@ const AtivosPage = () => {
               Nenhum ativo encontrado
             </p>
             <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-              Adicione ativos para a próxima rodada do comitê
+              Registre aqui o que comprar da folha de ordens do comitê
             </p>
           </div>
         ) : (
@@ -500,6 +585,7 @@ const AtivosPage = () => {
                 >
                   <SortHeader label="Ativo" field="ticker" current={sortField} dir={sortDir} onSort={handleSort} />
                   <SortHeader label="Classe" field="asset_class" current={sortField} dir={sortDir} onSort={handleSort} />
+                  <SortHeader label="Trava" field="lock" current={sortField} dir={sortDir} onSort={handleSort} />
                   <SortHeader label="Qtd" field="quantity" current={sortField} dir={sortDir} onSort={handleSort} align="right" />
                   <SortHeader label="PM" field="avg_price" current={sortField} dir={sortDir} onSort={handleSort} align="right" />
                   <SortHeader label="Atual" field="current_price" current={sortField} dir={sortDir} onSort={handleSort} align="right" />
@@ -516,6 +602,8 @@ const AtivosPage = () => {
                     asset.avg_price > 0
                       ? ((current - asset.avg_price) / asset.avg_price) * 100
                       : 0;
+                  const lock = lockInfoFor(asset);
+                  const locked = lock.kind === "locked";
 
                   return (
                     <tr
@@ -527,6 +615,7 @@ const AtivosPage = () => {
                         <span
                           className="font-semibold"
                           style={{ color: "var(--text-primary)" }}
+                          title={asset.thesis ?? undefined}
                         >
                           {asset.ticker}
                         </span>
@@ -536,6 +625,30 @@ const AtivosPage = () => {
                             style={{ color: "var(--text-muted)" }}
                           >
                             {asset.name}
+                          </span>
+                        )}
+                        {(asset.target_price !== null || asset.stop_price !== null) && (
+                          <span
+                            className="block text-[11px] mt-0.5 tabular"
+                            style={{ color: "var(--text-muted)" }}
+                          >
+                            {asset.target_price !== null && (
+                              <>
+                                alvo{" "}
+                                <span style={{ color: "var(--success)" }}>
+                                  {formatBRL(asset.target_price)}
+                                </span>
+                              </>
+                            )}
+                            {asset.target_price !== null && asset.stop_price !== null && " · "}
+                            {asset.stop_price !== null && (
+                              <>
+                                stop{" "}
+                                <span style={{ color: "var(--danger)" }}>
+                                  {formatBRL(asset.stop_price)}
+                                </span>
+                              </>
+                            )}
                           </span>
                         )}
                       </td>
@@ -549,6 +662,9 @@ const AtivosPage = () => {
                         >
                           {CLASS_LABELS[asset.asset_class]}
                         </span>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <LockBadge lock={lock} entryDate={asset.entry_date} />
                       </td>
                       <td className="px-4 py-3.5 text-right tabular">
                         {formatNumber(asset.quantity)}
@@ -594,13 +710,19 @@ const AtivosPage = () => {
                           </button>
                           <button
                             onClick={() => setSellTarget(asset)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium"
+                            disabled={locked}
+                            title={
+                              lock.kind === "locked"
+                                ? `Trava de ${MIN_HOLDING_DAYS} dias por lote — libera em ${lock.remainingDays}d (${lock.unlockDate.toLocaleDateString("pt-BR")})`
+                                : undefined
+                            }
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium disabled:opacity-45"
                             style={{
                               background: "var(--danger-light)",
                               color: "var(--danger)",
                             }}
                           >
-                            <Minus size={11} />
+                            {locked ? <Lock size={11} /> : <Minus size={11} />}
                             Vender
                           </button>
                           <button
@@ -624,6 +746,8 @@ const AtivosPage = () => {
         )}
       </div>
 
+      {trades !== null && <TradesSection trades={trades} />}
+
       <dialog
         ref={sellDialog}
         onClose={() => setSellTarget(null)}
@@ -638,6 +762,17 @@ const AtivosPage = () => {
             >
               Vender {sellTarget.ticker}?
             </h3>
+            {sellLock?.kind === "locked" && (
+              <p
+                className="p-3 rounded-md text-xs mb-4 flex items-start gap-2"
+                style={{ background: "var(--warning-light)", color: "var(--text-secondary)" }}
+              >
+                <Lock size={13} className="mt-0.5 shrink-0" style={{ color: "var(--warning)" }} />
+                Lote travado: faltam {sellLock.remainingDays} dia(s) — o backend
+                vai recusar a venda antes de{" "}
+                {sellLock.unlockDate.toLocaleDateString("pt-BR")}.
+              </p>
+            )}
             <div
               className="p-4 rounded-md mb-5 space-y-2"
               style={{ background: "var(--bg-secondary)" }}
@@ -725,6 +860,159 @@ const AtivosPage = () => {
     </div>
   );
 };
+
+const LockBadge = ({ lock, entryDate }: { lock: LockInfo; entryDate: string }) => {
+  if (lock.kind === "daily_liquidity") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded"
+        style={{ background: "var(--bg-secondary)", color: "var(--text-muted)" }}
+        title="CDB: sem trava, vendável a qualquer momento"
+      >
+        Liquidez diária
+      </span>
+    );
+  }
+  if (lock.kind === "locked") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded"
+        style={{ background: "var(--warning-light)", color: "var(--text-secondary)" }}
+        title={`Lote de ${formatDate(entryDate)} · libera em ${lock.unlockDate.toLocaleDateString("pt-BR")}`}
+      >
+        <Lock size={10} style={{ color: "var(--warning)" }} />
+        faltam {lock.remainingDays}d
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded"
+      style={{ background: "var(--success-light)", color: "var(--success)" }}
+      title={`Lote de ${formatDate(entryDate)} · trava cumprida`}
+    >
+      <LockOpen size={10} />
+      liberado
+    </span>
+  );
+};
+
+const TradesSection = ({ trades }: { trades: Trade[] }) => (
+  <section className="space-y-4">
+    <div>
+      <h3
+        className="text-2xl tracking-tight flex items-center gap-2.5"
+        style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
+      >
+        <History size={18} style={{ color: "var(--text-muted)" }} />
+        Histórico de operações
+      </h3>
+      <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+        Compras e vendas registradas, com P&amp;L realizado nas vendas
+      </p>
+    </div>
+    {trades.length === 0 ? (
+      <div
+        className="p-6 text-sm rounded-md"
+        style={{
+          background: "var(--bg-card)",
+          border: "1px solid var(--border)",
+          color: "var(--text-muted)",
+        }}
+      >
+        Nenhuma operação registrada ainda
+      </div>
+    ) : (
+      <div
+        className="rounded-md overflow-hidden"
+        style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr
+                className="text-left text-[10px] uppercase tracking-[0.16em]"
+                style={{
+                  color: "var(--text-muted)",
+                  borderBottom: "1px solid var(--border)",
+                }}
+              >
+                <th className="px-4 py-3 font-medium">Data</th>
+                <th className="px-4 py-3 font-medium">Ativo</th>
+                <th className="px-4 py-3 font-medium">Lado</th>
+                <th className="px-4 py-3 font-medium text-right">Qtd</th>
+                <th className="px-4 py-3 font-medium text-right">Preço</th>
+                <th className="px-4 py-3 font-medium text-right">Total</th>
+                <th className="px-4 py-3 font-medium text-right">P&amp;L realizado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trades.map((trade) => {
+                const isBuy = trade.side === "buy";
+                const pnlColor =
+                  trade.realized_pnl_brl === null
+                    ? "var(--text-muted)"
+                    : trade.realized_pnl_brl >= 0
+                      ? "var(--success)"
+                      : "var(--danger)";
+                return (
+                  <tr
+                    key={trade.id}
+                    style={{ borderBottom: "1px solid var(--border)" }}
+                  >
+                    <td className="px-4 py-3 tabular text-xs" style={{ color: "var(--text-secondary)" }}>
+                      {formatDateTime(trade.executed_at)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                        {trade.ticker}
+                      </span>
+                      <span
+                        className="ml-2 text-[11px] px-1.5 py-0.5 rounded"
+                        style={{ background: "var(--bg-secondary)", color: "var(--text-muted)" }}
+                      >
+                        {CLASS_LABELS[trade.asset_class]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className="text-[11px] font-semibold px-2 py-0.5 rounded"
+                        style={{
+                          background: isBuy ? "var(--success-light)" : "var(--danger-light)",
+                          color: isBuy ? "var(--success)" : "var(--danger)",
+                        }}
+                      >
+                        {isBuy ? "Compra" : "Venda"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right tabular">
+                      {formatNumber(trade.quantity)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular">
+                      {formatBRL(trade.price)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular font-semibold" style={{ color: "var(--text-primary)" }}>
+                      {formatBRL(trade.total_brl)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular font-medium" style={{ color: pnlColor }}>
+                      {trade.realized_pnl_brl === null
+                        ? "—"
+                        : `${trade.realized_pnl_brl >= 0 ? "+" : ""}${formatBRL(trade.realized_pnl_brl)}${
+                            trade.realized_pnl_pct !== null
+                              ? ` (${trade.realized_pnl_pct >= 0 ? "+" : ""}${trade.realized_pnl_pct.toFixed(2)}%)`
+                              : ""
+                          }`}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )}
+  </section>
+);
 
 const Row = ({
   label,

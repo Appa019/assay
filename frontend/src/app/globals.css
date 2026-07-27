@@ -80,3 +80,162 @@ button:disabled {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
+
+/* ── Markdown document (committee memos & reports) ─────────────────── */
+.md-doc {
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--text-primary);
+  overflow-wrap: break-word;
+}
+
+.md-doc > :first-child {
+  margin-top: 0;
+}
+
+.md-doc h1,
+.md-doc h2,
+.md-doc h3,
+.md-doc h4 {
+  font-family: var(--font-heading), serif;
+  color: var(--text-primary);
+  scroll-margin-top: 1rem;
+  line-height: 1.25;
+}
+
+.md-doc h1 {
+  font-size: 1.6rem;
+  margin: 2.2rem 0 0.9rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.md-doc h2 {
+  font-size: 1.3rem;
+  margin: 1.9rem 0 0.7rem;
+}
+
+.md-doc h3 {
+  font-size: 1.08rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+.md-doc h4 {
+  font-size: 0.95rem;
+  margin: 1.2rem 0 0.4rem;
+}
+
+.md-doc p {
+  margin: 0.65rem 0;
+}
+
+.md-doc ul,
+.md-doc ol {
+  margin: 0.65rem 0;
+  padding-left: 1.4rem;
+}
+
+.md-doc ul {
+  list-style: disc;
+}
+
+.md-doc ol {
+  list-style: decimal;
+}
+
+.md-doc li {
+  margin: 0.25rem 0;
+}
+
+.md-doc li > ul,
+.md-doc li > ol {
+  margin: 0.25rem 0;
+}
+
+.md-doc blockquote {
+  margin: 1rem 0;
+  padding: 0.4rem 1.1rem;
+  border-left: 3px solid var(--accent);
+  background: var(--bg-secondary);
+  border-radius: 0 4px 4px 0;
+  color: var(--text-secondary);
+}
+
+.md-doc code {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.8em;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.1em 0.4em;
+}
+
+.md-doc pre {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow-x: auto;
+  line-height: 1.55;
+}
+
+.md-doc pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.78rem;
+}
+
+.md-doc hr {
+  margin: 1.8rem 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+.md-doc a {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.md-doc strong {
+  font-weight: 700;
+}
+
+.md-table-wrap {
+  margin: 1rem 0;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.md-doc table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.md-doc th {
+  text-align: left;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.md-doc td {
+  padding: 0.5rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  font-variant-numeric: tabular-nums;
+}
+
+.md-doc tr:last-child td {
+  border-bottom: none;
+}
