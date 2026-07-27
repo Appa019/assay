@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import type { Contribution, Prompt } from "@/lib/api";
 import { MarkdownViewer } from "@/components/markdown-viewer";
-import { formatDateLong } from "@/lib/format";
+import { formatDateLong, stripMachineBlocks } from "@/lib/format";
 
 const POLL_INTERVAL_MS = 4000;
 
@@ -223,7 +223,7 @@ const FinalSummary = ({ summary }: { summary: string }) => (
         Onde investir e quanto
       </h3>
     </div>
-    <MarkdownViewer content={summary} />
+    <MarkdownViewer content={stripMachineBlocks(summary)} />
   </motion.section>
 );
 

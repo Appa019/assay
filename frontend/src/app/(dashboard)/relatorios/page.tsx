@@ -26,7 +26,7 @@ import {
   type ReportRead,
 } from "@/lib/api";
 import { MarkdownViewer } from "@/components/markdown-viewer";
-import { formatDateLong, formatDateTime } from "@/lib/format";
+import { formatDateLong, formatDateTime, stripMachineBlocks } from "@/lib/format";
 
 const RelatoriosPage = () => {
   const [items, setItems] = useState<ContributionListItem[]>([]);
@@ -476,7 +476,7 @@ const DetailView = ({ contribution }: { contribution: Contribution }) => {
           >
             Resumo executivo
           </p>
-          <MarkdownViewer content={contribution.final_summary} withToc={false} />
+          <MarkdownViewer content={stripMachineBlocks(contribution.final_summary)} withToc={false} />
         </div>
       )}
 

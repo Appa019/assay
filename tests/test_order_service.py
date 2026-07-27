@@ -122,6 +122,26 @@ def test_ingest_tolerates_model_field_dialects(session: Session) -> None:
     assert created[3].asset_class == AssetClass.CRYPTO  # stablecoin bucket
 
 
+def test_strip_machine_block_hides_json_but_parsing_still_works() -> None:
+    """The client sees ONLY the clean structure; ingestion keeps working on
+    the original text."""
+    closing = (
+        "📋 ONDE INVESTIR — Aporte de R$ 100\n\n"
+        "1. PETR4 — Ação B3 — R$ 60 (60%)\n   Por quê: barata\n\n"
+        "✔️ Total: R$ 100 de R$ 100\n\n"
+        "---\n"
+        '```json\n{"orders": [{"ticker": "PETR4", "classe": "acoes_b3", '
+        '"valor_brl": 60}]}\n```\n'
+    )
+    visible = order_service.strip_machine_block(closing)
+    assert "```" not in visible
+    assert "orders" not in visible
+    assert "ONDE INVESTIR" in visible and "✔️ Total" in visible
+    assert not visible.rstrip().endswith("---")
+    # Original text still parses for ingestion.
+    assert order_service.parse_orders_block(closing)[0]["ticker"] == "PETR4"
+
+
 def test_pending_order_lookup_and_skip(session: Session) -> None:
     contribution = _completed_contribution(session)
     order_service.ingest_contribution_orders(session, contribution)

@@ -34,6 +34,23 @@ from app.services import portfolio_service
 logger = structlog.get_logger()
 
 _JSON_BLOCK = re.compile(r"```json\s*(\{.*?\})\s*```", re.DOTALL)
+_MACHINE_TAIL = re.compile(r"\n*-{3,}\s*\n+```json.*?```\s*", re.DOTALL)
+_ANY_JSON_BLOCK = re.compile(r"```json.*?```", re.DOTALL)
+
+
+def strip_machine_block(text: str) -> str:
+    """Client-facing version of the closing summary.
+
+    The machine-readable ``{"orders": [...]}`` block exists for ingestion,
+    not for reading — the client asked for ONLY the clean allocation
+    structure. Removes the trailing separator + json block (and any stray
+    json fences), leaving the human part untouched.
+    """
+    if not text:
+        return text
+    cleaned = _MACHINE_TAIL.sub("\n", text)
+    cleaned = _ANY_JSON_BLOCK.sub("", cleaned)
+    return cleaned.strip()
 
 
 def _normalize_class(raw: Any) -> AssetClass | None:

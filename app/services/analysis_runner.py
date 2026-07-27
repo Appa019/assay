@@ -203,29 +203,48 @@ _SEED_AGENT_MCP = """\
 
 _SYNTHESIS_PROMPT = """\
 Com base em TODA a análise do comitê acima (todas as reuniões), produza o \
-FECHAMENTO EXECUTIVO final para o cliente. NÃO refaça pesquisa nem re-abra o \
-debate — apenas consolide o que o Round final da Reunião nº 5 já decidiu. \
-Responda em português, de forma direta e enxuta, contendo APENAS:
+FECHAMENTO EXECUTIVO — a resposta final que o cliente lê no celular. NÃO \
+refaça pesquisa nem re-abra o debate: apenas consolide o que a Reunião nº 5 \
+decidiu.
 
-1. **Folha de ordens consolidada** — tabela markdown com as ordens de compra \
-deste aporte: Ativo (ticker) | Classe | R$ a investir | % do aporte | \
-Preço-alvo de entrada | Stop sugerido | Racional em 1 linha.
-2. **Resumo por classe** — quanto (R$ e %) vai para Renda Fixa (CDB), Ações \
-(B3) e Crypto, e o caixa remanescente se houver.
-3. **Total alocado** vs. valor do aporte (devem bater).
-4. **Bloco estruturado** — ao final, um bloco ```json com \
+O cliente quer UMA COISA: uma estrutura clara e simples de QUANTO aportar e \
+ONDE. Copie EXATAMENTE este esqueleto, em português, e apenas preencha:
+
+📋 ONDE INVESTIR — Aporte de R$ <valor>
+
+1. <TICKER> — <CDB | Ação B3 | Crypto> — R$ <valor> (<pct>%)
+   Entrada: até R$ <preço> · Stop: R$ <stop, ou "—" p/ CDB>
+   Por quê: <tese em UMA linha>
+
+(uma entrada numerada por ordem, da MAIOR para a menor alocação)
+
+💰 POR CLASSE
+• CDB: R$ <x> (<x>%)
+• Ações B3: R$ <y> (<y>%)
+• Crypto: R$ <z> (<z>%)
+• Caixa/troco: R$ <w>
+
+✔️ Total: R$ <soma> de R$ <aporte> — deve bater (±R$ 5).
+
+REGRAS DURAS DO FORMATO:
+- NENHUMA outra seção: sem recap da análise, sem "próximos passos", sem \
+monitoramento, sem cenários, sem disclaimers, sem tabelas markdown. Se algo \
+não é "quanto e onde", NÃO entra.
+- Quantidades executáveis (ações B3 em lote inteiro de 1; cripto em fração).
+- NÃO mencione plataforma/corretora/exchange.
+- Mandato: Renda Fixa = 100% CDB; Ações = só equities da B3 (sem FII/ETF/\
+BDR); Crypto = agressivo.
+
+DEPOIS do fechamento acima, adicione uma linha "---" e um bloco ```json com \
 {"orders": [{"ticker": str, "classe": "cdb"|"acoes_b3"|"crypto", \
 "valor_brl": number, "pct": number, "preco_alvo": number|null, \
-"stop": number|null, "tese_1_linha": str}]} espelhando a tabela (é lido por \
-máquina para track record — precisa ser JSON válido).
+"stop": number|null, "tese_1_linha": str}]} espelhando EXATAMENTE as \
+entradas numeradas. Esse bloco é lido por máquina (track record) e NÃO é \
+mostrado ao cliente — use as chaves EXATAS acima.
 
-MANDATO (obrigatório): Renda Fixa = 100% CDB; Ações = só equities da B3 (sem \
-FII/ETF/BDR); Crypto = agressivo. NÃO mencione plataforma/corretora/exchange. \
-NÃO repita a análise — só o resultado acionável: onde investir e quanto.
-
-ANTES de escrever a folha de ordens, ATUALIZE o arquivo ./MEMORY.md deste \
-diretório (crie se não existir) com as teses, tickers/CG-ids e decisões deste \
-ciclo, e a watchlist do próximo. Depois entregue a folha de ordens como resposta."""
+ANTES de escrever, ATUALIZE o arquivo ./MEMORY.md deste diretório (crie se \
+não existir) com as teses, tickers/CG-ids e decisões deste ciclo, e a \
+watchlist do próximo. Depois entregue o fechamento como resposta."""
 
 
 class AnalysisError(RuntimeError):
@@ -1438,10 +1457,16 @@ def _run_analysis_locked(
         header = (
             f"📊 Recomendação do aporte de R$ {float(contribution.amount_brl):,.2f} "
             f"({contribution.created_at.date().isoformat()})\n"
-            "Registre no app o que você comprar.\n\n"
+            "Executou uma ordem? Confirme com /executei <ticker> <qtd> <preço>.\n\n"
         )
         try:
-            telegram_service.notify(header + summary.final_summary)
+            from app.services import order_service
+
+            # Client sees ONLY the clean allocation structure — the trailing
+            # machine block stays in the DB for ingestion, never on the phone.
+            telegram_service.notify(
+                header + order_service.strip_machine_block(summary.final_summary)
+            )
         except Exception as notify_exc:  # noqa: BLE001 — never fail the run for this
             logger.error("final_notify_failed", error=str(notify_exc))
 

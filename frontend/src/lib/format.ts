@@ -84,3 +84,14 @@ export const daysSince = (value: string): number => {
   today.setHours(0, 0, 0, 0);
   return Math.floor((today.getTime() - start.getTime()) / 86_400_000);
 };
+
+/**
+ * Hide the machine-readable ```json block appended to the committee's closing
+ * summary — it exists for order ingestion, not for reading. The client sees
+ * only the clean "how much and where" structure.
+ */
+export const stripMachineBlocks = (text: string): string =>
+  text
+    .replace(/\n*-{3,}\s*\n+```json[\s\S]*?```\s*/g, "\n")
+    .replace(/```json[\s\S]*?```/g, "")
+    .trim();
