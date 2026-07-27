@@ -80,6 +80,48 @@ def test_execute_order_creates_asset_with_committee_context(session: Session) ->
         order_service.execute_order(session, petr.id, quantity=Decimal("1"), price=Decimal("1"))
 
 
+_MODEL_DIALECT_SUMMARY = """\
+```json
+{"orders": [
+  {"ticker": "ITUB4", "class": "equity_b3", "total_brl": 212.7,
+   "pct_portfolio": 41.5, "stop_loss_brl": 38.5, "target_31d_brl": 43.5,
+   "thesis": "Banco barato"},
+  {"symbol": "BTC", "class": "crypto", "amount_brl": 61.49,
+   "stop_loss_usd": 57000, "thesis": "Reserva de valor"},
+  {"ticker": "BTG_CDB_120CDI_180D", "class": "fixed_income_cdb",
+   "amount_brl": 147.92},
+  {"symbol": "USDC", "class": "crypto_stablecoin", "amount_brl": 20.5}
+]}
+```
+"""
+
+
+def test_ingest_tolerates_model_field_dialects(session: Session) -> None:
+    """Regression from a REAL haiku run: the closing block used symbol/class/
+    amount_brl synonyms and the strict parser dropped every row."""
+    contribution = Contribution(
+        amount_brl=Decimal("100"),
+        status=ContributionStatus.COMPLETED,
+        final_summary=_MODEL_DIALECT_SUMMARY,
+    )
+    session.add(contribution)
+    session.commit()
+    session.refresh(contribution)
+
+    created = order_service.ingest_contribution_orders(session, contribution)
+    assert [o.ticker for o in created] == ["ITUB4", "BTC", "BTG_CDB_120CDI_180D", "USDC"]
+    itub = created[0]
+    assert itub.asset_class == AssetClass.STOCKS
+    assert itub.amount_brl == Decimal("212.70")
+    assert itub.target_price == Decimal("43.5")
+    assert itub.stop_price == Decimal("38.5")
+    assert itub.thesis == "Banco barato"
+    assert itub.pct_of_contribution == 41.5
+    assert created[1].asset_class == AssetClass.CRYPTO
+    assert created[2].asset_class == AssetClass.FIXED_INCOME
+    assert created[3].asset_class == AssetClass.CRYPTO  # stablecoin bucket
+
+
 def test_pending_order_lookup_and_skip(session: Session) -> None:
     contribution = _completed_contribution(session)
     order_service.ingest_contribution_orders(session, contribution)

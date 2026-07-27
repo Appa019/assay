@@ -35,15 +35,38 @@ logger = structlog.get_logger()
 
 _JSON_BLOCK = re.compile(r"```json\s*(\{.*?\})\s*```", re.DOTALL)
 
-_CLASS_MAP = {
-    "cdb": AssetClass.FIXED_INCOME,
-    "renda_fixa": AssetClass.FIXED_INCOME,
-    "fixed_income": AssetClass.FIXED_INCOME,
-    "acoes_b3": AssetClass.STOCKS,
-    "acoes": AssetClass.STOCKS,
-    "stocks": AssetClass.STOCKS,
-    "crypto": AssetClass.CRYPTO,
-}
+
+def _normalize_class(raw: Any) -> AssetClass | None:
+    """Tolerant class mapping — models paraphrase the canonical labels.
+
+    A real haiku run emitted ``equity_b3``/``fixed_income_cdb``/
+    ``crypto_stablecoin`` instead of the requested ``acoes_b3``/``cdb``/
+    ``crypto``; substring matching keeps the sheet usable regardless.
+    """
+    value = str(raw or "").strip().lower()
+    if not value:
+        return None
+    if "cdb" in value or "fixed" in value or "renda" in value or value == "rf":
+        return AssetClass.FIXED_INCOME
+    if "crypto" in value or "cripto" in value or "stable" in value:
+        return AssetClass.CRYPTO
+    if (
+        "acoes" in value
+        or "acao" in value
+        or "equity" in value
+        or "stock" in value
+        or "b3" in value
+    ):
+        return AssetClass.STOCKS
+    return None
+
+
+def _first(row: dict[str, Any], *keys: str) -> Any:
+    """First present-and-non-null value among synonym keys."""
+    for key in keys:
+        if row.get(key) is not None:
+            return row[key]
+    return None
 
 
 def parse_orders_block(text: str) -> list[dict[str, Any]]:
@@ -83,23 +106,24 @@ def ingest_contribution_orders(session: Session, contribution: Contribution) -> 
     rows = parse_orders_block(contribution.final_summary or "")
     created: list[Order] = []
     for row in rows:
-        ticker = str(row.get("ticker") or "").strip().upper()
-        asset_class = _CLASS_MAP.get(str(row.get("classe") or "").strip().lower())
-        amount = _to_decimal(row.get("valor_brl"))
+        ticker = str(_first(row, "ticker", "symbol", "ativo") or "").strip().upper()
+        asset_class = _normalize_class(_first(row, "classe", "class", "asset_class"))
+        amount = _to_decimal(_first(row, "valor_brl", "amount_brl", "total_brl", "valor"))
         if not ticker or asset_class is None or amount is None or amount <= 0:
             logger.warning("order_row_skipped", row=str(row)[:200])
             continue
+        pct = _first(row, "pct", "pct_aporte", "pct_portfolio")
         order = Order(
             contribution_id=contribution.id,
             ticker=ticker,
             asset_class=asset_class,
             amount_brl=amount.quantize(Decimal("0.01")),
-            pct_of_contribution=(
-                float(row["pct"]) if isinstance(row.get("pct"), int | float) else None
+            pct_of_contribution=float(pct) if isinstance(pct, int | float) else None,
+            target_price=_to_decimal(
+                _first(row, "preco_alvo", "target_31d_brl", "target_brl", "target")
             ),
-            target_price=_to_decimal(row.get("preco_alvo")),
-            stop_price=_to_decimal(row.get("stop")),
-            thesis=(str(row.get("tese_1_linha") or "").strip() or None),
+            stop_price=_to_decimal(_first(row, "stop", "stop_loss_brl", "stop_loss")),
+            thesis=(str(_first(row, "tese_1_linha", "thesis", "tese") or "").strip() or None),
         )
         session.add(order)
         created.append(order)
