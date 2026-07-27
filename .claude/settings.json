@@ -62,7 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FILE=\"$CLAUDE_TOOL_INPUT_FILE_PATH\"; case \"$FILE\" in *.ts|*.tsx|*.js|*.jsx|*.json|*.css) npx prettier --write \"$FILE\" 2>/dev/null ;; *.py) ruff format \"$FILE\" 2>/dev/null ;; esac; exit 0"
+            "command": "FILE=\"$CLAUDE_TOOL_INPUT_FILE_PATH\"; RUFF=\"${CLAUDE_PROJECT_DIR:-.}/.venv/bin/ruff\"; command -v \"$RUFF\" >/dev/null 2>&1 || RUFF=ruff; case \"$FILE\" in *.ts|*.tsx|*.js|*.jsx|*.json|*.css) npx prettier --write \"$FILE\" 2>/dev/null ;; *.py) \"$RUFF\" format \"$FILE\" 2>/dev/null ;; esac; exit 0"
           }
         ]
       }
@@ -72,7 +72,7 @@
         "hooks": [
           {
             "type": "agent",
-            "prompt": "You are a critical code reviewer. Do the following checks:\n\n1. Run `ruff check .` and `pnpm run lint` — report any errors\n2. Run `pnpm run type-check` if tsconfig exists — report TypeScript errors\n3. Run `pytest -x -q` if tests exist — report failures\n4. Read the memory file at ~/.claude/projects/-home-<usuario>-codigos-python-investimentos-manual/memory/project_errors.md — check if any documented errors are being repeated in the current changes\n5. If you find a NEW error or bug pattern, append it to project_errors.md with format:\n   ### [date] Error description\n   - **Cause:** what caused it\n   - **Fix:** how it was resolved\n   - **Prevention:** how to avoid in future\n\nReport 'PASS' if everything is clean, or list specific issues found. Be critical and thorough.",
+            "prompt": "You are a critical code reviewer. Do the following checks from the project root:\n\n1. Run `.venv/bin/ruff check app/ scripts/` — report any errors\n2. Run `cd frontend && pnpm run lint && pnpm run type-check` — report ESLint/TypeScript errors\n3. Run `.venv/bin/python -m pytest -x -q` if a tests/ directory exists — report failures\n4. Read the memory file at ~/.claude/projects/-home-<usuario>-investimentos-manual/memory/project_errors.md (create it if missing) — check if any documented errors are being repeated in the current changes\n5. If you find a NEW error or bug pattern, append it to project_errors.md with format:\n   ### [date] Error description\n   - **Cause:** what caused it\n   - **Fix:** how it was resolved\n   - **Prevention:** how to avoid in future\n\nReport 'PASS' if everything is clean, or list specific issues found. Be critical and thorough.",
             "timeout": 120
           }
         ]
