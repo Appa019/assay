@@ -1427,6 +1427,13 @@ def _run_analysis_locked(
 
     # Success side-effects OUTSIDE the failure path: a Telegram hiccup after a
     # multi-hour completed run must never revert the contribution to READY.
+    try:
+        from app.services import order_service
+
+        order_service.ingest_contribution_orders(session, contribution)
+    except Exception as ingest_exc:  # noqa: BLE001 — orders are best-effort extras
+        logger.warning("order_ingest_failed", error=str(ingest_exc))
+
     if notify and telegram_service.is_enabled():
         header = (
             f"📊 Recomendação do aporte de R$ {float(contribution.amount_brl):,.2f} "

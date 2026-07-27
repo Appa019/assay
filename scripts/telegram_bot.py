@@ -36,14 +36,17 @@ from app.config import settings  # noqa: E402
 from app.core.database import engine, init_db  # noqa: E402
 from app.models.asset import Asset, AssetClass  # noqa: E402
 from app.models.contribution import Contribution  # noqa: E402
+from app.models.order import OrderStatus  # noqa: E402
 from app.models.report import Report, ReportKind  # noqa: E402
 from app.schemas.asset import AssetCreate  # noqa: E402
 from app.services import (  # noqa: E402
     analysis_runner,
     contribution_service,
+    order_service,
     portfolio_service,
     price_refresh_service,
     review_service,
+    tax_service,
     telegram_service,
 )
 
@@ -73,7 +76,10 @@ _HELP = (
     "🤖 *Agente de Investimentos*\n\n"
     "/aporte <valor> — crio o aporte e rodo o comitê inteiro (Opus · max). "
     "Te devolvo onde investir e quanto.\n"
-    "/comprei <ticker> <classe> <qtd> <preço> — registro o que você comprou. "
+    "/ordens — folha de ordens pendente do último aporte.\n"
+    "/executei <ticker> <qtd> <preço> — confirmo a execução de uma ordem "
+    "(o lote herda tese, alvo e stop do comitê).\n"
+    "/comprei <ticker> <classe> <qtd> <preço> — registro uma compra avulsa. "
     "Classe: rf, acoes ou crypto.\n"
     "/vender <ticker> — vendo (ações/crypto após 30 dias por lote; CDB quando "
     "quiser). Peço confirmação antes de executar.\n"
@@ -81,18 +87,22 @@ _HELP = (
     "/atualizar — atualizo os preços de mercado de todas as posições.\n"
     "/revisao — rodo agora a revisão semanal do comitê (macro + carteira).\n"
     "/relatorios — últimos relatórios (semanais e de maturidade).\n"
+    "/ir [ano] — apuração simplificada de IR (DARF por mês).\n"
     "/status — carteira, análises em andamento e saúde do sistema.\n"
     "/ajuda — esta mensagem."
 )
 
 _BOT_COMMANDS = [
     {"command": "aporte", "description": "Criar aporte e rodar o comitê"},
-    {"command": "comprei", "description": "Registrar uma compra executada"},
+    {"command": "ordens", "description": "Folha de ordens pendente"},
+    {"command": "executei", "description": "Confirmar execução de uma ordem"},
+    {"command": "comprei", "description": "Registrar uma compra avulsa"},
     {"command": "vender", "description": "Vender uma posição (com confirmação)"},
     {"command": "carteira", "description": "Posições e travas por lote"},
     {"command": "atualizar", "description": "Atualizar preços de mercado"},
     {"command": "revisao", "description": "Rodar a revisão semanal agora"},
     {"command": "relatorios", "description": "Últimos relatórios do comitê"},
+    {"command": "ir", "description": "Apuração simplificada de IR"},
     {"command": "status", "description": "Carteira + saúde do sistema"},
     {"command": "ajuda", "description": "Ajuda"},
 ]
@@ -289,6 +299,88 @@ def _cmd_vender(args: list[str]) -> str:
     return f"✅ {result.message} (lote de {target.entry_date.isoformat()}, {days}d).{extra}"
 
 
+def _cmd_ordens() -> str:
+    with Session(engine) as s:
+        pending = order_service.list_orders(s, status=OrderStatus.PENDING)
+    if not pending:
+        return "Nenhuma ordem pendente. Rode /aporte para o comitê gerar uma folha nova."
+    lines = ["📋 *Ordens pendentes:*", ""]
+    for o in pending:
+        levels = []
+        if o.target_price is not None:
+            levels.append(f"alvo {_fmt_brl(float(o.target_price))}")
+        if o.stop_price is not None:
+            levels.append(f"stop {_fmt_brl(float(o.stop_price))}")
+        suffix = f" ({', '.join(levels)})" if levels else ""
+        lines.append(f"• {o.ticker} ({o.asset_class}) — {_fmt_brl(float(o.amount_brl))}{suffix}")
+        if o.thesis:
+            lines.append(f"  _{o.thesis[:120]}_")
+    lines.append("")
+    lines.append("Executou? Confirme com /executei <ticker> <qtd> <preço>.")
+    return "\n".join(lines)
+
+
+def _cmd_executei(args: list[str]) -> str:
+    if len(args) < 3:
+        return "Uso: /executei <ticker> <qtd> <preço>\nEx: /executei PETR4 100 38,50"
+    ticker = args[0].strip().upper()
+    try:
+        qty = Decimal(args[1].replace(",", "."))
+        price = _parse_amount(args[2])
+    except (InvalidOperation, ValueError):
+        return "Quantidade ou preço inválidos."
+    if qty <= 0 or price <= 0:
+        return "Quantidade e preço devem ser maiores que zero."
+    with Session(engine) as s:
+        order = order_service.pending_order_for_ticker(s, ticker)
+        if order is None:
+            return (
+                f"Não achei ordem pendente de {ticker}. Veja /ordens — "
+                "para compra fora da folha, use /comprei."
+            )
+        order = order_service.execute_order(s, order.id, quantity=qty, price=price)
+    total = _fmt_brl(float(qty * price))
+    planned = _fmt_brl(float(order.amount_brl))
+    return (
+        f"✅ Ordem executada: {ticker} — {float(qty)} @ {_fmt_brl(float(price))} = {total} "
+        f"(planejado {planned}).\nO lote herdou a tese, o alvo e o stop do comitê; "
+        f"trava de {settings.min_holding_days}d se ação/crypto."
+    )
+
+
+def _cmd_ir(args: list[str]) -> str:
+    year = date.today().year
+    if args:
+        try:
+            year = int(args[0])
+        except ValueError:
+            return "Uso: /ir [ano]  ·  Ex: /ir 2026"
+    with Session(engine) as s:
+        report = tax_service.build_year_report(s, year)
+    if not report["months"]:
+        return f"Sem vendas em {year} — nada a apurar. (Posições e compras não geram IR.)"
+    lines = [f"🧾 *IR {year} (simplificado)*", ""]
+    for m in report["months"]:
+        for label, key in (("Ações", "stocks"), ("Crypto", "crypto")):
+            data = m.get(key) or {}
+            if not data.get("sales_brl"):
+                continue
+            status = (
+                "isento" if data.get("exempt") else f"DARF {_fmt_brl(data.get('tax_due_brl', 0.0))}"
+            )
+            lines.append(f"• {m['month']} {label}: vendas {_fmt_brl(data['sales_brl'])} → {status}")
+    lines.append("")
+    lines.append(f"Total DARF no ano: {_fmt_brl(report['total_darf_brl'])}")
+    carry = report["loss_carryforward_brl"]
+    if carry["stocks"] or carry["crypto"]:
+        lines.append(
+            f"Prejuízo a compensar: ações {_fmt_brl(carry['stocks'])} · "
+            f"crypto {_fmt_brl(carry['crypto'])}"
+        )
+    lines.append("_Apuração simplificada — confira com seu contador._")
+    return "\n".join(lines)
+
+
 def _cmd_atualizar() -> str:
     with Session(engine) as s:
         result = asyncio.run(price_refresh_service.refresh_prices(s))
@@ -377,6 +469,12 @@ def _handle(text: str) -> str | None:
         return _cmd_revisao()
     if cmd in {"relatorios", "relatórios"}:
         return _cmd_relatorios()
+    if cmd == "ordens":
+        return _cmd_ordens()
+    if cmd == "executei":
+        return _cmd_executei(args)
+    if cmd == "ir":
+        return _cmd_ir(args)
     if cmd == "comprei":
         return _cmd_comprei(args)
     if cmd == "vender":
