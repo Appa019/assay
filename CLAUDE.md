@@ -2,8 +2,9 @@
 
 Gestão de aportes (AD-HOC, sem ciclo fixo) com comitê multipersona de IA padrão
 **Goldman Sachs GIR + Morgan Stanley GIC + Bridgewater + AQR**. A cada aporte o
-backend gera prompts extensos (~110k chars total) rodados no Claude Code (Opus
-4.7 + max reasoning + dangerously-skip-permissions). 100% local. A carteira é
+backend gera prompts extensos (~110k chars total) rodados no Claude Code (alias
+`opus` → Opus mais recente, hoje Opus 5 + max reasoning +
+dangerously-skip-permissions). 100% local. A carteira é
 revisada toda semana; aporte novo só quando o cliente quiser.
 
 Há dois modos de execução:
@@ -301,7 +302,8 @@ unlocks + on-chain (MVRV-Z/NUPL/SOPR/…) + derivativos (Coinglass) + dev activi
 ### Reunião nº 5 — Investment Committee Final
 14 personas. 14 rounds: risk overlay (VaR/CVaR/EVT/CDaR/Component VaR) → stress 8
 cenários (incl. **evento de crédito bancário**) → sentiment + IV/RV → confirma
-CDB (vindo da R2) → tax → pair trades + options → compliance → behavioral →
+CDB (vindo da R2) → tax → pair trades + options (informativos, não geram ordem)
+→ compliance → behavioral →
 cross-check CIO → execution → folha de ordens → monitoramento → resumo. Bolso ∈
 {cdb, acoes_b3, crypto}.
 

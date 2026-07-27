@@ -52,6 +52,7 @@ coverage/
 
 # Claude Code
 .claude/settings.local.json
+.playwright-mcp/
 storage/claude_session.json
 storage/analysis_runs/
 storage/agent_workspace/
