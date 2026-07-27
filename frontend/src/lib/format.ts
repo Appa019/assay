@@ -39,13 +39,20 @@ const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 /**
  * Parse an ISO string as a LOCAL date. `new Date("2026-05-11")` is parsed as
  * UTC midnight, which shifts the displayed day back in negative-offset
- * timezones (e.g. Brazil). Date-only strings are therefore expanded manually;
- * full datetimes fall through to the native parser.
+ * timezones (e.g. Brazil). Date-only strings are therefore expanded manually.
+ * Full datetimes WITHOUT a timezone come from the backend as naive UTC — the
+ * native parser would read them as local time and display timestamps three
+ * hours ahead, so a "Z" is appended before parsing.
  */
+const NAIVE_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+
 export const parseLocalDate = (value: string): Date => {
   if (DATE_ONLY_RE.test(value)) {
     const [year, month, day] = value.split("-").map(Number);
     return new Date(year, month - 1, day);
+  }
+  if (NAIVE_DATETIME_RE.test(value)) {
+    return new Date(`${value}Z`);
   }
   return new Date(value);
 };
