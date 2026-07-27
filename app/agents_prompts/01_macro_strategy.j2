@@ -324,6 +324,7 @@ de Renda Fixa como **CDB**:
 
 ### 3.1 Curva DI BR (sinal de CDI futuro)
 - {{ di_tenors }} · Inclinação 1y-10y · Forward implícita próximos COPOM
+- No JSON: um item de `curva_di_tenores` por tenor acima (tenor + taxa)
 - Mercado precifica corte/alta? → o CDI de hoje (~100% CDI ≈ Selic) cai/sobe quando?
 
 ### 3.2 Estratégia de CDB (o dry powder)
@@ -584,7 +585,7 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
     "riscos_cauda_31d_b3": [{"evento": "", "probabilidade": 0, "magnitude_ibov_pct": 0}]
   },
   "juros_e_cdb": {
-    "di_jan26": null, "di_jan27": null, "di_jan29": null, "di_jan31": null,
+    "curva_di_tenores": [{"tenor": "jan/AA", "taxa_pct": null}],
     "di_inclinacao_1y_10y_bps": null,
     "mercado_precifica_corte_ou_alta": "corte|alta|estavel",
     "breakeven_inflation_br_5y": null,
@@ -710,7 +711,10 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
 > 2. ✓ Σ `final_tactical_pct` (cdb + acoes_b3 + crypto) = 100 e Σ `final_tactical_brl` = {{ amount_brl }} (±R$ 5)
 > 3. ✓ Black-Litterman tem ≥ 4 views numéricas
 > 4. ✓ Risk-parity + HRP + Max Sharpe + Min Variance calculados sobre os 3 buckets
-> 5. ✓ Cada `null` preenchido com WebSearch + URL + data
+> 5. ✓ Cada `null` preenchido com WebSearch + URL + data. EXCEÇÃO: métrica de
+>      fonte paga sem chave/alternativa gratuita (ex.: Glassnode Reserve Risk /
+>      RHODL / Dormancy, NAAIM, MOVE, VVIX) PODE ficar `null` — registre o motivo
+>      em 1 linha. NUNCA estimem um número sem fonte para "fechar" o campo
 > 6. ✓ ≥ 15 fontes verificáveis distintas
 > 7. ✓ Top of Mind tem **exatamente 5 questões** + hipótese + conviction
 > 8. ✓ Top 3 OW + Bottom 3 UW B3 + Top 3 narrativas crypto explícitos

@@ -29,7 +29,7 @@ Agora o **Investment Committee Final** (CIO desk) executa:
 - Risk overlay completo (VaR/CVaR/Sharpe/Sortino/Calmar/IR/TE/EVT/CDaR)
 - Marginal VaR + Component VaR
 - Stress test 8 cenários (3 classes, incl. evento de crédito bancário do CDB)
-- Sentiment overlay + IV/RV → options overlays (ações B3)
+- Sentiment overlay + IV/RV (leitura informativa de vol — não gera ordem)
 - Behavioral checklist (9 biases)
 - Tax overlay máximo (3 classes)
 - Compliance BR
@@ -179,15 +179,17 @@ Aplique à posição agregada pós-aporte:
 - AAII Bull-Bear + percentil 10y · CNN F&G stocks · Crypto F&G · NAAIM Exposure + percentil
 - **IBOV breadth**: % papéis Ibov > 200d MA
 
-## ROUND 4 — IV vs RV (Sofia + Daniel)
+## ROUND 4 — IV vs RV (Sofia + Daniel) — camada INFORMATIVA (não gera ordem)
 
-Para top 5 ações B3 com opções líquidas:
+> Opções NÃO entram na folha de ordens — o fluxo do cliente executa apenas
+> COMPRAS nas 3 classes. Use IV vs RV somente como leitura de sentimento/vol
+> das top ações. SEJA BREVE: sem strikes, Greeks ou estruturas detalhadas.
+> No JSON, `iv_rv_options_analysis` pode ficar vazio (`[]`).
 
-| Ativo | IV ATM 30d | RV 30d | IV/RV | Skew 25Δ P/C | Strategy | Premium R$ |
-|---|---:|---:|---:|---:|---|---:|
+Para top 3-5 ações B3 com opções líquidas (se o dado for acessível):
 
-**Decision tree**: Covered Call (long + IV>RV×1.2) · Protective Put (conviction HIGH + evento binário) ·
-Collar (zero-cost hedge) · Cash-Secured Put (entry barato) · Vertical/Calendar/Diagonal/Iron Condor conforme vol.
+| Ativo | IV ATM 30d | RV 30d | IV/RV | Leitura (1 linha) |
+|---|---:|---:|---:|---|
 
 ## ROUND 5 — Renda Fixa = CDB (Henrique + Daniel) — confirmar a R2
 
@@ -226,16 +228,14 @@ A fatia de CDB **já foi materializada na Reunião nº 2** (`shortlist_cdb`: emi
 - **Bucket 3 (Growth 5y+)**: Ações B3 + Crypto
 - **Withdrawal/Sequence-of-returns**: aportes ad-hoc + dry powder mitigam (DCA)
 
-## ROUND 7 — Pair Trades & Options Overlays (Felipe + Daniel)
+## ROUND 7 — Pair Trades & Options Overlays (Felipe + Daniel) — camada INFORMATIVA (não gera ordem)
 
-### 7.1 Pair trades (vindos da R3/R4 — DD) — só B3 e crypto
-Exemplos: Long ITUB4 / Short BBAS3 (privado vs estatal) · Long PETR4 / Short VALE3 (petróleo vs minério) ·
-Long BTC / Short ETH (regime BTC season). Tese (relative value) · beta neutralizado · stop · target spread %.
-
-### 7.2 Options overlays (ações B3)
-Por posição candidata: strategy · strike(s) + vencimento + premium R$ · Greeks (Δ/Γ/Θ/V) · breakeven, max gain/loss.
-
-### 7.3 Premium líquido portfolio = Σ recebido − Σ pago
+> A folha de ordens NÃO tem short nem opções — nada deste round vira ordem.
+> Registre no máximo 1-2 ideias de relative value em 1 linha cada (ex.: "ITUB4
+> caro vs BBAS3" — podem informar a revisão semanal como viés de preferência
+> entre nomes LONG). NÃO calcule Greeks, strikes, prêmios ou spreads
+> detalhados. No JSON, os blocos de `pair_trades_options` podem ficar vazios
+> (`[]`) e `premium_liquido_portfolio_brl` = 0.
 
 ## ROUND 8 — Compliance Final (Alexandre)
 
@@ -531,8 +531,8 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
 **Investment Committee Final no nível Goldman Portfolio Strategy + MS GIC + AQR
 CIO Desk, dentro das TRÊS classes (CDB · Ações B3 · Crypto). CRO veta sem dó,
 Cláudia otimiza imposto até o último centavo, Henrique materializa o CDB com
-credit analysis e respeito ao FGC, Daniel ajusta options overlays com Greeks,
-Anderson confirma stops com Wyckoff, Vera checa forensic final, Felipe propõe
-pair trades, Edson aplica bucket strategy, Júlia fecha conta + audit trail,
+credit analysis e respeito ao FGC, Daniel calibra execução e slippage,
+Anderson confirma stops com Wyckoff, Vera checa forensic final, Felipe registra
+relative value como observação, Edson aplica bucket strategy, Júlia fecha conta + audit trail,
 Otávio decide. Cliente recebe folha de ordens limpa (sem coluna plataforma) e
 opera nas próximas 24 horas com confiança institucional.**
