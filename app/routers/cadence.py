@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -31,7 +31,10 @@ async def get_cadence(session: Session = Depends(get_session)) -> CadenceStatus:
             last_contribution_date=None, days_since_last=None, total_contributions=0
         )
 
-    last_date = last.created_at.date()
+    # created_at is stored as (naive) UTC; convert to the machine's local zone
+    # before taking the calendar date, or late-evening aportes show "yesterday".
+    created = last.created_at if last.created_at.tzinfo else last.created_at.replace(tzinfo=UTC)
+    last_date = created.astimezone().date()
     return CadenceStatus(
         last_contribution_date=last_date,
         days_since_last=(date.today() - last_date).days,

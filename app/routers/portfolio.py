@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session
 
 from app.core.database import get_session
@@ -9,9 +9,12 @@ from app.schemas.asset import (
     AssetRead,
     AssetUpdate,
     PortfolioSummary,
+    RefreshResult,
     SaleResult,
+    SnapshotRead,
+    TradeRead,
 )
-from app.services import portfolio_service
+from app.services import portfolio_service, price_refresh_service
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
@@ -52,6 +55,8 @@ async def sell_asset(asset_id: UUID, session: Session = Depends(get_session)) ->
         return portfolio_service.sell_asset(session, asset_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except portfolio_service.SellLockedError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.delete("/assets/{asset_id}", response_model=AssetRead)
@@ -61,3 +66,28 @@ async def delete_asset(asset_id: UUID, session: Session = Depends(get_session)) 
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return AssetRead.model_validate(asset, from_attributes=True)
+
+
+@router.post("/refresh", response_model=RefreshResult)
+async def refresh_prices(session: Session = Depends(get_session)) -> RefreshResult:
+    """Mark every lot to market (stocks, crypto, CDB accrual). Best-effort."""
+    result = await price_refresh_service.refresh_prices(session)
+    return RefreshResult(**result)
+
+
+@router.get("/history", response_model=list[SnapshotRead])
+async def portfolio_history(
+    days: int = Query(default=365, ge=1, le=3650),
+    session: Session = Depends(get_session),
+) -> list[SnapshotRead]:
+    snapshots = portfolio_service.get_portfolio_history(session, days=days)
+    return [SnapshotRead.model_validate(s, from_attributes=True) for s in snapshots]
+
+
+@router.get("/trades", response_model=list[TradeRead])
+async def list_trades(
+    limit: int = Query(default=200, ge=1, le=1000),
+    session: Session = Depends(get_session),
+) -> list[TradeRead]:
+    trades = portfolio_service.list_trades(session, limit=limit)
+    return [TradeRead.model_validate(t, from_attributes=True) for t in trades]

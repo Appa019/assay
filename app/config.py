@@ -34,6 +34,18 @@ class Settings(BaseSettings):
     min_holding_days: int = 30
     agent_model: str = "opus"
     agent_effort: str = "max"
+    # Per-step subprocess ceiling (seconds) for the headless Claude CLI.
+    agent_step_timeout: int = 2400
+    # Max consecutive failed automatic runs before auto-resume gives up on a
+    # contribution (prevents an endless paid retry loop on permanent failures).
+    max_run_attempts: int = 5
+
+    # CDB accrual assumption: % of CDI the paper pays (mandate: CDB >= 100%).
+    # Used to mark fixed-income lots to market from the BCB daily CDI series.
+    cdb_pct_cdi: float = 100.0
+
+    # TTL (seconds) for the cached macro/market context (/api/macro).
+    market_cache_ttl: int = 120
 
     # Telegram bot (notifications + two-way control)
     telegram_bot_token: str = ""

@@ -6,7 +6,8 @@ captures warnings so the prompts know which fields to double-check via WebSearch
 """
 
 import asyncio
-from datetime import UTC, datetime
+import time
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -24,6 +25,8 @@ BCB_IPCA_12M = 13522
 # 4389 = CDI annualized (% a.a., ~Selic). NOT 4391, which is the *monthly* CDI
 # (% a.m.) and was injecting a wrong ~0.75 into the prompts.
 BCB_CDI = 4389
+# 12 = daily CDI (% a.d.) — used to compound fixed-income accrual per lot.
+BCB_CDI_DAILY = 12
 BCB_USD_BRL = 1
 
 
@@ -43,6 +46,35 @@ async def _fetch_bcb_series(series_id: int) -> Decimal | None:
     except Exception as exc:
         logger.warning("bcb_fetch_failed", series=series_id, error=str(exc))
     return None
+
+
+async def get_cdi_accumulated_factor(start: date, end: date | None = None) -> float | None:
+    """Compound daily CDI factor between two dates (BCB series 12).
+
+    Returns e.g. 1.0123 for +1.23% over the window, or None on failure.
+    Used to mark CDB lots to market: value = principal * factor ** (pct_cdi).
+    """
+    end = end or date.today()
+    if start >= end:
+        return 1.0
+    url = (
+        f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.{BCB_CDI_DAILY}/dados"
+        f"?formato=json&dataInicial={start.strftime('%d/%m/%Y')}"
+        f"&dataFinal={end.strftime('%d/%m/%Y')}"
+    )
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            rows = response.json()
+        factor = 1.0
+        for row in rows if isinstance(rows, list) else []:
+            raw = str(row.get("valor", "0")).replace(",", ".")
+            factor *= 1.0 + float(raw) / 100.0
+        return factor
+    except Exception as exc:
+        logger.warning("cdi_accumulated_fetch_failed", error=str(exc))
+        return None
 
 
 async def get_macro_data() -> dict[str, Any]:
@@ -142,7 +174,7 @@ async def get_stock_fundamentals(ticker: str) -> dict[str, Any]:
                 "profit_margin": _pct(info.get("profitMargins")),
                 "debt_to_equity": info.get("debtToEquity"),
                 "current_ratio": info.get("currentRatio"),
-                "dividend_yield": _pct(info.get("dividendYield")),
+                "dividend_yield": _yield_pct(info.get("dividendYield")),
                 "payout_ratio": _pct(info.get("payoutRatio")),
                 "market_cap": info.get("marketCap"),
                 "enterprise_value": info.get("enterpriseValue"),
@@ -335,7 +367,25 @@ async def enrich_crypto_candidates(coin_ids: list[str]) -> list[dict[str, Any]]:
     return await asyncio.gather(*[_fetch(c) for c in coin_ids])
 
 
-async def build_full_context() -> dict[str, Any]:
+# Short-lived cache: every dashboard refresh hits /api/macro, and each build
+# fans out to BCB + Yahoo + CoinGecko + alternative.me. TTL keeps us far away
+# from their rate limits without ever serving stale-by-minutes data.
+_context_cache: dict[str, Any] = {"at": 0.0, "value": None}
+_context_lock = asyncio.Lock()
+
+
+async def build_full_context(*, force: bool = False) -> dict[str, Any]:
+    async with _context_lock:
+        age = time.monotonic() - _context_cache["at"]
+        if not force and _context_cache["value"] is not None and age < settings.market_cache_ttl:
+            return _context_cache["value"]
+        context = await _build_full_context_uncached()
+        _context_cache["at"] = time.monotonic()
+        _context_cache["value"] = context
+        return context
+
+
+async def _build_full_context_uncached() -> dict[str, Any]:
     macro, ibov, btc_dom, fear_greed = await asyncio.gather(
         get_macro_data(),
         get_ibovespa_snapshot(),
@@ -388,3 +438,15 @@ def _pct(value: float | None) -> float | None:
     if value is None:
         return None
     return round(value * 100, 2)
+
+
+def _yield_pct(value: float | None) -> float | None:
+    """Normalize a yield that may come as fraction (0.065) or percent (6.5).
+
+    Recent yfinance versions return ``dividendYield`` already in percent;
+    older ones returned a fraction — multiplying blindly inflated it 100x.
+    B3 yields above 100% don't exist, so >1.5 is safely "already percent".
+    """
+    if value is None:
+        return None
+    return round(value if value > 1.5 else value * 100, 2)

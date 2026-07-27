@@ -8,6 +8,8 @@ from sqlmodel import Session, select
 
 from app.config import settings
 from app.models.asset import Asset, AssetClass
+from app.models.portfolio_snapshot import PortfolioSnapshot
+from app.models.trade import Trade, TradeSide
 from app.schemas.asset import (
     AllocationBreakdown,
     AssetCreate,
@@ -18,6 +20,10 @@ from app.schemas.asset import (
 )
 
 logger = structlog.get_logger()
+
+
+class SellLockedError(RuntimeError):
+    """The lot is still inside the per-lot holding lock (stocks/crypto only)."""
 
 
 def list_assets(session: Session) -> list[Asset]:
@@ -43,6 +49,19 @@ def create_asset(session: Session, payload: AssetCreate) -> Asset:
         entry_date=payload.entry_date or date.today(),
     )
     session.add(asset)
+    session.add(
+        Trade(
+            asset_id=asset.id,
+            ticker=asset.ticker,
+            name=asset.name,
+            asset_class=asset.asset_class,
+            side=TradeSide.BUY,
+            quantity=asset.quantity,
+            price=asset.avg_price,
+            total_brl=(asset.quantity * asset.avg_price).quantize(Decimal("0.01")),
+            lot_entry_date=asset.entry_date,
+        )
+    )
     session.commit()
     session.refresh(asset)
     logger.info("asset_created", ticker=asset.ticker, asset_class=str(asset.asset_class))
@@ -69,10 +88,54 @@ def delete_asset(session: Session, asset_id: UUID) -> Asset:
     return asset
 
 
+def sell_lock_days_left(asset: Asset, *, today: date | None = None) -> int:
+    """Days until this lot unlocks. 0 = sellable. CDB never locks."""
+    if asset.asset_class == AssetClass.FIXED_INCOME:
+        return 0
+    today = today or date.today()
+    held = (today - asset.entry_date).days
+    return max(0, settings.min_holding_days - held)
+
+
 def sell_asset(session: Session, asset_id: UUID) -> SaleResult:
+    """Sell a whole lot, enforcing the per-lot holding lock at the source.
+
+    The lock lives HERE (not in each caller) so the API, the bot and any
+    future surface all obey the same rule. Records a sell Trade with realized
+    P&L before removing the position — the ledger is the permanent history.
+    """
     asset = get_asset(session, asset_id)
+    days_left = sell_lock_days_left(asset)
+    if days_left > 0:
+        raise SellLockedError(
+            f"{asset.ticker} ainda travado: lote de {asset.entry_date.isoformat()} "
+            f"libera em {days_left} dia(s) (trava de {settings.min_holding_days}d "
+            "por lote para ações e crypto)."
+        )
+
     price = asset.current_price if asset.current_price is not None else asset.avg_price
     sale_value = asset.quantity * price
+    cost_basis = asset.quantity * asset.avg_price
+    realized_brl = (sale_value - cost_basis).quantize(Decimal("0.01"))
+    realized_pct = (
+        float((price - asset.avg_price) / asset.avg_price * 100) if asset.avg_price > 0 else None
+    )
+
+    session.add(
+        Trade(
+            asset_id=asset.id,
+            ticker=asset.ticker,
+            name=asset.name,
+            asset_class=asset.asset_class,
+            side=TradeSide.SELL,
+            quantity=asset.quantity,
+            price=price,
+            total_brl=sale_value.quantize(Decimal("0.01")),
+            realized_pnl_brl=realized_brl,
+            realized_pnl_pct=round(realized_pct, 2) if realized_pct is not None else None,
+            lot_entry_date=asset.entry_date,
+        )
+    )
 
     result = SaleResult(
         ticker=asset.ticker,
@@ -80,16 +143,26 @@ def sell_asset(session: Session, asset_id: UUID) -> SaleResult:
         price=price,
         sale_value=sale_value,
         asset_class=asset.asset_class,
-        message=f"{asset.ticker} vendido por R$ {sale_value:,.2f}",
+        message=(
+            f"{asset.ticker} vendido por R$ {sale_value:,.2f} "
+            f"(P&L realizado R$ {realized_brl:,.2f})"
+        ),
     )
 
     session.delete(asset)
     session.commit()
-    logger.info("asset_sold", ticker=asset.ticker, value=str(sale_value))
+    logger.info(
+        "asset_sold", ticker=asset.ticker, value=str(sale_value), realized=str(realized_brl)
+    )
     return result
 
 
-def _calculate_allocation(assets: list[Asset]) -> AllocationBreakdown:
+def list_trades(session: Session, *, limit: int = 200) -> list[Trade]:
+    statement = select(Trade).order_by(Trade.executed_at.desc()).limit(limit)
+    return list(session.exec(statement).all())
+
+
+def _class_totals(assets: list[Asset]) -> dict[AssetClass, Decimal]:
     buckets = {
         AssetClass.FIXED_INCOME: Decimal("0"),
         AssetClass.STOCKS: Decimal("0"),
@@ -98,7 +171,11 @@ def _calculate_allocation(assets: list[Asset]) -> AllocationBreakdown:
     for asset in assets:
         price = asset.current_price if asset.current_price is not None else asset.avg_price
         buckets[asset.asset_class] += asset.quantity * price
+    return buckets
 
+
+def _calculate_allocation(assets: list[Asset]) -> AllocationBreakdown:
+    buckets = _class_totals(assets)
     total = sum(buckets.values(), Decimal("0"))
 
     def pct(value: Decimal) -> float:
@@ -166,6 +243,43 @@ def build_portfolio_snapshot(session: Session) -> list[dict[str, Any]]:
                 "total_value": round(total_value, 2),
                 "pnl_pct": round(pnl_pct, 2) if pnl_pct is not None else None,
                 "days_in_portfolio": (today - asset.entry_date).days,
+                "entry_date": asset.entry_date.isoformat(),
+                "thesis": asset.thesis,
+                "target_price": float(asset.target_price) if asset.target_price else None,
+                "stop_price": float(asset.stop_price) if asset.stop_price else None,
             }
         )
+    return rows
+
+
+def record_daily_snapshot(session: Session) -> PortfolioSnapshot:
+    """Upsert today's portfolio valuation (idempotent — safe to cron daily)."""
+    assets = list_assets(session)
+    buckets = _class_totals(assets)
+    total = sum(buckets.values(), Decimal("0"))
+    today = date.today()
+    existing = session.exec(
+        select(PortfolioSnapshot).where(PortfolioSnapshot.snapshot_date == today)
+    ).first()
+    snapshot = existing or PortfolioSnapshot(snapshot_date=today)
+    snapshot.total_value = total.quantize(Decimal("0.01"))
+    snapshot.fixed_income = buckets[AssetClass.FIXED_INCOME].quantize(Decimal("0.01"))
+    snapshot.stocks = buckets[AssetClass.STOCKS].quantize(Decimal("0.01"))
+    snapshot.crypto = buckets[AssetClass.CRYPTO].quantize(Decimal("0.01"))
+    snapshot.assets = build_portfolio_snapshot(session)
+    session.add(snapshot)
+    session.commit()
+    session.refresh(snapshot)
+    logger.info("portfolio_snapshot_recorded", date=today.isoformat())
+    return snapshot
+
+
+def get_portfolio_history(session: Session, *, days: int = 365) -> list[PortfolioSnapshot]:
+    statement = (
+        select(PortfolioSnapshot)
+        .order_by(PortfolioSnapshot.snapshot_date.desc())
+        .limit(max(1, min(days, 3650)))
+    )
+    rows = list(session.exec(statement).all())
+    rows.reverse()  # chronological for charting
     return rows
