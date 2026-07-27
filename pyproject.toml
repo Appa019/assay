@@ -1,19 +1,24 @@
 [project]
 name = "investimentos-manual"
-version = "0.3.0"
-description = "Portfolio + 3-prompt monthly research cycle. Fully local (FastAPI + SQLite + Next.js)."
+version = "0.4.0"
+description = "Ad-hoc contributions with a 5-meeting AI investment committee. Fully local (FastAPI + SQLite + Next.js)."
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
 
 [tool.ruff]
 target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "W", "UP"]
-ignore = ["E501"]
+select = ["E", "F", "I", "N", "W", "UP", "B"]
+# E501: line length handled by the formatter. B008: FastAPI's Depends() in
+# parameter defaults is the framework's canonical pattern.
+ignore = ["E501", "B008"]
 
 [tool.ruff.format]
 quote-style = "double"
