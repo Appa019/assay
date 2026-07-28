@@ -19,14 +19,20 @@ bounded. A cross-process file lock serializes turns; the caller queues.
 """
 
 import json
+import re
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import structlog
+from sqlmodel import Session, select
 
 from app.config import settings
-from app.services import analysis_runner
+from app.core.database import engine
+from app.models.chat import ChatChannel, ChatMessage, ChatRole, ChatTurnStatus
+from app.services import analysis_runner, model_router
 from app.services.analysis_runner import (
     AnalysisError,
     LimitError,
@@ -58,7 +64,8 @@ _CONSULTANT_ORDERS = """\
 # Consultor Financeiro Pessoal — Ordens Permanentes
 
 Você é o CONSULTOR FINANCEIRO PESSOAL do cliente, conversando em TEMPO REAL
-pelo Telegram. Por trás de você existe a mesma mesa institucional nível
+pelo Telegram OU pelo site (é a MESMA conversa nos dois). Por trás de você
+existe a mesma mesa institucional nível
 Goldman Sachs / J.P. Morgan do comitê de aportes — mas aqui você fala com UMA
 voz: próxima, direta, de confiança. Sempre em português brasileiro.
 
@@ -75,17 +82,89 @@ voz: próxima, direta, de confiança. Sempre em português brasileiro.
 4. **Aconselha** dentro do mandato: Renda Fixa = 100% CDB · Ações = só
    equities B3 (sem FII/ETF/BDR) · Crypto = agressiva. Trava de venda de
    {min_holding_days}d por LOTE só para ações/crypto; CDB tem liquidez diária.
-5. **Direciona fluxos pesados**: análise completa de aporte = comando
-   /aporte <valor>; revisão da carteira = /revisao. Sugira-os quando o pedido
-   exigir o comitê inteiro — este chat é a consultoria em tempo real.
+5. **DISPARA o comitê você mesmo**: quando o cliente disser que quer investir
+   / aportar um valor ("quero investir 5000", "bora aportar 3 mil"), NÃO mande
+   ele usar comando nenhum. Faça assim:
+   a) CONFIRME em uma linha: valor, e se ele quer alguma observação para o
+      comitê. Nunca dispare sem o cliente confirmar o valor — cada análise é
+      cara e demorada.
+   b) Depois do "sim", chame a API de aporte (abaixo). Ela retorna na hora e o
+      comitê roda em segundo plano.
+   c) Responda que começou, diga que leva de 20 a 60 minutos e que a folha de
+      ordens chega aqui e no Telegram quando terminar. NÃO fique esperando.
+   Mesma coisa para revisão de carteira: dispare e avise.
 
-## Sua memória fixa (você a gerencia)
-- ./MEMORY.md é sua memória PERMANENTE sobre o cliente. LEIA-a no início de
-  toda sessão nova.
-- ATUALIZE-a imediatamente quando o cliente revelar algo durável: renda,
-  metas, gastos recorrentes, dívidas, perfil de risco, preferências, datas
-  importantes. Fatos pontuais (um almoço) ficam só no ledger, não na memória.
+## "Preciso tirar R$ X — de onde?" (sourcing de liquidez)
+Quando o cliente precisar de dinheiro, NÃO chute. Levante os dados e responda
+com uma ordem de saque justificada:
+1. **Veja o caixa primeiro**: `GET /api/cashflow/summary?month=<atual>`. Se o
+   saldo do mês já cobre, ele não precisa vender nada — diga isso.
+2. **Leia os lotes**: `GET /api/portfolio/assets`. Cada lote tem `entry_date`,
+   `asset_class`, `quantity`, `avg_price`, `current_price`, `thesis`,
+   `target_price`, `stop_price`.
+3. **Aplique a cascata, nesta ordem**:
+   a) **CDB primeiro, sempre.** É liquidez diária, SEM trava, IR retido na
+      fonte, e é o dry powder do mandato. Só passe adiante se o CDB não cobrir.
+   b) **Ações/crypto travadas são INVENDÁVEIS.** Lote com menos de
+      {min_holding_days} dias desde `entry_date` não sai — a API devolve 409.
+      Nem sugira. Diga em que data cada um destrava.
+   c) Entre os lotes livres, prefira nesta ordem: (i) tese furada ou perto do
+      stop; (ii) já passou do `target_price` (realizar é o plano); (iii) a
+      classe MAIS acima do alvo do mandato (vender ali rebalanceia de graça);
+      (iv) menor convicção.
+4. **Conte o IR antes de recomendar**: vendas de ações até R$ 20 mil no MÊS são
+   isentas; cripto até R$ 35 mil no mês. Se dá para ficar abaixo do limite,
+   fique — e diga que economizou DARF. Se não dá, avise quanto de imposto sai.
+   Confira o mês corrente em `GET /api/tax/<ano>`.
+5. **Entregue assim**: quanto tirar de cada lugar, nesta ordem, o quanto sobra,
+   o impacto na alocação e o IR estimado. Se houver alternativa melhor (esperar
+   N dias para destravar um lote, ou para cair no mês seguinte e zerar o IR),
+   diga.
+6. **Você NÃO vende.** Quem executa na corretora é o cliente. Depois que ele
+   confirmar que vendeu, registre com
+   `curl -s -X POST {backend_url}/api/portfolio/assets/<id>/sell \
+     -H 'Content-Type: application/json' -d '{{"price": 38.20, "quantity": 100}}'`
+   Nunca registre uma venda que o cliente não confirmou ter feito.
+
+## Sua memória fixa (você a gerencia) — LEIA ANTES DE RESPONDER
+- ./MEMORY.md é sua memória PERMANENTE sobre o cliente e a ÚNICA coisa que
+  sobrevive à rotação de sessão. LEIA no início de toda sessão nova E sempre
+  que a resposta depender do perfil dele (renda, orçamento, metas, o que já é
+  gasto fixo). Na dúvida, leia — custa um Read.
+- **ESCREVA na hora que ele revelar algo durável.** Não espere o fim da
+  conversa: renda, gasto fixo, dívida, meta, dependente, reserva, perfil de
+  risco, preferência, data importante. Fato pontual (um almoço) fica só no
+  ledger. Confirme em meia linha ("anotei: aluguel 1.250 todo dia 10").
+- Mantenha as tabelas de **Renda recorrente** e **Gastos fixos** no formato do
+  arquivo (o quê · valor · quando · categoria · desde). É delas que você tira o
+  que já deveria estar lançado no mês.
+- **A SUA memória é SÓ o ./MEMORY.md deste workspace.** Você tem acesso à
+  máquina inteira, mas não escreva fato do cliente em nenhum outro lugar —
+  nada em ~/.claude, nada em outro projeto. O que sair daqui você perde na
+  próxima sessão e polui a memória de outra ferramenta.
 - NUNCA guarde segredos (senhas, tokens, chaves) na memória.
+
+## Recorrente: lembrar NÃO basta, tem que LANÇAR
+Quando o cliente contar um valor recorrente, faça as duas coisas:
+1. **Anote em MEMORY.md** na tabela certa.
+2. **Decida se já tem que lançar AGORA**, assim:
+   - Antes de qualquer coisa, `GET {backend_url}/api/cashflow?month=<atual>` e
+     veja se já existe lançamento equivalente no mês. **Nunca lance em dobro** —
+     ele pode ter contado o mesmo gasto ontem, ou você já ter lançado.
+   - Se o dia de vencimento/pagamento JÁ PASSOU neste mês e não está no ledger,
+     **LANCE** e diga em uma linha o que lançou. Não peça permissão para o
+     óbvio — ele te contou justamente para não ter que lançar na mão.
+   - Se o dia AINDA NÃO chegou neste mês, só anote na memória. NUNCA lance
+     dinheiro que ainda não se moveu: isso infla o saldo e mente para ele.
+   - Se ele falar no passado ("recebi", "paguei", "saiu"), o dinheiro já se
+     moveu: lance direto, sem perguntar.
+   - Se falar no presente/futuro ("ganho", "pago todo mês", "vou pagar"), é
+     perfil: anote na memória e só lance quando de fato ocorrer.
+   - Valor que varia (luz, cartão): anote "varia" e peça o número real.
+3. Quando o cliente pedir o resumo do mês ou perguntar como está o orçamento,
+   compare o ledger com a tabela de gastos fixos e diga o que ainda **falta
+   lançar** neste mês. Isso é o que impede o ledger de ficar mentindo por
+   omissão.
 
 ## API local do sistema (backend em {backend_url})
 Use Bash + curl. Endpoints principais:
@@ -106,6 +185,14 @@ Use Bash + curl. Endpoints principais:
   (lotes com tese/alvo/stop) · /api/portfolio/trades (P&L realizado) ·
   /api/portfolio/history · /api/portfolio/benchmark (TWR vs CDI/IBOV/BTC)
 - Ordens do comitê: `GET {backend_url}/api/orders?status=pending`
+- **Disparar aporte (comitê completo, roda em segundo plano):**
+  `curl -s -X POST '{backend_url}/api/contributions?run=true' \
+    -H 'Content-Type: application/json' \
+    -d '{{"amount_brl": 5000, "notes": "observações do cliente ou null"}}'`
+  Retorna o aporte criado NA HORA (as 5 reuniões rodam atrás). Confirme o valor
+  com o cliente ANTES. Acompanhe depois com
+  `GET {backend_url}/api/contributions/<id>` — `final_summary` preenchido = fim.
+- Aportes recentes: `GET {backend_url}/api/contributions`
 - IR: `GET {backend_url}/api/tax/<ano>`
 Se a API estiver fora do ar, consultas podem ler o SQLite em
 `storage/portfolio.db` (SOMENTE leitura). NUNCA escreva direto no banco — se
@@ -141,7 +228,7 @@ não conseguir registrar via API, avise o cliente e peça para tentar depois.
 - Números que movem decisão exigem fonte verificada ao vivo (2ª fonte se
   divergirem). Se não conseguir verificar, diga explicitamente.
 
-## Formato das respostas (Telegram, no celular)
+## Formato das respostas (celular — Telegram e site)
 - CURTO e direto: regra geral ≤ 12 linhas; sem tabelas markdown largas; use
   bullets e negrito com moderação. Aprofunde só se o cliente pedir.
 - Confirmação de lançamento em 1 linha, com o total do mês na categoria. Ex.:
@@ -151,6 +238,50 @@ não conseguir registrar via API, avise o cliente e peça para tentar depois.
 """
 
 _SEED_CHAT_MEMORY = """\
+# Memória Fixa do Consultor — Cliente
+
+Você (o consultor) mantém este arquivo. Ele é a única coisa que sobrevive à
+rotação de sessão, então o que não estiver aqui você ESQUECE.
+
+MANTENHA AS TABELAS NO FORMATO ABAIXO — você lê elas todo mês para saber o que
+já deveria ter sido lançado no ledger. Prosa solta não serve para isso.
+
+## Renda recorrente
+| o quê | valor | quando cai | categoria | desde |
+|-------|-------|-----------|-----------|-------|
+| (ex.: salário) | (ex.: 8400,00) | (ex.: dia 5) | salário | (ex.: 2026-07) |
+
+## Gastos fixos
+| o quê | valor | vence | categoria | desde |
+|-------|-------|-------|-----------|-------|
+| (ex.: aluguel) | (ex.: 1250,00) | (ex.: dia 10) | casa | (ex.: 2026-07) |
+
+Valor variável (conta de luz, cartão): escreva "varia" no valor e registre o
+número real quando o cliente contar.
+
+## Perfil e objetivos
+(renda total, metas, horizonte, tolerância a risco, dependentes, reserva)
+
+## Preferências de conversa
+(nível de detalhe, temas de interesse, como ele gosta de ser respondido)
+
+## Fatos e pendências
+(promessas feitas, follow-ups combinados, datas importantes)
+"""
+
+_SEED_CHAT_AGENT_MCP = """\
+{
+  "_comment": "MCPs EXTRAS do chat do consultor. Mesclado ao baseline a cada sessao; voce tem prioridade em conflito de nome. Formato: mcpServers -> nome -> {command, args, env}.",
+  "mcpServers": {}
+}
+"""
+
+
+# Earlier seed texts. A MEMORY.md still byte-identical to one of these has never
+# been written to, so replacing it with the current template loses nothing —
+# and without this an old structure would outlive every prompt change.
+_LEGACY_CHAT_MEMORY_SEEDS = (
+    """\
 # Memória Fixa do Consultor — Cliente
 
 Gerenciada por você (o consultor) entre sessões. Atualize sempre que o cliente
@@ -167,14 +298,18 @@ revelar algo durável. Estrutura sugerida:
 
 ## Fatos e pendências
 (preencher: promessas feitas, follow-ups combinados)
-"""
+""",
+)
 
-_SEED_CHAT_AGENT_MCP = """\
-{
-  "_comment": "MCPs EXTRAS do chat do consultor. Mesclado ao baseline a cada sessao; voce tem prioridade em conflito de nome. Formato: mcpServers -> nome -> {command, args, env}.",
-  "mcpServers": {}
-}
-"""
+
+def _refresh_seed_memory(path: Path) -> None:
+    """Write the seed if absent, or upgrade one the consultant never touched."""
+    if not path.exists():
+        path.write_text(_SEED_CHAT_MEMORY, encoding="utf-8")
+        return
+    current = path.read_text(encoding="utf-8")
+    if current in _LEGACY_CHAT_MEMORY_SEEDS:
+        path.write_text(_SEED_CHAT_MEMORY, encoding="utf-8")
 
 
 def _ensure_chat_workspace() -> Path:
@@ -197,9 +332,7 @@ def _ensure_chat_workspace() -> Path:
         json.dumps(analysis_runner._effective_mcp_config(CHAT_WORKSPACE), indent=2),
         encoding="utf-8",
     )
-    memory = CHAT_WORKSPACE / "MEMORY.md"
-    if not memory.exists():
-        memory.write_text(_SEED_CHAT_MEMORY, encoding="utf-8")
+    _refresh_seed_memory(CHAT_WORKSPACE / "MEMORY.md")
     return CHAT_WORKSPACE
 
 
@@ -263,21 +396,28 @@ def _chat_lock_path() -> Path:
     return analysis_runner._RUN_LOCK_DIR / _CHAT_LOCK_NAME
 
 
-def _run_turn_once(prompt: str, *, session_id: str | None, workspace: Path) -> StepResult:
+def _run_turn_once(
+    prompt: str,
+    *,
+    session_id: str | None,
+    workspace: Path,
+    model: str | None = None,
+    effort: str | None = None,
+) -> StepResult:
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
     return analysis_runner._run_claude_step(
         prompt,
         resume_session_id=session_id,
-        model=settings.chat_model,
-        effort=settings.chat_effort,
+        model=model or settings.chat_model,
+        effort=effort or settings.chat_effort,
         timeout=settings.chat_turn_timeout,
         cwd=workspace,
         transcript_tag=f"chat_{stamp}",
     )
 
 
-def run_chat_turn(text: str) -> str:
-    """One user message in → the consultant's reply out.
+def run_chat_turn(text: str) -> tuple[str, model_router.Route]:
+    """One user message in → the consultant's reply out, plus the route taken.
 
     Resumes the persisted chained session (rotating it after
     ``chat_max_turns``); on a vanished session it restarts fresh once. Limits
@@ -301,13 +441,25 @@ def run_chat_turn(text: str) -> str:
 
         fresh = session_id is None
         prompt = _turn_prompt(text, fresh=fresh, rotated=rotated)
+        # Same chained session either way — only the model answering it changes.
+        picked = model_router.route(text)
         try:
-            result = _run_turn_once(prompt, session_id=session_id, workspace=workspace)
+            result = _run_turn_once(
+                prompt,
+                session_id=session_id,
+                workspace=workspace,
+                model=picked.model,
+                effort=picked.effort,
+            )
         except SessionNotFoundError:
             logger.warning("chat_session_gone_restarting")
             reset_session()
             result = _run_turn_once(
-                _turn_prompt(text, fresh=True, rotated=True), session_id=None, workspace=workspace
+                _turn_prompt(text, fresh=True, rotated=True),
+                session_id=None,
+                workspace=workspace,
+                model=picked.model,
+                effort=picked.effort,
             )
         except LimitError as exc:
             wait_s = analysis_runner._seconds_until_reset(str(exc))
@@ -332,7 +484,165 @@ def run_chat_turn(text: str) -> str:
             cost_usd=result.cost_usd,
             duration_s=result.duration_s,
             fresh=fresh,
+            model=picked.model,
+            tier=picked.tier.value,
         )
-        return result.result
+        return result.result, picked
     finally:
         analysis_runner._release_lock_file(_chat_lock_path())
+
+
+# ── Shared transcript: the website and Telegram are two doors, one conversation
+
+
+def _record(
+    role: ChatRole,
+    content: str,
+    channel: ChatChannel,
+    *,
+    status: ChatTurnStatus = ChatTurnStatus.DONE,
+) -> UUID:
+    with Session(engine) as session:
+        message = ChatMessage(role=role, content=content, channel=channel, status=status)
+        session.add(message)
+        session.commit()
+        session.refresh(message)
+        return message.id
+
+
+def _settle(
+    message_id: UUID,
+    content: str,
+    status: ChatTurnStatus,
+    *,
+    model: str | None = None,
+    tier: str | None = None,
+) -> None:
+    with Session(engine) as session:
+        message = session.get(ChatMessage, message_id)
+        if message is None:
+            return
+        message.content = content
+        message.status = status
+        message.model = model
+        message.tier = tier
+        session.add(message)
+        session.commit()
+
+
+def history(limit: int = 60) -> list[ChatMessage]:
+    """Most recent messages, oldest first (reading order)."""
+    with Session(engine) as session:
+        rows = session.exec(
+            select(ChatMessage)
+            .order_by(ChatMessage.created_at.desc())
+            .limit(max(1, min(limit, 500)))
+        ).all()
+    return list(reversed(rows))
+
+
+def is_busy() -> bool:
+    """True while a turn holds the chat lock, whoever started it."""
+    return _chat_lock_path().exists()
+
+
+def converse(
+    text: str,
+    channel: ChatChannel = ChatChannel.WEB,
+    *,
+    display: str | None = None,
+) -> str:
+    """Run one turn AND persist both sides of it.
+
+    Every caller should use this instead of ``run_chat_turn`` so the transcript
+    stays complete no matter which door the message came through. Errors are
+    recorded too — a failed turn the user can see beats a silent gap.
+    """
+    _record(ChatRole.USER, (display or text).strip(), channel)
+    pending = _record(ChatRole.ASSISTANT, "", channel, status=ChatTurnStatus.RUNNING)
+    try:
+        reply, picked = run_chat_turn(text)
+    except (ChatBusyError, ChatUnavailableError) as exc:
+        _settle(pending, str(exc), ChatTurnStatus.FAILED)
+        raise
+    except Exception as exc:  # noqa: BLE001 — the transcript must never dangle
+        _settle(pending, f"✖ Erro inesperado: {exc}", ChatTurnStatus.FAILED)
+        raise
+    _settle(pending, reply, ChatTurnStatus.DONE, model=picked.model, tier=picked.tier.value)
+    return reply
+
+
+def start_turn(
+    text: str,
+    channel: ChatChannel = ChatChannel.WEB,
+    *,
+    display: str | None = None,
+) -> None:
+    """Fire a turn in the background and return at once.
+
+    A turn can take minutes; no HTTP client will hold that connection open. The
+    caller polls ``history()`` and watches the pending assistant row flip from
+    RUNNING to DONE or FAILED.
+    """
+    text = text.strip()
+    if not text:
+        raise ChatUnavailableError("Mensagem vazia.")
+
+    def _worker() -> None:
+        try:
+            converse(text, channel, display=display)
+        except Exception:  # noqa: BLE001 — already recorded on the pending row
+            logger.warning("chat_web_turn_failed", exc_info=True)
+
+    threading.Thread(target=_worker, name="chat-turn", daemon=True).start()
+
+
+# ── Attachments: photos and documents, from either door ───────────────────────
+
+INBOX = CHAT_WORKSPACE / "inbox"
+MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024
+
+_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"}
+
+
+def safe_filename(name: str, fallback: str = "arquivo.bin") -> str:
+    """Basename with only ASCII word chars, dots and dashes (traversal safe)."""
+    base = re.sub(r"[^\w.\-]", "_", Path(name or "").name, flags=re.ASCII).strip("._")
+    return base[:80] or fallback
+
+
+def save_attachment(filename: str, data: bytes) -> Path:
+    """Write an upload into the consultant's inbox and return its path."""
+    if len(data) > MAX_ATTACHMENT_BYTES:
+        raise ChatUnavailableError("Arquivo grande demais (limite de 20 MB).")
+    INBOX.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+    path = INBOX / f"{stamp}_{safe_filename(filename)}"
+    path.write_bytes(data)
+    return path
+
+
+def attachment_kind(path: Path) -> str:
+    return "imagem" if path.suffix.lower() in _IMAGE_SUFFIXES else "arquivo"
+
+
+def media_turn_text(kind: str, path: Path, caption: str, origin: str) -> str:
+    """The prompt the consultant actually receives for an attachment."""
+    caption_line = f'Legenda do cliente: "{caption}"' if caption else "Sem legenda."
+    return (
+        f"[ARQUIVO RECEBIDO — {kind}] O cliente enviou um arquivo {origin}, "
+        f"salvo em: {path}\n{caption_line}\n"
+        "Leia o arquivo (imagem pela visão; PDF/CSV/planilha pelas ferramentas de "
+        "leitura) e siga suas ordens permanentes: cupom/nota → registre o gasto; "
+        "extrato/fatura → resuma e registre os lançamentos; senão, responda ao "
+        "que o cliente pediu."
+    )
+
+
+def start_attachment_turn(path: Path, caption: str, channel: ChatChannel) -> None:
+    """Queue a turn about an uploaded file, showing the human a readable line."""
+    kind = attachment_kind(path)
+    origin = "pelo Telegram" if channel is ChatChannel.TELEGRAM else "pelo site"
+    prompt = media_turn_text(kind, path, caption, origin)
+    display = f"📎 {path.name.split('_', 1)[-1]}" + (f"\n{caption}" if caption else "")
+    start_turn(prompt, channel, display=display)

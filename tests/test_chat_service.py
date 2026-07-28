@@ -51,8 +51,10 @@ def test_first_turn_starts_fresh_and_persists_session(
         return _step()
 
     monkeypatch.setattr(analysis_runner, "_run_claude_step", fake_step)
-    reply = chat_service.run_chat_turn("quanto está o BTC?")
+    reply, route = chat_service.run_chat_turn("quanto está o BTC?")
     assert reply == "olá!"
+    assert route.model  # the router always picks something
+
     assert seen["resume"] is None
     assert "Nova sessão" in str(seen["prompt"])
     assert "quanto está o BTC?" in str(seen["prompt"])
@@ -72,7 +74,7 @@ def test_second_turn_resumes_same_session(chat_dirs: Path, monkeypatch: pytest.M
         return _step(result="resumido", session_id="sess-1")
 
     monkeypatch.setattr(analysis_runner, "_run_claude_step", fake_step)
-    assert chat_service.run_chat_turn("e a PETR4?") == "resumido"
+    assert chat_service.run_chat_turn("e a PETR4?")[0] == "resumido"
     assert seen["resume"] == "sess-1"
     assert "Nova sessão" not in str(seen["prompt"])
     assert chat_service._load_state()["turns"] == 4
@@ -111,7 +113,7 @@ def test_vanished_session_restarts_fresh_once(
         return _step(result="recomecei", session_id="sess-new")
 
     monkeypatch.setattr(analysis_runner, "_run_claude_step", fake_step)
-    assert chat_service.run_chat_turn("oi") == "recomecei"
+    assert chat_service.run_chat_turn("oi")[0] == "recomecei"
     assert calls == ["sess-gone", None]
     assert chat_service._load_state()["session_id"] == "sess-new"
 

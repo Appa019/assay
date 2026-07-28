@@ -47,6 +47,7 @@ from app.config import settings  # noqa: E402
 from app.core.database import engine, init_db  # noqa: E402
 from app.models.asset import Asset, AssetClass  # noqa: E402
 from app.models.cashflow import CashflowKind, CashflowSource  # noqa: E402
+from app.models.chat import ChatChannel  # noqa: E402
 from app.models.contribution import Contribution  # noqa: E402
 from app.models.order import OrderStatus  # noqa: E402
 from app.models.report import Report, ReportKind  # noqa: E402
@@ -157,7 +158,8 @@ def _send(text: str) -> None:
 
 # --- consultant chat (free text → chained Claude session) -------------------
 
-_chat_queue: queue.Queue[str] = queue.Queue()
+# (prompt sent to the consultant, human-readable line for the shared transcript)
+_chat_queue: queue.Queue[tuple[str, str | None]] = queue.Queue()
 
 
 def _typing_loop(stop: threading.Event) -> None:
@@ -170,11 +172,12 @@ def _typing_loop(stop: threading.Event) -> None:
 def _chat_worker() -> None:
     """Serial consumer: one consultant turn at a time, in message order."""
     while True:
-        text = _chat_queue.get()
+        text, display = _chat_queue.get()
         stop = threading.Event()
         threading.Thread(target=_typing_loop, args=(stop,), daemon=True).start()
         try:
-            reply = chat_service.run_chat_turn(text)
+            # converse() persists both sides so the website shows this exchange.
+            reply = chat_service.converse(text, ChatChannel.TELEGRAM, display=display)
         except (chat_service.ChatBusyError, chat_service.ChatUnavailableError) as exc:
             reply = str(exc)
         except Exception as exc:  # noqa: BLE001 — the worker must survive anything
@@ -185,9 +188,9 @@ def _chat_worker() -> None:
         _chat_queue.task_done()
 
 
-def _enqueue_chat(text: str) -> str | None:
+def _enqueue_chat(text: str, display: str | None = None) -> str | None:
     backlog = _chat_queue.qsize()
-    _chat_queue.put(text)
+    _chat_queue.put((text, display))
     if backlog >= 2:
         return f"📥 Na fila — ainda estou respondendo {backlog} mensagem(ns) antes dessa."
     return None  # the worker replies when the turn finishes
@@ -228,15 +231,7 @@ def _extract_media(msg: dict) -> tuple[str, str, str, int] | None:
 
 
 def _media_turn_text(kind: str, path: Path, caption: str) -> str:
-    caption_line = f'Legenda do cliente: "{caption}"' if caption else "Sem legenda."
-    return (
-        f"[ARQUIVO RECEBIDO — {kind}] O cliente enviou um arquivo pelo Telegram, "
-        f"salvo em: {path}\n{caption_line}\n"
-        "Leia o arquivo (imagem pela visão; PDF/CSV/planilha pelas ferramentas de "
-        "leitura) e siga suas ordens permanentes: cupom/nota → registre o gasto; "
-        "extrato/fatura → resuma e registre os lançamentos; senão, responda ao "
-        "que o cliente pediu."
-    )
+    return chat_service.media_turn_text(kind, path, caption, "pelo Telegram")
 
 
 def _unsupported_media(msg: dict) -> str | None:
@@ -260,7 +255,8 @@ def _handle_media(msg: dict) -> str:
     except telegram_service.TelegramError as exc:
         return f"✖ Não consegui baixar o arquivo: {exc}"
     caption = (msg.get("caption") or "").strip()
-    queued = _enqueue_chat(_media_turn_text(kind, path, caption))
+    display = f"📎 {name}" + (f"\n{caption}" if caption else "")
+    queued = _enqueue_chat(_media_turn_text(kind, path, caption), display)
     ack = f"📎 Recebi {'a imagem' if kind == 'imagem' else 'o arquivo'} — analisando…"
     return f"{queued}\n{ack}" if queued else ack
 
