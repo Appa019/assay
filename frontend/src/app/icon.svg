@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180" role="img" aria-label="Mesa">
+  <rect width="180" height="180" rx="40" fill="#faf8f4"/>
+  <!-- The desk: a surface rule with two legs, plus one accent block resting on
+       it. Abstract mark for "Mesa", deliberately not a chart or a coin. -->
+  <rect x="34" y="96" width="112" height="9" rx="2" fill="#2a2419"/>
+  <rect x="46" y="105" width="9" height="42" rx="2" fill="#2a2419"/>
+  <rect x="125" y="105" width="9" height="42" rx="2" fill="#2a2419"/>
+  <rect x="66" y="46" width="48" height="48" rx="4" fill="#007d94"/>
+</svg>

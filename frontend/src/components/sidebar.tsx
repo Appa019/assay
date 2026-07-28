@@ -2,30 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  PlusCircle,
-  Briefcase,
-  FileBarChart,
-  Receipt,
-  Settings,
-} from "lucide-react";
+import { NAV_ITEMS, isCurrentPath } from "@/lib/nav";
 
-const NAV_ITEMS = [
-  { href: "/", label: "Painel", icon: LayoutDashboard },
-  { href: "/aporte", label: "Novo aporte", icon: PlusCircle },
-  { href: "/ativos", label: "Carteira", icon: Briefcase },
-  { href: "/relatorios", label: "Histórico", icon: FileBarChart },
-  { href: "/ir", label: "Imposto de renda", icon: Receipt },
-  { href: "/configuracoes", label: "Ajustes", icon: Settings },
-] as const;
-
+/** Desktop navigation. Below `md` the bottom tab bar replaces it entirely. */
 export const Sidebar = () => {
   const pathname = usePathname();
 
   return (
     <aside
-      className="w-60 border-r shrink-0 px-6 py-10 flex flex-col"
+      className="hidden md:flex w-60 border-r shrink-0 px-6 py-10 flex-col"
       style={{ borderColor: "var(--border)" }}
     >
       <div className="mb-12">
@@ -36,20 +21,19 @@ export const Sidebar = () => {
             color: "var(--text-primary)",
           }}
         >
-          Mesa de aportes
+          Mesa
         </h1>
         <p
           className="text-[11px] mt-1.5 uppercase tracking-[0.18em]"
           style={{ color: "var(--text-muted)" }}
         >
-          Aporte ad-hoc · comitê autônomo
+          Finanças · investimentos
         </p>
       </div>
 
       <nav className="flex flex-col gap-1">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const isActive =
-            href === "/" ? pathname === "/" : pathname.startsWith(href);
+          const isActive = isCurrentPath(pathname, href);
           return (
             <Link
               key={href}

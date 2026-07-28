@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Manrope } from "next/font/google";
 import "./globals.css";
 
@@ -17,9 +17,23 @@ const body = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Mesa de aportes",
-  description:
-    "Aportes ad-hoc com comitê autônomo de investimentos — 5 reuniões encadeadas + fechamento",
+  title: "Mesa",
+  description: "Finanças pessoais e carteira de investimentos, 100% local",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Mesa",
+    // Renders the status bar over the page so the header can own the top inset.
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  // viewport-fit=cover is what makes env(safe-area-inset-*) resolve on iPhone.
+  viewportFit: "cover",
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#faf8f4",
 };
 
 const RootLayout = ({

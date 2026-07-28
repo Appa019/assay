@@ -1,19 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  /* Editorial palette — warm parchment + ink, single teal accent */
-  --bg-primary: oklch(0.985 0.005 75);
-  --bg-secondary: oklch(0.955 0.008 75);
-  --bg-card: oklch(0.995 0.003 75);
-  --bg-elevated: oklch(0.975 0.006 75);
+  /* Editorial palette — warm ink on a barely-tinted page, pure white panels.
+     The page sits a shade below the cards so white surfaces lift off it without
+     needing a shadow; the warmth stays in the ink and the neutrals. */
+  --bg-primary: oklch(0.972 0.004 75);
+  --bg-secondary: oklch(0.951 0.006 75);
+  --bg-card: #ffffff;
+  --bg-elevated: #ffffff;
   --text-primary: oklch(0.18 0.02 75);
   --text-secondary: oklch(0.42 0.018 75);
   --text-muted: oklch(0.60 0.012 75);
   --accent: oklch(0.52 0.13 200);
   --accent-light: oklch(0.92 0.04 200);
   --accent-strong: oklch(0.44 0.14 200);
-  --border: oklch(0.90 0.008 75);
-  --border-strong: oklch(0.82 0.012 75);
+  --border: oklch(0.885 0.008 75);
+  --border-strong: oklch(0.80 0.012 75);
   --success: oklch(0.58 0.14 145);
   --success-light: oklch(0.95 0.04 145);
   --danger: oklch(0.55 0.18 28);
@@ -238,4 +240,46 @@ button:disabled {
 
 .md-doc tr:last-child td {
   border-bottom: none;
+}
+
+/* ── Phone / iOS ───────────────────────────────────────────────────── */
+
+html {
+  /* Safari bumps font sizes on rotation to landscape without this. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  /* Nothing in this app scrolls sideways; a stray wide child should be
+     contained rather than dragging the whole page with it. */
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+}
+
+@media (hover: none) {
+  /* The grey flash on tap reads as a rendering glitch on a designed surface;
+     :active and :focus-visible already carry the feedback. */
+  a,
+  button,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* iOS zooms the viewport when a focused control renders below 16px, and never
+   zooms back out. Any control the thumb can land on has to clear that bar. */
+@media (max-width: 767px) {
+  /* :where() keeps specificity at 0 so any explicit utility still wins. Without
+     it this unlayered rule outranks every Tailwind class and becomes a CAP,
+     silently shrinking controls that are meant to be larger. */
+  :where(input, select, textarea) {
+    font-size: 16px;
+  }
+}
+
+/* Long URLs and unbroken strings in committee memos wrap instead of widening
+   the page. `break-word` only breaks when a word alone would overflow, so it
+   never splits a monetary value mid-digit the way `anywhere` does. */
+.md-doc {
+  overflow-wrap: break-word;
 }
