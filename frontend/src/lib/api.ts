@@ -596,6 +596,9 @@ export type ChatMessage = {
   content: string;
   channel: ChatChannel;
   status: ChatTurnStatus;
+  /** Which model answered, and the tier the router picked for it. */
+  model: string | null;
+  tier: string | null;
   created_at: string;
 };
 

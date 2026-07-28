@@ -86,3 +86,26 @@ def test_delete_entry_and_missing(session: Session) -> None:
     assert cashflow_service.list_entries(session) == []
     with pytest.raises(cashflow_service.CashflowNotFoundError):
         cashflow_service.delete_entry(session, uuid4())
+
+
+def test_identical_entry_within_the_window_is_not_duplicated(session: Session) -> None:
+    """The consultant sometimes re-POSTs after missing the first response."""
+    payload = CashflowCreate(
+        kind=CashflowKind.EXPENSE,
+        amount_brl=Decimal("48.00"),
+        category="mercado",
+        description="cupom do mercado",
+    )
+    first = cashflow_service.add_entry(session, payload)
+    second = cashflow_service.add_entry(session, payload)
+
+    assert second.id == first.id
+    assert len(cashflow_service.list_entries(session)) == 1
+
+
+def test_a_different_amount_still_creates_a_second_entry(session: Session) -> None:
+    base = {"kind": CashflowKind.EXPENSE, "category": "mercado", "description": "pão"}
+    cashflow_service.add_entry(session, CashflowCreate(amount_brl=Decimal("10.00"), **base))
+    cashflow_service.add_entry(session, CashflowCreate(amount_brl=Decimal("11.00"), **base))
+
+    assert len(cashflow_service.list_entries(session)) == 2

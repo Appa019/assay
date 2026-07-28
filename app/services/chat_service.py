@@ -219,6 +219,10 @@ Use Bash + curl. Endpoints principais:
     lazer, assinatura, educacao, vestuario, salario, freela, dividendos,
     reembolso, outros — escolha a mais próxima; crie nova só se necessário.
   · occurred_on: a data que o cliente disse (padrão: hoje). source: "chat".
+  · **Chame o POST UMA VEZ e só uma.** Se não tiver certeza se gravou, CONFIRA
+    com `GET .../api/cashflow?month=...` — nunca repita o POST. Um lançamento em
+    dobro estraga o mês do cliente. (A API descarta repetição idêntica dentro de
+    2 minutos, mas não conte com isso: valores diferentes passariam.)
 - Resumo do mês: `GET {backend_url}/api/cashflow/summary?month=YYYY-MM`
 - Tendência (totais por mês, do mais antigo ao atual, p/ comparar):
   `GET {backend_url}/api/cashflow/history?months=6`

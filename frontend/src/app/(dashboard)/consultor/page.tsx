@@ -333,6 +333,7 @@ const Turn = ({ message }: { message: ChatMessage }) => {
           </div>
           <p className="mt-1.5 text-[10px]" style={{ color: "var(--text-muted)" }}>
             {timeLabel(message.created_at)}
+            {message.model ? ` · ${message.model}` : ""}
           </p>
         </>
       )}

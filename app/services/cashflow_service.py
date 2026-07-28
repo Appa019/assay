@@ -6,9 +6,10 @@ names are normalized to lowercase so "Mercado" and "mercado" aggregate together.
 """
 
 from calendar import monthrange
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
+import structlog
 from sqlmodel import Session, select
 
 from app.models.cashflow import CashflowEntry, CashflowKind
@@ -18,6 +19,8 @@ from app.schemas.cashflow import (
     CategoryTotal,
     MonthTotals,
 )
+
+logger = structlog.get_logger()
 
 
 class CashflowNotFoundError(LookupError):
@@ -33,6 +36,30 @@ def _month_bounds(month: str) -> tuple[date, date]:
     return date(year, mon, 1), date(year, mon, monthrange(year, mon)[1])
 
 
+# An identical entry arriving within this window is treated as a repeat of the
+# same POST, not as a second purchase. The consultant sometimes posts, fails to
+# read the response, and posts again — which silently doubled an expense in the
+# ledger. Two genuine identical purchases minutes apart still both land.
+_DUPLICATE_WINDOW_S = 120
+
+
+def _recent_duplicate(session: Session, entry: CashflowEntry) -> CashflowEntry | None:
+    """An entry identical in every field, written moments ago."""
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(seconds=_DUPLICATE_WINDOW_S)
+    return session.exec(
+        select(CashflowEntry)
+        .where(
+            CashflowEntry.kind == entry.kind,
+            CashflowEntry.amount_brl == entry.amount_brl,
+            CashflowEntry.category == entry.category,
+            CashflowEntry.occurred_on == entry.occurred_on,
+            CashflowEntry.description == entry.description,
+            CashflowEntry.created_at >= cutoff,
+        )
+        .order_by(CashflowEntry.created_at.desc())
+    ).first()
+
+
 def add_entry(session: Session, data: CashflowCreate) -> CashflowEntry:
     entry = CashflowEntry(
         kind=data.kind,
@@ -42,6 +69,15 @@ def add_entry(session: Session, data: CashflowCreate) -> CashflowEntry:
         occurred_on=data.occurred_on or date.today(),
         source=data.source,
     )
+    existing = _recent_duplicate(session, entry)
+    if existing is not None:
+        logger.info(
+            "cashflow_duplicate_ignored",
+            amount=float(entry.amount_brl),
+            category=entry.category,
+            source=str(entry.source),
+        )
+        return existing
     session.add(entry)
     session.commit()
     session.refresh(entry)

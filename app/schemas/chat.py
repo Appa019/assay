@@ -16,6 +16,10 @@ class ChatMessageRead(BaseModel):
     content: str
     channel: ChatChannel
     status: ChatTurnStatus
+    # Which model answered. Recorded on every assistant row so the routing
+    # decision is visible instead of buried in the database.
+    model: str | None = None
+    tier: str | None = None
     created_at: datetime
 
 
