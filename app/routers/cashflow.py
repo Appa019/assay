@@ -2,12 +2,13 @@ import re
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlmodel import Session
 
 from app.core.database import get_session
 from app.models.cashflow import CashflowKind
 from app.schemas.cashflow import CashflowCreate, CashflowRead, CashflowSummary
-from app.services import cashflow_service
+from app.services import cashflow_service, classifier_service
 
 router = APIRouter(prefix="/api/cashflow", tags=["cashflow"])
 
@@ -19,6 +20,10 @@ def _validate_month(month: str | None) -> None:
         raise HTTPException(status_code=422, detail="Mês deve estar no formato YYYY-MM")
 
 
+class CashflowClassify(BaseModel):
+    text: str = Field(..., min_length=1, max_length=500)
+
+
 @router.post("", response_model=CashflowRead, status_code=status.HTTP_201_CREATED)
 async def create_entry(
     data: CashflowCreate, session: Session = Depends(get_session)
@@ -26,6 +31,21 @@ async def create_entry(
     """Register one expense or income line in the personal ledger."""
     entry = cashflow_service.add_entry(session, data)
     return CashflowRead.model_validate(entry, from_attributes=True)
+
+
+@router.post("/classify", response_model=CashflowCreate)
+async def classify_entry(payload: CashflowClassify) -> CashflowCreate:
+    """Parse free text into a DRAFT entry. Writes nothing.
+
+    Returning a draft rather than saving keeps a misread sentence out of the
+    ledger: the client shows what the model understood and the user confirms.
+    """
+    try:
+        return classifier_service.classify(payload.text)
+    except classifier_service.ClassificationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
 
 @router.get("", response_model=list[CashflowRead])
