@@ -87,8 +87,12 @@ long_service bot "Investimentos Manual — bot do Telegram" \
   "${PY} ${PROJECT_ROOT}/scripts/telegram_bot.py"
 # Serves the production build; bound to loopback so a shared LAN cannot reach it
 # (put a TLS front like `tailscale serve` in front for remote access).
+#
+# Invokes next directly rather than through `pnpm start`: pnpm is itself a Node
+# process that stays resident just to spawn another one, and on a 4 GB Pi that
+# wrapper costs ~110 MB for nothing.
 long_service frontend "Investimentos Manual — frontend Next.js" \
-  "/usr/bin/env sh -c 'cd ${PROJECT_ROOT}/frontend && exec pnpm start --hostname 127.0.0.1 --port ${FRONTEND_PORT}'"
+  "/usr/bin/env sh -c 'cd ${PROJECT_ROOT}/frontend && exec node_modules/.bin/next start --hostname 127.0.0.1 --port ${FRONTEND_PORT}'"
 
 oneshot_pair cadence  "maturidade dos lotes"        "${PY} ${PROJECT_ROOT}/scripts/check_cadence.py"  "*-*-* 09:00"
 oneshot_pair weekly   "revisão semanal do comitê"    "${PY} ${PROJECT_ROOT}/scripts/weekly_review.py"  "*-*-* 09:30"
