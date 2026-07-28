@@ -93,7 +93,8 @@ Responda com UMA palavra, nada mais:
 - `fast` — conversa curta, registrar um gasto/ganho, consultar um número que já
   existe (saldo, quanto gastei, qual meu patrimônio), pergunta factual simples.
 - `balanced` — dúvida que pede explicação ou contexto, comparação simples,
-  organizar finanças, entender um conceito, planejar o mês.
+  organizar finanças, entender um conceito, planejar o mês, **pedir opinião
+  sobre os próprios gastos** ou sobre como o mês está indo.
 - `deep` — decisão de investimento, análise de ativo ou carteira, tese de
   compra/venda, cenário macro, risco, tributação complexa, qualquer coisa que
   exija pesquisa na web ou dados de mercado ao vivo.

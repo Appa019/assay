@@ -41,3 +41,13 @@ class CashflowSummary(BaseModel):
     net_brl: float
     entries: int
     by_category: list[CategoryTotal]
+
+
+class MonthTotals(BaseModel):
+    """One month collapsed to four numbers, for trend comparison."""
+
+    month: str  # YYYY-MM
+    income_brl: float
+    expense_brl: float
+    net_brl: float
+    entries: int

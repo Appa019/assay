@@ -7,7 +7,12 @@ from sqlmodel import Session
 
 from app.core.database import get_session
 from app.models.cashflow import CashflowKind
-from app.schemas.cashflow import CashflowCreate, CashflowRead, CashflowSummary
+from app.schemas.cashflow import (
+    CashflowCreate,
+    CashflowRead,
+    CashflowSummary,
+    MonthTotals,
+)
 from app.services import cashflow_service, classifier_service
 
 router = APIRouter(prefix="/api/cashflow", tags=["cashflow"])
@@ -69,6 +74,12 @@ async def summary(
     """Monthly totals (income, expense, net) grouped by category."""
     _validate_month(month)
     return cashflow_service.month_summary(session, month)
+
+
+@router.get("/history", response_model=list[MonthTotals])
+async def history(months: int = 6, session: Session = Depends(get_session)) -> list[MonthTotals]:
+    """Totals per month, oldest first — the trend behind the current month."""
+    return cashflow_service.month_history(session, months)
 
 
 @router.delete("/{entry_id}", response_model=CashflowRead)

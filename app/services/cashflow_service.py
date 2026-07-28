@@ -12,7 +12,12 @@ from uuid import UUID
 from sqlmodel import Session, select
 
 from app.models.cashflow import CashflowEntry, CashflowKind
-from app.schemas.cashflow import CashflowCreate, CashflowSummary, CategoryTotal
+from app.schemas.cashflow import (
+    CashflowCreate,
+    CashflowSummary,
+    CategoryTotal,
+    MonthTotals,
+)
 
 
 class CashflowNotFoundError(LookupError):
@@ -98,3 +103,31 @@ def month_summary(session: Session, month: str | None = None) -> CashflowSummary
         entries=len(entries),
         by_category=by_category,
     )
+
+
+def month_history(session: Session, months: int = 6) -> list[MonthTotals]:
+    """Totals per month, oldest first, ending on the current month.
+
+    One call instead of one per month: the consultant needs the trend to say
+    anything useful about whether spending is drifting, and asking it to stitch
+    six requests together is both slow and easy to get wrong.
+    """
+    months = max(1, min(months, 36))
+    today = date.today()
+    out: list[MonthTotals] = []
+    for offset in range(months - 1, -1, -1):
+        year, mon = divmod(today.year * 12 + (today.month - 1) - offset, 12)
+        label = f"{year:04d}-{mon + 1:02d}"
+        entries = list_entries(session, month=label, limit=10_000)
+        income = sum(float(e.amount_brl) for e in entries if e.kind == CashflowKind.INCOME)
+        expense = sum(float(e.amount_brl) for e in entries if e.kind == CashflowKind.EXPENSE)
+        out.append(
+            MonthTotals(
+                month=label,
+                income_brl=round(income, 2),
+                expense_brl=round(expense, 2),
+                net_brl=round(income - expense, 2),
+                entries=len(entries),
+            )
+        )
+    return out
