@@ -318,6 +318,23 @@ _KEY_GATED_MCP_SERVERS: tuple[tuple[str, str, dict[str, Any]], ...] = (
 )
 
 
+def _playwright_mcp_args() -> list[str]:
+    """Browser MCP args, with a Chromium fallback for ARM hosts.
+
+    ``@playwright/mcp`` defaults to the Google Chrome channel, and Chrome ships
+    no ARM64 Linux build — on a Raspberry Pi it dies with "Chromium distribution
+    'chrome' is not found at /opt/google/chrome/chrome". Point it at the distro
+    Chromium there; x86 desktops with Chrome installed keep the default.
+    """
+    args = ["@playwright/mcp@latest"]
+    if Path("/opt/google/chrome/chrome").exists():
+        return args
+    chromium = shutil.which("chromium") or shutil.which("chromium-browser")
+    if chromium:
+        args += ["--browser", "chromium", "--executable-path", chromium, "--headless"]
+    return args
+
+
 def _baseline_mcp_servers(workspace: Path | None = None) -> dict[str, Any]:
     """Curated, research-grade MCP servers always available to the analyst.
 
@@ -351,7 +368,7 @@ def _baseline_mcp_servers(workspace: Path | None = None) -> dict[str, Any]:
         # Live library docs when the agent writes its own tools.
         "context7": {"command": "npx", "args": ["-y", "@upstash/context7-mcp@latest"]},
         # Full browser for JS-heavy research sites (dashboards, on-chain, RI).
-        "playwright": {"command": "npx", "args": ["@playwright/mcp@latest"]},
+        "playwright": {"command": "npx", "args": _playwright_mcp_args()},
         # Structured knowledge graph, complementary to the file-based MEMORY.md.
         "memory": {
             "command": "npx",
