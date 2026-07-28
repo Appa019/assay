@@ -12,10 +12,14 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PY="${PROJECT_ROOT}/.venv/bin/python"
 UNIT_DIR="${HOME}/.config/systemd/user"
 PREFIX="investimentos"
-PATH_LINE="PATH=${HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin"
+# ~/.local/node/bin covers hosts where Node was installed from the tarball
+# instead of a package manager (e.g. the Raspberry Pi); harmless when absent.
+PATH_LINE="PATH=${HOME}/.local/node/bin:${HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin"
+FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 
 if [[ "${1:-}" == "--uninstall" ]]; then
-  systemctl --user disable --now "${PREFIX}-backend.service" "${PREFIX}-bot.service" 2>/dev/null || true
+  systemctl --user disable --now "${PREFIX}-backend.service" "${PREFIX}-bot.service" \
+    "${PREFIX}-frontend.service" 2>/dev/null || true
   for t in cadence weekly resume prices snapshot alerts monthly backup; do
     systemctl --user disable --now "${PREFIX}-${t}.timer" 2>/dev/null || true
   done
@@ -81,6 +85,10 @@ long_service backend "Investimentos Manual — backend FastAPI" \
   "${PROJECT_ROOT}/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000"
 long_service bot "Investimentos Manual — bot do Telegram" \
   "${PY} ${PROJECT_ROOT}/scripts/telegram_bot.py"
+# Serves the production build; bound to loopback so a shared LAN cannot reach it
+# (put a TLS front like `tailscale serve` in front for remote access).
+long_service frontend "Investimentos Manual — frontend Next.js" \
+  "/usr/bin/env sh -c 'cd ${PROJECT_ROOT}/frontend && exec pnpm start --hostname 127.0.0.1 --port ${FRONTEND_PORT}'"
 
 oneshot_pair cadence  "maturidade dos lotes"        "${PY} ${PROJECT_ROOT}/scripts/check_cadence.py"  "*-*-* 09:00"
 oneshot_pair weekly   "revisão semanal do comitê"    "${PY} ${PROJECT_ROOT}/scripts/weekly_review.py"  "*-*-* 09:30"
@@ -92,7 +100,8 @@ oneshot_pair monthly  "relatório mensal"             "${PY} ${PROJECT_ROOT}/scr
 oneshot_pair backup   "backup do SQLite"             "/usr/bin/env bash ${PROJECT_ROOT}/scripts/backup_db.sh" "*-*-* 03:00"
 
 systemctl --user daemon-reload
-systemctl --user enable --now "${PREFIX}-backend.service" "${PREFIX}-bot.service"
+systemctl --user enable --now "${PREFIX}-backend.service" "${PREFIX}-bot.service" \
+  "${PREFIX}-frontend.service"
 for t in cadence weekly resume prices snapshot alerts monthly backup; do
   systemctl --user enable --now "${PREFIX}-${t}.timer"
 done
