@@ -119,12 +119,6 @@ const ConsultorPage = () => {
     <div className="flex flex-col" style={{ minHeight: "calc(100dvh - 8rem)" }}>
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p
-            className="text-[11px] uppercase tracking-[0.18em]"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Tempo real · mesma conversa do Telegram
-          </p>
           <h2
             className="text-[1.7rem] md:text-3xl leading-tight"
             style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}

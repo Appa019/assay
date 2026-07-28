@@ -55,13 +55,6 @@ export const Sidebar = () => {
           );
         })}
       </nav>
-
-      <div
-        className="mt-auto pt-5 text-[11px] leading-relaxed"
-        style={{ borderTop: "1px solid var(--border)", color: "var(--text-muted)" }}
-      >
-        100% local · SQLite · Sem credenciais
-      </div>
     </aside>
   );
 };
