@@ -1,4 +1,5 @@
 from app.models.asset import Asset, AssetClass
+from app.models.cashflow import CashflowEntry, CashflowKind, CashflowSource
 from app.models.contribution import (
     Contribution,
     ContributionPrompt,
@@ -13,6 +14,9 @@ from app.models.trade import Trade, TradeSide
 __all__ = [
     "Asset",
     "AssetClass",
+    "CashflowEntry",
+    "CashflowKind",
+    "CashflowSource",
     "Contribution",
     "ContributionPrompt",
     "ContributionStatus",

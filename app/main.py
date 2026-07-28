@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.core.database import init_db
-from app.routers import cadence, contributions, macro, orders, portfolio, reports, tax
+from app.routers import cadence, cashflow, contributions, macro, orders, portfolio, reports, tax
 
 logger = structlog.get_logger()
 
@@ -49,6 +49,7 @@ app.include_router(cadence.router)
 app.include_router(reports.router)
 app.include_router(orders.router)
 app.include_router(tax.router)
+app.include_router(cashflow.router)
 
 
 @app.get("/api/health")
