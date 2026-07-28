@@ -26,9 +26,21 @@ import {
   type ReportRead,
 } from "@/lib/api";
 import { MarkdownViewer } from "@/components/markdown-viewer";
-import { formatDateLong, formatDateTime, stripMachineBlocks } from "@/lib/format";
+import { DownloadButton } from "@/components/download-button";
+import {
+  formatBRL,
+  formatDate,
+  formatDateLong,
+  formatDateTime,
+  stripMachineBlocks,
+} from "@/lib/format";
 
-const RelatoriosPage = () => {
+/**
+ * Committee reports + past contributions. Exported by name so /investimentos
+ * can host it as a sub-tab; the default export keeps this route alive for
+ * existing deep links.
+ */
+export const RelatoriosView = () => {
   const [items, setItems] = useState<ContributionListItem[]>([]);
   const [reports, setReports] = useState<ReportListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,7 +105,7 @@ const RelatoriosPage = () => {
     <div className="space-y-10 max-w-5xl">
       <header>
         <h2
-          className="text-5xl tracking-tight leading-[1.05]"
+          className="text-4xl md:text-5xl tracking-tight leading-[1.05]"
           style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
         >
           Histórico
@@ -144,7 +156,7 @@ const RelatoriosPage = () => {
           </p>
           <Link
             href="/aporte"
-            className="inline-flex items-center gap-2 mt-5 px-5 py-2.5 rounded-md text-sm font-semibold"
+            className="inline-flex items-center gap-2 mt-5 px-5 py-2.5 min-h-11 md:min-h-0 rounded-md text-sm font-semibold"
             style={{ background: "var(--accent)", color: "white" }}
           >
             Fazer o primeiro aporte
@@ -173,10 +185,10 @@ const RelatoriosPage = () => {
                 }}
               >
                 <header
-                  className="px-6 py-4 flex items-center justify-between cursor-pointer"
+                  className="px-4 py-4 md:px-6 flex flex-col gap-3 md:gap-0 md:flex-row md:items-center md:justify-between cursor-pointer"
                   onClick={() => void handleExpand(item.id)}
                 >
-                  <div className="flex items-center gap-5">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 md:gap-5">
                     <div>
                       <p
                         className="text-xs uppercase tracking-[0.16em] font-medium"
@@ -206,11 +218,11 @@ const RelatoriosPage = () => {
                           : "Aberto"}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <Link
                       href={`/aporte/${item.id}`}
                       onClick={(e) => e.stopPropagation()}
-                      className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-md"
+                      className="flex items-center gap-1 text-xs font-medium px-3 md:px-2.5 py-1.5 min-h-11 md:min-h-0 rounded-md"
                       style={{ background: "var(--bg-secondary)", color: "var(--accent-strong)" }}
                       title="Abrir a página da análise (acompanhar ou reler)"
                     >
@@ -222,22 +234,30 @@ const RelatoriosPage = () => {
                         e.stopPropagation();
                         void handleDelete(item.id);
                       }}
-                      className="p-2 rounded-md transition-colors"
+                      className="p-2 rounded-md transition-colors flex md:block items-center justify-center min-h-11 min-w-11 md:min-h-0 md:min-w-0"
                       style={{ color: "var(--text-muted)" }}
                       title="Apagar aporte"
                     >
                       <Trash2 size={14} />
                     </button>
                     {expanded ? (
-                      <ChevronUp size={18} style={{ color: "var(--text-muted)" }} />
+                      <ChevronUp
+                        size={18}
+                        className="ml-auto md:ml-0"
+                        style={{ color: "var(--text-muted)" }}
+                      />
                     ) : (
-                      <ChevronDown size={18} style={{ color: "var(--text-muted)" }} />
+                      <ChevronDown
+                        size={18}
+                        className="ml-auto md:ml-0"
+                        style={{ color: "var(--text-muted)" }}
+                      />
                     )}
                   </div>
                 </header>
                 {expanded && (
                   <div
-                    className="px-6 py-5"
+                    className="px-4 py-5 md:px-6"
                     style={{ borderTop: "1px solid var(--border)" }}
                   >
                     {detail ? (
@@ -309,16 +329,20 @@ const AgentReports = ({ reports }: { reports: ReportListItem[] }) => {
               }}
             >
               <header
-                className="px-5 py-3.5 flex items-center justify-between cursor-pointer"
+                className="px-4 md:px-5 py-3.5 flex items-center justify-between gap-3 md:gap-0 cursor-pointer"
                 onClick={() => void toggle(r.id)}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   {weekly ? (
-                    <CalendarClock size={16} style={{ color: "var(--accent-strong)" }} />
+                    <CalendarClock
+                      size={16}
+                      className="shrink-0"
+                      style={{ color: "var(--accent-strong)" }}
+                    />
                   ) : (
-                    <Unlock size={16} style={{ color: "var(--success)" }} />
+                    <Unlock size={16} className="shrink-0" style={{ color: "var(--success)" }} />
                   )}
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                       {r.title}
                     </p>
@@ -329,15 +353,31 @@ const AgentReports = ({ reports }: { reports: ReportListItem[] }) => {
                   </div>
                 </div>
                 {open ? (
-                  <ChevronUp size={16} style={{ color: "var(--text-muted)" }} />
+                  <ChevronUp
+                    size={16}
+                    className="shrink-0"
+                    style={{ color: "var(--text-muted)" }}
+                  />
                 ) : (
-                  <ChevronDown size={16} style={{ color: "var(--text-muted)" }} />
+                  <ChevronDown
+                    size={16}
+                    className="shrink-0"
+                    style={{ color: "var(--text-muted)" }}
+                  />
                 )}
               </header>
               {open && (
-                <div className="px-5 py-4" style={{ borderTop: "1px solid var(--border)" }}>
+                <div
+                  className="px-4 md:px-5 py-4"
+                  style={{ borderTop: "1px solid var(--border)" }}
+                >
                   {full ? (
-                    <MarkdownViewer content={full.content} maxHeight={560} />
+                    <>
+                      <div className="mb-3 flex justify-end">
+                        <DownloadButton content={full.content} title={full.title} />
+                      </div>
+                      <MarkdownViewer content={full.content} maxHeight={560} />
+                    </>
                   ) : loadError ? (
                     <p className="text-xs" style={{ color: "var(--danger)" }}>
                       {loadError}
@@ -406,7 +446,7 @@ const DetailView = ({ contribution }: { contribution: Contribution }) => {
           <button
             key={p.id}
             onClick={() => setActiveKey(p.prompt_key)}
-            className="px-3 py-1.5 rounded-md text-xs font-medium"
+            className="px-3 py-1.5 min-h-11 md:min-h-0 rounded-md text-xs font-medium text-left"
             style={{
               background:
                 activeKey === p.prompt_key ? "var(--accent)" : "var(--bg-secondary)",
@@ -423,13 +463,13 @@ const DetailView = ({ contribution }: { contribution: Contribution }) => {
         <div className="space-y-4">
           <details>
             <summary
-              className="cursor-pointer text-[11px] uppercase tracking-[0.16em] font-medium"
+              className="cursor-pointer text-[11px] uppercase tracking-[0.16em] font-medium py-3 md:py-0 min-h-11 md:min-h-0"
               style={{ color: "var(--text-muted)" }}
             >
               Ver prompt enviado
             </summary>
             <pre
-              className="mt-3 p-4 rounded-md text-[12px] leading-relaxed whitespace-pre-wrap font-mono max-h-96 overflow-auto"
+              className="mt-3 p-4 rounded-md text-[12px] leading-relaxed whitespace-pre-wrap break-words font-mono max-h-96 overflow-auto"
               style={{
                 background: "var(--bg-secondary)",
                 color: "var(--text-secondary)",
@@ -448,7 +488,7 @@ const DetailView = ({ contribution }: { contribution: Contribution }) => {
             </p>
             {active.response ? (
               <div
-                className="p-4 rounded-md"
+                className="p-3 md:p-4 rounded-md min-w-0"
                 style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
               >
                 <MarkdownViewer content={active.response} maxHeight={480} />
@@ -467,22 +507,28 @@ const DetailView = ({ contribution }: { contribution: Contribution }) => {
 
       {contribution.final_summary && (
         <div
-          className="p-5 rounded-md"
+          className="p-4 md:p-5 rounded-md min-w-0"
           style={{ background: "var(--accent-light)", border: "1px solid var(--accent)" }}
         >
-          <p
-            className="text-[11px] uppercase tracking-[0.16em] font-medium mb-3"
-            style={{ color: "var(--accent-strong)" }}
-          >
-            Resumo executivo
-          </p>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <p
+              className="text-[11px] uppercase tracking-[0.16em] font-medium"
+              style={{ color: "var(--accent-strong)" }}
+            >
+              Resumo executivo
+            </p>
+            <DownloadButton
+              content={stripMachineBlocks(contribution.final_summary)}
+              title={`Aporte ${formatBRL(contribution.amount_brl)} — ${formatDate(contribution.created_at)}`}
+            />
+          </div>
           <MarkdownViewer content={stripMachineBlocks(contribution.final_summary)} withToc={false} />
         </div>
       )}
 
       <Link
         href={`/aporte/${contribution.id}`}
-        className="inline-flex items-center gap-1.5 text-xs font-medium"
+        className="inline-flex items-center gap-1.5 text-xs font-medium min-h-11 md:min-h-0"
         style={{ color: "var(--accent)" }}
       >
         Abrir a página completa da análise
@@ -492,4 +538,4 @@ const DetailView = ({ contribution }: { contribution: Contribution }) => {
   );
 };
 
-export default RelatoriosPage;
+export default RelatoriosView;

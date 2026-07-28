@@ -7,7 +7,11 @@ import { AlertTriangle, RefreshCw, Send } from "lucide-react";
 import { createContribution } from "@/lib/api";
 import { useMacro } from "@/hooks/use-macro";
 
-const AportePage = () => {
+/**
+ * New-contribution section. Exported by name so /investimentos can host it as
+ * a sub-tab; the default export keeps this route alive for existing deep links.
+ */
+export const AporteView = () => {
   const router = useRouter();
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
@@ -51,10 +55,10 @@ const AportePage = () => {
   };
 
   return (
-    <div className="max-w-3xl space-y-12">
+    <div className="max-w-3xl space-y-9 md:space-y-12">
       <header>
         <h2
-          className="text-5xl tracking-tight leading-[1.05]"
+          className="text-4xl md:text-5xl tracking-tight leading-[1.05]"
           style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
         >
           Novo aporte
@@ -71,10 +75,10 @@ const AportePage = () => {
       </header>
 
       <section
-        className="p-9 rounded-md"
+        className="p-5 md:p-9 rounded-md"
         style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
       >
-        <form onSubmit={handleSubmit} className="space-y-7">
+        <form onSubmit={handleSubmit} className="space-y-6 md:space-y-7">
           <div>
             <label
               htmlFor="amount"
@@ -92,17 +96,24 @@ const AportePage = () => {
               </span>
               <input
                 id="amount"
-                inputMode="numeric"
+                // `decimal` opens the numeric keypad with a separator on iOS;
+                // non-digits are stripped by the mask anyway.
+                inputMode="decimal"
                 autoFocus
                 value={amount}
                 onChange={(e) => handleAmountChange(e.target.value)}
                 placeholder="0,00"
-                className="w-full pl-12 pr-4 py-3.5 rounded-md text-2xl font-semibold tabular outline-none transition-colors"
+                className="w-full min-h-14 pl-12 pr-4 py-3.5 rounded-md text-2xl font-semibold tabular outline-none transition-colors"
                 style={{
                   background: "var(--bg-secondary)",
                   border: "1px solid var(--border)",
                   color: "var(--text-primary)",
                   fontFamily: "var(--font-body)",
+                  // The unlayered `input { font-size }` floor in globals.css
+                  // outranks any utility class, so the hero field states its
+                  // size inline to keep the 24px hierarchy on phones too —
+                  // still well clear of the 16px iOS zoom threshold.
+                  fontSize: "1.5rem",
                 }}
               />
             </div>
@@ -121,7 +132,8 @@ const AportePage = () => {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="ex: aporte de bonus, foco em RF curto"
-              className="w-full px-4 py-3 rounded-md text-sm outline-none transition-colors"
+              // 16px on phones keeps iOS from zooming the viewport on focus.
+              className="w-full min-h-12 md:min-h-0 px-4 py-3 rounded-md text-base md:text-sm outline-none transition-colors"
               style={{
                 background: "var(--bg-secondary)",
                 border: "1px solid var(--border)",
@@ -144,11 +156,12 @@ const AportePage = () => {
             )}
           </AnimatePresence>
 
-          <div className="flex items-center gap-3 pt-1">
+          {/* Full-width submit on phones: bottom of the card, inside thumb reach. */}
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 pt-1">
             <button
               type="submit"
               disabled={submitting || !amount}
-              className="flex items-center gap-2.5 px-6 py-3 rounded-md text-sm font-semibold transition-opacity disabled:opacity-40"
+              className="flex items-center justify-center md:justify-start gap-2.5 w-full md:w-auto min-h-12 md:min-h-0 px-6 py-3 rounded-md text-sm font-semibold transition-opacity disabled:opacity-40"
               style={{ background: "var(--accent)", color: "white" }}
             >
               <Send size={15} />
@@ -174,7 +187,7 @@ const MacroPreview = ({
 }) => {
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h3
             className="text-xl tracking-tight"
@@ -190,7 +203,7 @@ const MacroPreview = ({
           type="button"
           onClick={onRefresh}
           disabled={loading}
-          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-colors"
+          className="flex items-center justify-center gap-1.5 self-start md:self-auto text-xs font-medium min-h-11 px-4 md:min-h-0 md:px-3 md:py-1.5 rounded-md transition-colors"
           style={{ color: "var(--text-secondary)", background: "var(--bg-secondary)" }}
         >
           <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
@@ -258,7 +271,7 @@ const MacroCard = ({
 
   return (
     <div
-      className="p-4 rounded-md"
+      className="p-3.5 md:p-4 rounded-md"
       style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
     >
       <p
@@ -268,7 +281,7 @@ const MacroCard = ({
         {label}
       </p>
       <p
-        className="text-lg font-semibold tabular mt-1.5"
+        className="text-base md:text-lg font-semibold tabular mt-1.5"
         style={{ color: value === null ? "var(--text-muted)" : "var(--text-primary)" }}
       >
         {formatted}
@@ -277,4 +290,4 @@ const MacroCard = ({
   );
 };
 
-export default AportePage;
+export default AporteView;

@@ -87,7 +87,39 @@ type SortField =
 
 type SortDirection = "asc" | "desc";
 
-const AtivosPage = () => {
+/** Phone-only sort picker — same fields the desktop table header exposes. */
+const SORT_OPTIONS: { value: SortField; label: string }[] = [
+  { value: "total_value", label: "Valor" },
+  { value: "ticker", label: "Ativo" },
+  { value: "asset_class", label: "Classe" },
+  { value: "lock", label: "Trava" },
+  { value: "quantity", label: "Quantidade" },
+  { value: "avg_price", label: "Preço médio" },
+  { value: "current_price", label: "Preço atual" },
+  { value: "pnl", label: "P&L" },
+];
+
+const realizedPnlColor = (trade: Trade): string =>
+  trade.realized_pnl_brl === null
+    ? "var(--text-muted)"
+    : trade.realized_pnl_brl >= 0
+      ? "var(--success)"
+      : "var(--danger)";
+
+const realizedPnlLabel = (trade: Trade): string =>
+  trade.realized_pnl_brl === null
+    ? "—"
+    : `${trade.realized_pnl_brl >= 0 ? "+" : ""}${formatBRL(trade.realized_pnl_brl)}${
+        trade.realized_pnl_pct !== null
+          ? ` (${trade.realized_pnl_pct >= 0 ? "+" : ""}${trade.realized_pnl_pct.toFixed(2)}%)`
+          : ""
+      }`;
+
+/**
+ * Portfolio section. Exported by name so /investimentos can host it as a
+ * sub-tab; the default export keeps this route alive for existing deep links.
+ */
+export const AtivosView = () => {
   const { data, loading, refresh } = usePortfolio();
   const [showBuyForm, setShowBuyForm] = useState(false);
   const [editing, setEditing] = useState<Asset | null>(null);
@@ -298,11 +330,11 @@ const AtivosPage = () => {
   const sellLock = sellTarget ? lockInfoFor(sellTarget) : null;
 
   return (
-    <div className="space-y-10 max-w-6xl">
-      <div className="flex items-end justify-between">
+    <div className="space-y-8 md:space-y-10 max-w-6xl">
+      <div className="flex flex-col max-md:gap-5 md:flex-row md:items-end md:justify-between">
         <div>
           <h2
-            className="text-5xl tracking-tight leading-[1.05]"
+            className="text-4xl md:text-5xl tracking-tight leading-[1.05]"
             style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
           >
             Carteira
@@ -320,7 +352,7 @@ const AtivosPage = () => {
           <button
             onClick={() => void handleRefreshPrices()}
             disabled={refreshing || loading}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium disabled:opacity-40"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium disabled:opacity-40 max-md:min-h-11 max-md:flex-1 max-md:justify-center"
             style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)" }}
           >
             <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
@@ -328,7 +360,7 @@ const AtivosPage = () => {
           </button>
           <button
             onClick={() => setShowBuyForm((v) => !v)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold max-md:min-h-11 max-md:flex-1 max-md:justify-center"
             style={{ background: "var(--accent)", color: "white" }}
           >
             {showBuyForm ? <ChevronUp size={14} /> : <Plus size={14} />}
@@ -362,10 +394,10 @@ const AtivosPage = () => {
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="p-5 rounded-md flex items-center justify-between"
+            className="p-5 rounded-md flex items-center justify-between max-md:flex-col max-md:items-start max-md:gap-4"
             style={{ background: "var(--bg-card)", border: "1px solid var(--accent)" }}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <DollarSign size={18} style={{ color: "var(--accent)" }} />
               <div>
                 <p
@@ -382,7 +414,7 @@ const AtivosPage = () => {
             </div>
             <button
               onClick={() => setLastSale(null)}
-              className="text-xs px-3 py-1.5 rounded-md font-medium"
+              className="text-xs px-3 py-1.5 rounded-md font-medium max-md:min-h-11 max-md:px-4"
               style={{ background: "var(--bg-secondary)", color: "var(--text-muted)" }}
             >
               Dispensar
@@ -399,7 +431,7 @@ const AtivosPage = () => {
             className="overflow-hidden"
           >
             <div
-              className="p-7 rounded-md"
+              className="p-7 rounded-md max-md:p-5"
               style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
             >
               <h3
@@ -445,7 +477,7 @@ const AtivosPage = () => {
                         asset_class: e.target.value as AssetClass,
                       })
                     }
-                    className="w-full px-4 py-2.5 rounded-md text-sm outline-none"
+                    className="w-full px-4 py-2.5 rounded-md text-sm outline-none max-md:text-base max-md:min-h-11"
                     style={{
                       background: "var(--bg-secondary)",
                       border: "1px solid var(--border)",
@@ -503,7 +535,7 @@ const AtivosPage = () => {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold disabled:opacity-40"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold disabled:opacity-40 max-md:min-h-11 max-md:flex-1 max-md:justify-center"
                     style={{ background: "var(--success)", color: "white" }}
                   >
                     <Plus size={13} />
@@ -512,7 +544,7 @@ const AtivosPage = () => {
                   <button
                     type="button"
                     onClick={() => setShowBuyForm(false)}
-                    className="px-5 py-2.5 rounded-md text-sm font-medium"
+                    className="px-5 py-2.5 rounded-md text-sm font-medium max-md:min-h-11 max-md:flex-1"
                     style={{
                       background: "var(--bg-secondary)",
                       color: "var(--text-secondary)",
@@ -527,12 +559,12 @@ const AtivosPage = () => {
         )}
       </AnimatePresence>
 
-      <div className="flex gap-1">
+      <div className="flex gap-1 max-md:flex-wrap max-md:gap-1.5">
         {FILTER_TABS.map((tab) => (
           <button
             key={tab.value}
             onClick={() => setFilter(tab.value)}
-            className="px-4 py-1.5 rounded-md text-sm font-medium transition-colors"
+            className="px-4 py-1.5 rounded-md text-sm font-medium transition-colors max-md:min-h-11"
             style={{
               background:
                 filter === tab.value ? "var(--accent)" : "var(--bg-secondary)",
@@ -573,176 +605,322 @@ const AtivosPage = () => {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr
-                  className="text-left text-[10px] uppercase tracking-[0.16em]"
-                  style={{
-                    color: "var(--text-muted)",
-                    borderBottom: "1px solid var(--border)",
-                  }}
-                >
-                  <SortHeader label="Ativo" field="ticker" current={sortField} dir={sortDir} onSort={handleSort} />
-                  <SortHeader label="Classe" field="asset_class" current={sortField} dir={sortDir} onSort={handleSort} />
-                  <SortHeader label="Trava" field="lock" current={sortField} dir={sortDir} onSort={handleSort} />
-                  <SortHeader label="Qtd" field="quantity" current={sortField} dir={sortDir} onSort={handleSort} align="right" />
-                  <SortHeader label="PM" field="avg_price" current={sortField} dir={sortDir} onSort={handleSort} align="right" />
-                  <SortHeader label="Atual" field="current_price" current={sortField} dir={sortDir} onSort={handleSort} align="right" />
-                  <SortHeader label="P&L" field="pnl" current={sortField} dir={sortDir} onSort={handleSort} align="right" />
-                  <SortHeader label="Valor" field="total_value" current={sortField} dir={sortDir} onSort={handleSort} align="right" />
-                  <th className="px-4 pb-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((asset) => {
-                  const current = asset.current_price ?? asset.avg_price;
-                  const total = asset.quantity * current;
-                  const pnl =
-                    asset.avg_price > 0
-                      ? ((current - asset.avg_price) / asset.avg_price) * 100
-                      : 0;
-                  const lock = lockInfoFor(asset);
-                  const locked = lock.kind === "locked";
+          <>
+            {/* Phone: the sortable header row is gone, so sorting moves into a
+                dedicated control that reuses the very same handler. */}
+            <div
+              className="flex items-center gap-2 px-4 py-3 md:hidden"
+              style={{ borderBottom: "1px solid var(--border)" }}
+            >
+              <label
+                htmlFor="sort-field"
+                className="text-[10px] uppercase tracking-[0.16em] shrink-0"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Ordenar
+              </label>
+              <select
+                id="sort-field"
+                value={sortField}
+                onChange={(e) => handleSort(e.target.value as SortField)}
+                className="flex-1 min-w-0 min-h-11 px-3 rounded-md text-base outline-none"
+                style={{
+                  background: "var(--bg-secondary)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => handleSort(sortField)}
+                aria-label={
+                  sortDir === "asc"
+                    ? "Ordenar do maior para o menor"
+                    : "Ordenar do menor para o maior"
+                }
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-md"
+                style={{
+                  background: "var(--bg-secondary)",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                {sortDir === "asc" ? (
+                  <ChevronUp size={16} />
+                ) : (
+                  <ChevronDown size={16} />
+                )}
+              </button>
+            </div>
 
-                  return (
-                    <tr
-                      key={asset.id}
-                      className="group transition-colors"
-                      style={{ borderBottom: "1px solid var(--border)" }}
-                    >
-                      <td className="px-4 py-3.5">
-                        <span
-                          className="font-semibold"
+            <ul className="md:hidden">
+              {rows.map((asset) => {
+                const current = asset.current_price ?? asset.avg_price;
+                const total = asset.quantity * current;
+                const pnl =
+                  asset.avg_price > 0
+                    ? ((current - asset.avg_price) / asset.avg_price) * 100
+                    : 0;
+                const lock = lockInfoFor(asset);
+                const locked = lock.kind === "locked";
+                const pnlColor =
+                  pnl > 0
+                    ? "var(--success)"
+                    : pnl < 0
+                      ? "var(--danger)"
+                      : "var(--text-secondary)";
+
+                return (
+                  <li
+                    key={asset.id}
+                    className="px-4 py-4"
+                    style={{ borderBottom: "1px solid var(--border)" }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p
+                          className="text-[15px] font-semibold truncate"
                           style={{ color: "var(--text-primary)" }}
                           title={asset.thesis ?? undefined}
                         >
                           {asset.ticker}
-                        </span>
+                        </p>
                         {asset.name && (
-                          <span
-                            className="block text-xs mt-0.5"
+                          <p
+                            className="text-xs mt-0.5 truncate"
                             style={{ color: "var(--text-muted)" }}
                           >
                             {asset.name}
-                          </span>
+                          </p>
                         )}
-                        {(asset.target_price !== null || asset.stop_price !== null) && (
-                          <span
-                            className="block text-[11px] mt-0.5 tabular"
-                            style={{ color: "var(--text-muted)" }}
-                          >
-                            {asset.target_price !== null && (
-                              <>
-                                alvo{" "}
-                                <span style={{ color: "var(--success)" }}>
-                                  {formatBRL(asset.target_price)}
-                                </span>
-                              </>
-                            )}
-                            {asset.target_price !== null && asset.stop_price !== null && " · "}
-                            {asset.stop_price !== null && (
-                              <>
-                                stop{" "}
-                                <span style={{ color: "var(--danger)" }}>
-                                  {formatBRL(asset.stop_price)}
-                                </span>
-                              </>
-                            )}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <span
-                          className="text-xs px-2 py-0.5 rounded font-medium"
-                          style={{
-                            background: "var(--bg-secondary)",
-                            color: "var(--text-secondary)",
-                          }}
-                        >
-                          {CLASS_LABELS[asset.asset_class]}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <LockBadge lock={lock} entryDate={asset.entry_date} />
-                      </td>
-                      <td className="px-4 py-3.5 text-right tabular">
-                        {formatNumber(asset.quantity)}
-                      </td>
-                      <td className="px-4 py-3.5 text-right tabular">
-                        {formatBRL(asset.avg_price)}
-                      </td>
-                      <td className="px-4 py-3.5 text-right tabular">
-                        {formatBRL(current)}
-                      </td>
-                      <td
-                        className="px-4 py-3.5 text-right tabular font-medium"
-                        style={{
-                          color:
-                            pnl > 0
-                              ? "var(--success)"
-                              : pnl < 0
-                                ? "var(--danger)"
-                                : "var(--text-secondary)",
-                        }}
-                      >
-                        {pnl > 0 ? "+" : ""}
-                        {pnl.toFixed(2)}%
-                      </td>
-                      <td
-                        className="px-4 py-3.5 text-right tabular font-semibold"
+                      </div>
+                      <p
+                        className="tabular text-[15px] font-semibold shrink-0"
                         style={{ color: "var(--text-primary)" }}
                       >
                         {formatBRL(total)}
-                      </td>
-                      <td className="px-4 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => setEditing(asset)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium"
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                      <span
+                        className="text-xs px-2 py-0.5 rounded font-medium"
+                        style={{
+                          background: "var(--bg-secondary)",
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        {CLASS_LABELS[asset.asset_class]}
+                      </span>
+                      <LockBadge lock={lock} entryDate={asset.entry_date} />
+                    </div>
+
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 mt-3.5">
+                      <CardStat label="Qtd" value={formatNumber(asset.quantity)} />
+                      <CardStat label="PM" value={formatBRL(asset.avg_price)} />
+                      <CardStat label="Atual" value={formatBRL(current)} />
+                      <CardStat
+                        label="P&L"
+                        value={`${pnl > 0 ? "+" : ""}${pnl.toFixed(2)}%`}
+                        color={pnlColor}
+                      />
+                    </dl>
+
+                    <TargetStopLine asset={asset} className="text-[11px] mt-3" />
+
+                    <div className="flex gap-2 mt-4">
+                      <button
+                        onClick={() => setEditing(asset)}
+                        className="flex flex-1 min-h-11 items-center justify-center gap-1.5 rounded-md text-xs font-medium"
+                        style={{
+                          background: "var(--bg-secondary)",
+                          color: "var(--text-secondary)",
+                        }}
+                      >
+                        <Pencil size={12} />
+                        Preço
+                      </button>
+                      <button
+                        onClick={() => setSellTarget(asset)}
+                        disabled={locked}
+                        className="flex flex-1 min-h-11 items-center justify-center gap-1.5 rounded-md text-xs font-medium disabled:opacity-45"
+                        style={{
+                          background: "var(--danger-light)",
+                          color: "var(--danger)",
+                        }}
+                      >
+                        {locked ? <Lock size={12} /> : <Minus size={12} />}
+                        Vender
+                      </button>
+                      <button
+                        onClick={() => handleDelete(asset)}
+                        className="flex flex-1 min-h-11 items-center justify-center rounded-md text-xs font-medium"
+                        style={{
+                          background: "var(--bg-secondary)",
+                          color: "var(--text-muted)",
+                        }}
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr
+                    className="text-left text-[10px] uppercase tracking-[0.16em]"
+                    style={{
+                      color: "var(--text-muted)",
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    <SortHeader label="Ativo" field="ticker" current={sortField} dir={sortDir} onSort={handleSort} />
+                    <SortHeader label="Classe" field="asset_class" current={sortField} dir={sortDir} onSort={handleSort} />
+                    <SortHeader label="Trava" field="lock" current={sortField} dir={sortDir} onSort={handleSort} />
+                    <SortHeader label="Qtd" field="quantity" current={sortField} dir={sortDir} onSort={handleSort} align="right" />
+                    <SortHeader label="PM" field="avg_price" current={sortField} dir={sortDir} onSort={handleSort} align="right" />
+                    <SortHeader label="Atual" field="current_price" current={sortField} dir={sortDir} onSort={handleSort} align="right" />
+                    <SortHeader label="P&L" field="pnl" current={sortField} dir={sortDir} onSort={handleSort} align="right" />
+                    <SortHeader label="Valor" field="total_value" current={sortField} dir={sortDir} onSort={handleSort} align="right" />
+                    <th className="px-4 pb-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((asset) => {
+                    const current = asset.current_price ?? asset.avg_price;
+                    const total = asset.quantity * current;
+                    const pnl =
+                      asset.avg_price > 0
+                        ? ((current - asset.avg_price) / asset.avg_price) * 100
+                        : 0;
+                    const lock = lockInfoFor(asset);
+                    const locked = lock.kind === "locked";
+
+                    return (
+                      <tr
+                        key={asset.id}
+                        className="group transition-colors"
+                        style={{ borderBottom: "1px solid var(--border)" }}
+                      >
+                        <td className="px-4 py-3.5">
+                          <span
+                            className="font-semibold"
+                            style={{ color: "var(--text-primary)" }}
+                            title={asset.thesis ?? undefined}
+                          >
+                            {asset.ticker}
+                          </span>
+                          {asset.name && (
+                            <span
+                              className="block text-xs mt-0.5"
+                              style={{ color: "var(--text-muted)" }}
+                            >
+                              {asset.name}
+                            </span>
+                          )}
+                          <TargetStopLine asset={asset} className="text-[11px] mt-0.5" />
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span
+                            className="text-xs px-2 py-0.5 rounded font-medium"
                             style={{
                               background: "var(--bg-secondary)",
                               color: "var(--text-secondary)",
                             }}
                           >
-                            <Pencil size={11} />
-                            Preço
-                          </button>
-                          <button
-                            onClick={() => setSellTarget(asset)}
-                            disabled={locked}
-                            title={
-                              lock.kind === "locked"
-                                ? `Trava de ${MIN_HOLDING_DAYS} dias por lote — libera em ${lock.remainingDays}d (${lock.unlockDate.toLocaleDateString("pt-BR")})`
-                                : undefined
-                            }
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium disabled:opacity-45"
-                            style={{
-                              background: "var(--danger-light)",
-                              color: "var(--danger)",
-                            }}
-                          >
-                            {locked ? <Lock size={11} /> : <Minus size={11} />}
-                            Vender
-                          </button>
-                          <button
-                            onClick={() => handleDelete(asset)}
-                            className="text-xs px-2.5 py-1.5 rounded-md font-medium"
-                            style={{
-                              background: "var(--bg-secondary)",
-                              color: "var(--text-muted)",
-                            }}
-                          >
-                            Remover
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                            {CLASS_LABELS[asset.asset_class]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <LockBadge lock={lock} entryDate={asset.entry_date} />
+                        </td>
+                        <td className="px-4 py-3.5 text-right tabular">
+                          {formatNumber(asset.quantity)}
+                        </td>
+                        <td className="px-4 py-3.5 text-right tabular">
+                          {formatBRL(asset.avg_price)}
+                        </td>
+                        <td className="px-4 py-3.5 text-right tabular">
+                          {formatBRL(current)}
+                        </td>
+                        <td
+                          className="px-4 py-3.5 text-right tabular font-medium"
+                          style={{
+                            color:
+                              pnl > 0
+                                ? "var(--success)"
+                                : pnl < 0
+                                  ? "var(--danger)"
+                                  : "var(--text-secondary)",
+                          }}
+                        >
+                          {pnl > 0 ? "+" : ""}
+                          {pnl.toFixed(2)}%
+                        </td>
+                        <td
+                          className="px-4 py-3.5 text-right tabular font-semibold"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          {formatBRL(total)}
+                        </td>
+                        <td className="px-4 py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => setEditing(asset)}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium"
+                              style={{
+                                background: "var(--bg-secondary)",
+                                color: "var(--text-secondary)",
+                              }}
+                            >
+                              <Pencil size={11} />
+                              Preço
+                            </button>
+                            <button
+                              onClick={() => setSellTarget(asset)}
+                              disabled={locked}
+                              title={
+                                lock.kind === "locked"
+                                  ? `Trava de ${MIN_HOLDING_DAYS} dias por lote — libera em ${lock.remainingDays}d (${lock.unlockDate.toLocaleDateString("pt-BR")})`
+                                  : undefined
+                              }
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium disabled:opacity-45"
+                              style={{
+                                background: "var(--danger-light)",
+                                color: "var(--danger)",
+                              }}
+                            >
+                              {locked ? <Lock size={11} /> : <Minus size={11} />}
+                              Vender
+                            </button>
+                            <button
+                              onClick={() => handleDelete(asset)}
+                              className="text-xs px-2.5 py-1.5 rounded-md font-medium"
+                              style={{
+                                background: "var(--bg-secondary)",
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -751,7 +929,7 @@ const AtivosPage = () => {
       <dialog
         ref={sellDialog}
         onClose={() => setSellTarget(null)}
-        className="p-7 rounded-md max-w-md w-full backdrop:bg-black/40"
+        className="p-7 rounded-md max-w-md w-full backdrop:bg-black/40 max-md:p-5 max-md:max-h-[85dvh] max-md:overflow-y-auto"
         style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
       >
         {sellTarget && (
@@ -793,11 +971,11 @@ const AtivosPage = () => {
                 />
               </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 max-md:flex-col">
               <button
                 onClick={handleSell}
                 disabled={submitting}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold disabled:opacity-40"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold disabled:opacity-40 max-md:min-h-11 max-md:w-full max-md:justify-center"
                 style={{ background: "var(--danger)", color: "white" }}
               >
                 <Minus size={13} />
@@ -805,7 +983,7 @@ const AtivosPage = () => {
               </button>
               <button
                 onClick={() => setSellTarget(null)}
-                className="px-5 py-2.5 rounded-md text-sm font-medium"
+                className="px-5 py-2.5 rounded-md text-sm font-medium max-md:min-h-11 max-md:w-full"
                 style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)" }}
               >
                 Cancelar
@@ -818,7 +996,7 @@ const AtivosPage = () => {
       <dialog
         ref={editDialog}
         onClose={() => setEditing(null)}
-        className="p-7 rounded-md max-w-md w-full backdrop:bg-black/40"
+        className="p-7 rounded-md max-w-md w-full backdrop:bg-black/40 max-md:p-5 max-md:max-h-[85dvh] max-md:overflow-y-auto"
         style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
       >
         {editing && (
@@ -836,11 +1014,11 @@ const AtivosPage = () => {
               value={editPrice}
               onChange={setEditPrice}
             />
-            <div className="flex gap-3 mt-5">
+            <div className="flex gap-3 mt-5 max-md:flex-col">
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-5 py-2.5 rounded-md text-sm font-semibold disabled:opacity-40"
+                className="px-5 py-2.5 rounded-md text-sm font-semibold disabled:opacity-40 max-md:min-h-11 max-md:w-full"
                 style={{ background: "var(--accent)", color: "white" }}
               >
                 {submitting ? "Salvando..." : "Salvar preço"}
@@ -848,7 +1026,7 @@ const AtivosPage = () => {
               <button
                 type="button"
                 onClick={() => setEditing(null)}
-                className="px-5 py-2.5 rounded-md text-sm font-medium"
+                className="px-5 py-2.5 rounded-md text-sm font-medium max-md:min-h-11 max-md:w-full"
                 style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)" }}
               >
                 Cancelar
@@ -858,6 +1036,66 @@ const AtivosPage = () => {
         )}
       </dialog>
     </div>
+  );
+};
+
+/** Label-over-value pair used by the phone card lists that replace the tables. */
+const CardStat = ({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+}) => (
+  <div className="min-w-0">
+    <dt
+      className="text-[10px] uppercase tracking-[0.14em]"
+      style={{ color: "var(--text-muted)" }}
+    >
+      {label}
+    </dt>
+    <dd
+      className="tabular text-sm font-medium mt-0.5 truncate"
+      style={{ color: color ?? "var(--text-primary)" }}
+    >
+      {value}
+    </dd>
+  </div>
+);
+
+const TargetStopLine = ({
+  asset,
+  className,
+}: {
+  asset: Asset;
+  className: string;
+}) => {
+  if (asset.target_price === null && asset.stop_price === null) return null;
+  return (
+    <span
+      className={`block tabular ${className}`}
+      style={{ color: "var(--text-muted)" }}
+    >
+      {asset.target_price !== null && (
+        <>
+          alvo{" "}
+          <span style={{ color: "var(--success)" }}>
+            {formatBRL(asset.target_price)}
+          </span>
+        </>
+      )}
+      {asset.target_price !== null && asset.stop_price !== null && " · "}
+      {asset.stop_price !== null && (
+        <>
+          stop{" "}
+          <span style={{ color: "var(--danger)" }}>
+            {formatBRL(asset.stop_price)}
+          </span>
+        </>
+      )}
+    </span>
   );
 };
 
@@ -927,7 +1165,83 @@ const TradesSection = ({ trades }: { trades: Trade[] }) => (
         className="rounded-md overflow-hidden"
         style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
       >
-        <div className="overflow-x-auto">
+        <ul className="md:hidden">
+          {trades.map((trade) => {
+            const isBuy = trade.side === "buy";
+            return (
+              <li
+                key={trade.id}
+                className="px-4 py-3.5"
+                style={{ borderBottom: "1px solid var(--border)" }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="font-semibold truncate"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {trade.ticker}
+                      </span>
+                      <span
+                        className="text-[11px] px-1.5 py-0.5 rounded shrink-0"
+                        style={{
+                          background: "var(--bg-secondary)",
+                          color: "var(--text-muted)",
+                        }}
+                      >
+                        {CLASS_LABELS[trade.asset_class]}
+                      </span>
+                    </div>
+                    <p
+                      className="tabular text-[11px] mt-1"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {formatDateTime(trade.executed_at)}
+                    </p>
+                  </div>
+                  <span
+                    className="text-[11px] font-semibold px-2 py-0.5 rounded shrink-0"
+                    style={{
+                      background: isBuy ? "var(--success-light)" : "var(--danger-light)",
+                      color: isBuy ? "var(--success)" : "var(--danger)",
+                    }}
+                  >
+                    {isBuy ? "Compra" : "Venda"}
+                  </span>
+                </div>
+
+                <dl className="grid grid-cols-3 gap-x-3 gap-y-2 mt-3">
+                  <CardStat label="Qtd" value={formatNumber(trade.quantity)} />
+                  <CardStat label="Preço" value={formatBRL(trade.price)} />
+                  <CardStat label="Total" value={formatBRL(trade.total_brl)} />
+                </dl>
+
+                {trade.realized_pnl_brl !== null && (
+                  <div
+                    className="flex items-baseline justify-between gap-3 mt-3 pt-3"
+                    style={{ borderTop: "1px solid var(--border)" }}
+                  >
+                    <span
+                      className="text-[10px] uppercase tracking-[0.14em]"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      P&amp;L realizado
+                    </span>
+                    <span
+                      className="tabular text-sm font-medium text-right"
+                      style={{ color: realizedPnlColor(trade) }}
+                    >
+                      {realizedPnlLabel(trade)}
+                    </span>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr
@@ -949,12 +1263,7 @@ const TradesSection = ({ trades }: { trades: Trade[] }) => (
             <tbody>
               {trades.map((trade) => {
                 const isBuy = trade.side === "buy";
-                const pnlColor =
-                  trade.realized_pnl_brl === null
-                    ? "var(--text-muted)"
-                    : trade.realized_pnl_brl >= 0
-                      ? "var(--success)"
-                      : "var(--danger)";
+                const pnlColor = realizedPnlColor(trade);
                 return (
                   <tr
                     key={trade.id}
@@ -995,13 +1304,7 @@ const TradesSection = ({ trades }: { trades: Trade[] }) => (
                       {formatBRL(trade.total_brl)}
                     </td>
                     <td className="px-4 py-3 text-right tabular font-medium" style={{ color: pnlColor }}>
-                      {trade.realized_pnl_brl === null
-                        ? "—"
-                        : `${trade.realized_pnl_brl >= 0 ? "+" : ""}${formatBRL(trade.realized_pnl_brl)}${
-                            trade.realized_pnl_pct !== null
-                              ? ` (${trade.realized_pnl_pct >= 0 ? "+" : ""}${trade.realized_pnl_pct.toFixed(2)}%)`
-                              : ""
-                          }`}
+                      {realizedPnlLabel(trade)}
                     </td>
                   </tr>
                 );
@@ -1106,7 +1409,8 @@ const InputField = ({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       step={type === "number" ? "any" : undefined}
-      className="w-full px-4 py-2.5 rounded-md text-sm outline-none"
+      /* text-base below md: anything under 16px makes iOS zoom on focus. */
+      className="w-full px-4 py-2.5 rounded-md text-sm outline-none max-md:text-base max-md:min-h-11"
       style={{
         background: "var(--bg-secondary)",
         border: "1px solid var(--border)",
@@ -1116,4 +1420,4 @@ const InputField = ({
   </div>
 );
 
-export default AtivosPage;
+export default AtivosView;

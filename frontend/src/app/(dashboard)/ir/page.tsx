@@ -25,7 +25,11 @@ const formatMonth = (month: string): string => {
   return label.charAt(0).toUpperCase() + label.slice(1);
 };
 
-const IrPage = () => {
+/**
+ * Tax section. Exported by name so /investimentos can host it as a sub-tab;
+ * the default export keeps this route alive for existing deep links.
+ */
+export const IrView = () => {
   const currentYear = new Date().getFullYear();
   const years = Array.from(
     { length: currentYear - FIRST_SUPPORTED_YEAR + 1 },
@@ -71,10 +75,10 @@ const IrPage = () => {
 
   return (
     <div className="space-y-10 max-w-5xl">
-      <header className="flex items-end justify-between gap-6">
+      <header className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between md:gap-6">
         <div>
           <h2
-            className="text-5xl tracking-tight leading-[1.05]"
+            className="text-4xl md:text-5xl tracking-tight leading-[1.05]"
             style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
           >
             Imposto de renda
@@ -84,13 +88,14 @@ const IrPage = () => {
             crypto, mais as posições de 31/12 para bens e direitos.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
           <CalendarRange size={15} style={{ color: "var(--text-muted)" }} />
+          {/* text-base below md: iOS zooms the viewport on inputs under 16px. */}
           <select
             aria-label="Ano-calendário"
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
-            className="px-4 py-2.5 rounded-md text-sm font-semibold outline-none tabular"
+            className="flex-1 md:flex-none min-h-11 md:min-h-0 px-4 py-2.5 rounded-md text-base md:text-sm font-semibold outline-none tabular"
             style={{
               background: "var(--bg-card)",
               border: "1px solid var(--border)",
@@ -191,7 +196,29 @@ const IrPage = () => {
                 className="rounded-md overflow-hidden"
                 style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
               >
-                <div className="overflow-x-auto">
+                {/* Phone: one stacked block per month — five columns are
+                    unreadable at 390px. */}
+                <div className="md:hidden">
+                  {report.months.map((m, idx) => (
+                    <div
+                      key={m.month}
+                      className="px-4 py-4 space-y-4"
+                      style={
+                        idx > 0 ? { borderTop: "1px solid var(--border)" } : undefined
+                      }
+                    >
+                      <p
+                        className="text-sm font-semibold"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {formatMonth(m.month)}
+                      </p>
+                      <MonthClassBlock label="Vendas ações" cls={m.stocks} />
+                      <MonthClassBlock label="Vendas crypto" cls={m.crypto} />
+                    </div>
+                  ))}
+                </div>
+                <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr
@@ -256,7 +283,52 @@ const IrPage = () => {
                 className="rounded-md overflow-hidden"
                 style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
               >
-                <div className="overflow-x-auto">
+                {/* Phone: stacked block per lançamento. */}
+                <div className="md:hidden">
+                  {fixedIncomeRows.map((row, idx) => (
+                    <div
+                      key={`m-${row.month}-${row.ticker}-${idx}`}
+                      className="px-4 py-4"
+                      style={
+                        idx > 0 ? { borderTop: "1px solid var(--border)" } : undefined
+                      }
+                    >
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p
+                          className="text-sm font-semibold min-w-0 break-words"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          {row.ticker}
+                        </p>
+                        <p
+                          className="text-xs shrink-0"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          {formatMonth(row.month)}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-3 mt-3">
+                        <StackedField
+                          label="Rendimento"
+                          value={formatBRL(row.income_brl)}
+                        />
+                        <StackedField
+                          label="Dias"
+                          value={row.days_held !== null ? String(row.days_held) : "—"}
+                        />
+                        <StackedField
+                          label="Alíquota retida"
+                          value={
+                            row.withheld_rate_pct !== null
+                              ? `${row.withheld_rate_pct.toFixed(1)}%`
+                              : "—"
+                          }
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr
@@ -323,7 +395,49 @@ const IrPage = () => {
                 className="rounded-md overflow-hidden"
                 style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
               >
-                <div className="overflow-x-auto">
+                {/* Phone: stacked block per posição. */}
+                <div className="md:hidden">
+                  {report.year_end_positions.map((pos, idx) => (
+                    <div
+                      key={`m-${pos.ticker}-${idx}`}
+                      className="px-4 py-4"
+                      style={
+                        idx > 0 ? { borderTop: "1px solid var(--border)" } : undefined
+                      }
+                    >
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p
+                          className="text-sm font-semibold min-w-0 break-words"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          {pos.ticker}
+                        </p>
+                        <span
+                          className="text-xs px-2 py-0.5 rounded font-medium"
+                          style={{
+                            background: "var(--bg-secondary)",
+                            color: "var(--text-secondary)",
+                          }}
+                        >
+                          {CLASS_LABELS[pos.asset_class]}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-3 mt-3">
+                        <StackedField
+                          label="Quantidade"
+                          value={pos.quantity.toLocaleString("pt-BR", {
+                            maximumFractionDigits: 8,
+                          })}
+                        />
+                        <StackedField
+                          label="Custo de aquisição"
+                          value={formatBRL(pos.cost_basis_brl)}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr
@@ -435,6 +549,37 @@ const StatCard = ({
   </div>
 );
 
+/** Label above value — the phone replacement for a table cell. */
+const StackedField = ({ label, value }: { label: string; value: string }) => (
+  <div className="min-w-0">
+    <p
+      className="text-[10px] uppercase tracking-[0.16em] font-medium"
+      style={{ color: "var(--text-muted)" }}
+    >
+      {label}
+    </p>
+    <p
+      className="text-sm mt-1 tabular break-words"
+      style={{ color: "var(--text-primary)" }}
+    >
+      {value}
+    </p>
+  </div>
+);
+
+/** Phone view of one month × one asset class: sales figure plus the status. */
+const MonthClassBlock = ({ label, cls }: { label: string; cls: TaxMonthClass }) => (
+  <div>
+    <StackedField
+      label={label}
+      value={cls.sales_brl > 0 ? formatBRL(cls.sales_brl) : "—"}
+    />
+    <div className="mt-2">
+      <TaxStatus cls={cls} />
+    </div>
+  </div>
+);
+
 const TaxStatus = ({ cls }: { cls: TaxMonthClass }) => {
   if (cls.sales_brl <= 0) {
     return (
@@ -512,4 +657,4 @@ const Badge = ({
   </span>
 );
 
-export default IrPage;
+export default IrView;

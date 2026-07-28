@@ -501,3 +501,146 @@ export const listReports = async (kind?: ReportKind): Promise<ReportListItem[]> 
 
 export const fetchReport = async (id: string): Promise<ReportRead> =>
   json<ReportRead>(await fetch(`${API_BASE}/api/reports/${id}`));
+
+// ── Personal cashflow (day-to-day expenses and income) ────────────────────
+
+export type CashflowKind = "expense" | "income";
+export type CashflowSource = "chat" | "bot" | "api";
+
+export type CashflowEntry = {
+  id: string;
+  kind: CashflowKind;
+  amount_brl: number;
+  category: string;
+  description: string | null;
+  occurred_on: string;
+  source: CashflowSource;
+  created_at: string;
+};
+
+export type CashflowCreate = {
+  kind: CashflowKind;
+  amount_brl: number;
+  category?: string;
+  description?: string | null;
+  occurred_on?: string;
+};
+
+export type CategoryTotal = {
+  kind: CashflowKind;
+  category: string;
+  total_brl: number;
+  count: number;
+};
+
+export type CashflowSummary = {
+  month: string;
+  income_brl: number;
+  expense_brl: number;
+  net_brl: number;
+  entries: number;
+  by_category: CategoryTotal[];
+};
+
+/** Current month as YYYY-MM in local time, the format the API expects. */
+export const currentMonth = (): string => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+};
+
+export const fetchCashflow = async (
+  month: string,
+  kind?: CashflowKind,
+): Promise<CashflowEntry[]> => {
+  const params = new URLSearchParams({ month, limit: "500" });
+  if (kind) params.set("kind", kind);
+  return json<CashflowEntry[]>(
+    await fetch(`${API_BASE}/api/cashflow?${params.toString()}`),
+  );
+};
+
+export const fetchCashflowSummary = async (
+  month: string,
+): Promise<CashflowSummary> =>
+  json<CashflowSummary>(
+    await fetch(`${API_BASE}/api/cashflow/summary?month=${month}`),
+  );
+
+export const createCashflowEntry = async (
+  payload: CashflowCreate,
+): Promise<CashflowEntry> =>
+  json<CashflowEntry>(
+    await fetch(`${API_BASE}/api/cashflow`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, source: "api" }),
+    }),
+  );
+
+export const deleteCashflowEntry = async (
+  id: string,
+): Promise<CashflowEntry> =>
+  json<CashflowEntry>(
+    await fetch(`${API_BASE}/api/cashflow/${id}`, { method: "DELETE" }),
+  );
+
+// ── Consultant chat (same conversation the Telegram bot talks to) ─────────
+
+export type ChatRole = "user" | "assistant";
+export type ChatChannel = "telegram" | "web";
+export type ChatTurnStatus = "running" | "done" | "failed";
+
+export type ChatMessage = {
+  id: string;
+  role: ChatRole;
+  content: string;
+  channel: ChatChannel;
+  status: ChatTurnStatus;
+  created_at: string;
+};
+
+export type ChatState = {
+  busy: boolean;
+  messages: ChatMessage[];
+};
+
+export const fetchChat = async (limit = 60): Promise<ChatState> =>
+  json<ChatState>(await fetch(`${API_BASE}/api/chat?limit=${limit}`));
+
+export const sendChatMessage = async (text: string): Promise<ChatState> =>
+  json<ChatState>(
+    await fetch(`${API_BASE}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    }),
+  );
+
+export const resetChatSession = async (): Promise<void> => {
+  const res = await fetch(`${API_BASE}/api/chat/reset`, { method: "POST" });
+  if (!res.ok) throw new ApiError(res.status, "Não foi possível reiniciar a sessão");
+};
+
+/** Free text → a draft ledger entry. Saves nothing; the user confirms. */
+export const classifyCashflow = async (text: string): Promise<CashflowCreate> =>
+  json<CashflowCreate>(
+    await fetch(`${API_BASE}/api/cashflow/classify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    }),
+  );
+
+/** Send a photo or document to the consultant's inbox and start a turn. */
+export const uploadChatAttachment = async (
+  file: File,
+  caption = "",
+): Promise<ChatState> => {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("caption", caption);
+  // No Content-Type header: the browser must set the multipart boundary.
+  return json<ChatState>(
+    await fetch(`${API_BASE}/api/chat/upload`, { method: "POST", body: form }),
+  );
+};
