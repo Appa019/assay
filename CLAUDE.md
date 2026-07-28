@@ -1,4 +1,26 @@
-# Investimentos Manual
+# Mesa — finanças pessoais + investimentos
+
+> ## ⚠️ ONDE ISTO RODA (leia antes de qualquer coisa)
+>
+> **O RASPBERRY PI É A ÚNICA MÁQUINA DE PRODUÇÃO.** Desde 2026-07-28 o app roda
+> exclusivamente no Pi 4 (`pi`, `~/investimentos_manual`),
+> sob systemd, 24/7. O desktop é só onde se ESCREVE código.
+>
+> - **Acesso**: `https://raspberrypi.tail1d0148.ts.net` — VPN Tailscale privada,
+>   nada exposto na internet. Só aparelhos logados na conta do Pedro enxergam.
+>   Home Assistant (bônus) na `:8443`.
+> - **Serviços no Pi** (`systemctl --user`): `investimentos-backend` (uvicorn em
+>   127.0.0.1:8000) · `investimentos-frontend` (Next em 127.0.0.1:3001) ·
+>   `investimentos-bot` (Telegram) + 8 timers. `Linger=yes`, sobem no boot.
+> - **NUNCA rode o bot em duas máquinas** — os dois fazem polling e o cliente
+>   recebe resposta em dobro.
+> - **Bind SEMPRE em 127.0.0.1.** A LAN é compartilhada com o prédio inteiro;
+>   `0.0.0.0` entrega as finanças do cliente aos vizinhos. Quem publica é o
+>   `tailscale serve`.
+> - **Deploy**: `rsync` do desktop excluindo `.venv node_modules .next storage
+>   .env .env.local`, depois `pnpm build` + `systemctl --user restart` no Pi.
+>   O `.env` e o banco do Pi são a fonte da verdade e NÃO são sobrescritos.
+> - **Detalhes de máquina, firewall e correções ARM**: `acesso-remoto-pi.md`.
 
 Gestão de aportes (AD-HOC, sem ciclo fixo) com comitê multipersona de IA padrão
 **Goldman Sachs GIR + Morgan Stanley GIC + Bridgewater + AQR**. A cada aporte o
@@ -172,9 +194,97 @@ sem Playwright.
   `/financas [AAAA-MM]`; categorias normalizadas p/ minúsculas; fontes:
   chat | bot | api.
 
+### Chat no site + roteador de modelo (2026-07-28)
+O consultor deixou de ser exclusivo do Telegram. **É UMA conversa só**, com duas
+portas: o bot e a página `/consultor`.
+- **Transcrição compartilhada** (`ChatMessage`): toda mensagem, dos dois lados e
+  das duas portas, vira linha em `chat_message` (role · channel · status ·
+  model · tier). Rotacionar a sessão do Claude NÃO apaga o histórico. Todo
+  caller deve usar `chat_service.converse(text, channel)`, nunca
+  `run_chat_turn` direto — é `converse` que persiste.
+- **API**: `GET /api/chat` (histórico + `busy`), `POST /api/chat` (enfileira e
+  volta 202 na hora — um turno leva minutos, ninguém segura HTTP), `POST
+  /api/chat/reset`. O front faz polling: 2,5s ocupado, 12s ocioso (resposta pode
+  chegar do Telegram).
+- **Roteador de modelo** (`model_router`): triagem haiku decide o tier de cada
+  turno — `fast` haiku/low · `balanced` sonnet/medium · `deep` opus/high. Com
+  atalhos sem custo para saudação e para lançamento no ledger ("gastei 42 no
+  mercado"), que é a mensagem mais frequente do produto. Triagem custa ~6s;
+  falha nela cai em `balanced` e NUNCA derruba o chat. `CHAT_ROUTER_ENABLED=false`
+  volta ao comportamento antigo (tudo em opus). O modelo usado fica gravado na
+  mensagem.
+- **O consultor DISPARA aportes**: "quero investir 5000" → ele confirma o valor
+  e chama `POST /api/contributions?run=true` (BackgroundTasks, volta na hora).
+  Não manda mais o cliente usar comando.
+- **Sourcing de liquidez**: "preciso tirar 5 mil, de onde?" tem framework nas
+  ordens permanentes — caixa primeiro, depois CDB (liquidez diária), nunca lote
+  travado nos 30d, e conta a isenção de IR (20k ações / 35k cripto) antes de
+  recomendar. Ele recomenda; QUEM VENDE é o cliente.
+- **Classificador de gasto** (`classifier_service`): `POST /api/cashflow/classify`
+  transforma "gastei 42,90 no mercado ontem" em rascunho estruturado (resolve
+  data relativa). Modelo pequeno, workspace SEM `.mcp.json` (é a ausência do
+  arquivo que mantém rápido, ~5s). Devolve RASCUNHO e não grava — o usuário
+  confirma no formulário, senão um erro de leitura entra no ledger calado.
+- **Bot mora no Pi** (`investimentos-bot.service`). Não rode em duas máquinas:
+  os dois fazem polling e respondem em dobro.
+
+### Produto merged + mobile-first (2026-07-28)
+O app deixou de ser só "mesa de aportes": **finanças pessoais e investimentos
+são pares**, não um sub-tópico do outro. O wordmark é **Mesa**.
+- **Superfície primária = iPhone via Tailscale**. Desenhe mobile-first; o
+  desktop herda. `PRODUCT.md` e `DESIGN.md` na raiz são o contrato de design
+  (registro `product`, paleta editorial em oklch, Fraunces só em títulos,
+  Manrope no resto, ZERO gradiente). **Branco puro é PERMITIDO** e preferido
+  pelo cliente: `--bg-card` é `#fff` e o texto sobre botões de accent é `white`.
+- **TRÊS abas, só** (`src/lib/nav.ts` é a fonte única — mexa lá, não nos
+  componentes):
+  1. **`/` Visão geral** — patrimônio + saldo do mês + alocação vs mandato +
+     benchmark + ordens pendentes + macro. É a única tela que mostra as duas
+     metades do dinheiro juntas.
+  2. **`/consultor`** — o chat. É por onde se registra gasto/ganho e se pede
+     aporte. Aceita foto e arquivo.
+  3. **`/investimentos`** — casca com sub-abas na URL (`?aba=carteira|aportar|
+     analises|ir`) que hospeda as views de `/ativos`, `/aporte`, `/relatorios`
+     e `/ir`. Essas 4 páginas exportam o componente por NOME (`AtivosView` etc.)
+     além do default — as rotas antigas seguem vivas para deep links.
+- **Shell responsivo**: `<Sidebar>` some abaixo de `md` e dá lugar ao
+  `<MobileNav>` (barra inferior de 3 abas, respeita `env(safe-area-inset-bottom)`).
+- **`/financas`** ainda existe como rota (ledger detalhado com lançamento
+  inline + classificação por IA), mas saiu da navegação: o caminho normal é
+  contar ao consultor.
+- **Regras de iOS** (em `globals.css`): controles ≥16px senão o Safari dá zoom
+  e não volta; alvos de toque ≥44px; `viewport-fit=cover` + safe areas.
+- **PWA**: `manifest.webmanifest` + `apple-icon.png` — "Adicionar à Tela de
+  Início" abre em tela cheia, sem barra do Safari.
+- **Origem única**: `next.config.ts` reescreve `/api/*` para o backend, então o
+  navegador só fala com o Next. Com `NEXT_PUBLIC_API_BASE_URL` vazio as chamadas
+  são relativas e não há CORS nem segunda porta exposta.
+
 ## Commands
-- `./start.sh`: Inicia backend + frontend, abre browser (uso diário; sem
-  --reload por padrão — `START_RELOAD=1` p/ dev)
+
+### No Pi (produção — é onde o app vive)
+```bash
+ssh pi
+export XDG_RUNTIME_DIR=/run/user/$(id -u)          # necessário via ssh não-interativo
+systemctl --user status  investimentos-backend investimentos-frontend investimentos-bot
+systemctl --user restart investimentos-backend investimentos-frontend investimentos-bot
+systemctl --user list-timers 'investimentos-*'
+journalctl --user -u investimentos-bot -f
+sudo tailscale serve status                         # o que está publicado na VPN
+```
+
+### Deploy do desktop para o Pi
+```bash
+rsync -a --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
+  --exclude '__pycache__' --exclude '*.pyc' --exclude 'storage' \
+  --exclude '.env' --exclude '.env.local' --exclude 'frontend/.env.local' \
+  ./ pi:~/investimentos_manual/
+# no Pi: pnpm install && pnpm build (em frontend/) e restart dos serviços
+```
+
+### No desktop (só desenvolvimento)
+- `./start.sh`: sobe backend + frontend locais para desenvolver (NÃO é produção;
+  sem --reload por padrão — `START_RELOAD=1` p/ dev). Não deixe o bot subir aqui.
 - `./install.sh`: Setup inicial (venv, deps, atalho Desktop)
 - `make check`: ruff + pytest + lint/type-check/build do frontend (o que a CI roda)
 - `.venv/bin/python -m pytest`: suíte de testes do backend (tests/)
@@ -343,10 +453,29 @@ cross-check CIO → execution → folha de ordens → monitoramento → resumo. 
 **Folha de ordens SEM coluna plataforma** — cliente decide onde executar.
 
 ## Pré-requisitos de runtime
-- Python 3.11+
-- Node 20+ com pnpm (install.sh instala via npm se não houver)
+- Python 3.11+ (o Pi roda 3.13.5; todas as deps têm wheel ARM64, zero compilação)
+- Node 20.9+ com pnpm (o Pi roda Node 22 instalado por tarball em
+  `~/.local/node`, fora do apt — por isso `install_systemd.sh` põe esse caminho
+  no PATH das units)
+- `uv`/`uvx` em `~/.local/bin` — 4 dos MCPs dependem dele
 - Acesso à internet (BCB, Yahoo Finance, CoinGecko)
 - Projeto em filesystem ext4 (NTFS via ntfs-3g não preserva bits +x)
+
+### Armadilhas específicas do Pi (todas já corrigidas — não regrida)
+- **Playwright MCP**: o pacote aponta para o Google Chrome, que NÃO tem build
+  ARM64 para Linux. `analysis_runner._playwright_mcp_args()` detecta a ausência
+  e cai para o Chromium do sistema. Não simplifique de volta.
+- **Porta 3000 é do painel de casa** (container `dashboard`). O frontend roda na
+  3001 (`FRONTEND_PORT=3001 bash scripts/install_systemd.sh`).
+- **Firewall `panel_guard`** filtra 443/3000/3443/8123 por MAC. Tráfego de VPN
+  não tem cabeçalho ethernet, então `ether saddr` nunca casa. A regra
+  `iifname "tailscale0" accept` na chain `input` é o que faz o acesso remoto
+  funcionar — vive em `~/<repo-automacao>/infra/panel-guard.nft`.
+- **`rewrites` do Next é assado no BUILD**, não lido no start: `BACKEND_ORIGIN`
+  tem que estar setado na hora do `pnpm build`.
+- **RAM é o recurso escasso** (3,7 GB com Home Assistant + 5 containers usando
+  ~1,7 GB). Um run do comitê com os 12 MCPs mediu pico de 1,1 GB. Cabe, sem
+  folga larga.
 
 ## Memória do projeto
 - Memória persistente em `~/.claude/projects/<encoded>/memory/`
