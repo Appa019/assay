@@ -280,6 +280,33 @@ def send_document(
         return False
 
 
+def send_chat_action(
+    action: str = "typing",
+    *,
+    chat_id: str | None = None,
+    token: str | None = None,
+) -> bool:
+    """Show a chat action ("typing…") while a slow reply is being produced.
+
+    Telegram clears the action after ~5s, so callers re-send it on a loop for
+    long turns. Best-effort: never raises.
+    """
+    token = token or settings.telegram_bot_token
+    chat_id = chat_id or settings.telegram_chat_id
+    if not token or not chat_id:
+        return False
+    try:
+        with httpx.Client(timeout=_TIMEOUT) as client:
+            resp = client.post(
+                f"{_base(token)}/sendChatAction",
+                json={"chat_id": chat_id, "action": action},
+            )
+        return bool(resp.json().get("ok"))
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.warning("telegram_chat_action_failed", error=_redact(token, str(exc)))
+        return False
+
+
 def set_my_commands(commands: list[dict[str, str]], *, token: str | None = None) -> bool:
     """Register the bot's command menu (shown by Telegram's / button)."""
     token = token or settings.telegram_bot_token

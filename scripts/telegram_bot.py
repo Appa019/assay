@@ -4,10 +4,16 @@
 Locked to a single chat (``TELEGRAM_CHAT_ID``); it ignores everyone else.
 Long-polls Telegram and speaks Portuguese only.
 
+Any NON-command text is a live conversation with the financial consultant
+(a chained Claude session with its own fixed memory — see chat_service).
+
 Commands:
     /aporte <valor>                 cria o aporte e roda o comitê inteiro
     /comprei <ticker> <classe> <qtd> <preço>   registra uma compra
     /vender <ticker>                vende (ações/crypto após 30 dias; CDB quando quiser)
+    /gasto <valor> [descrição #categoria]      registra um gasto no ledger
+    /ganho <valor> [descrição #categoria]      registra um ganho no ledger
+    /financas [YYYY-MM]             resumo do mês (gastos × ganhos × saldo)
     /carteira                       lista posições + elegibilidade de venda
     /status                         alocação atual vs. alvo + cadência
     /ajuda                          esta ajuda
@@ -19,6 +25,7 @@ import asyncio
 import atexit
 import json
 import os
+import queue
 import sys
 import threading
 import time
@@ -35,12 +42,16 @@ from sqlmodel import Session, select  # noqa: E402
 from app.config import settings  # noqa: E402
 from app.core.database import engine, init_db  # noqa: E402
 from app.models.asset import Asset, AssetClass  # noqa: E402
+from app.models.cashflow import CashflowKind, CashflowSource  # noqa: E402
 from app.models.contribution import Contribution  # noqa: E402
 from app.models.order import OrderStatus  # noqa: E402
 from app.models.report import Report, ReportKind  # noqa: E402
 from app.schemas.asset import AssetCreate  # noqa: E402
+from app.schemas.cashflow import CashflowCreate  # noqa: E402
 from app.services import (  # noqa: E402
     analysis_runner,
+    cashflow_service,
+    chat_service,
     contribution_service,
     order_service,
     portfolio_service,
@@ -74,6 +85,14 @@ _SELL_CONFIRM_TTL_S = 120
 
 _HELP = (
     "🤖 *Agente de Investimentos*\n\n"
+    "💬 *Me mande qualquer mensagem sem /* e eu respondo como seu consultor "
+    "financeiro em tempo real: dúvidas de tickers, cripto, CDB, carteira, IR — "
+    'e registro gastos e ganhos que você me contar ("gastei 80 no mercado"). '
+    "Eu lembro das conversas (memória fixa).\n\n"
+    "/gasto <valor> [descrição #categoria] — registro rápido de um gasto.\n"
+    "/ganho <valor> [descrição #categoria] — registro rápido de um ganho.\n"
+    "/financas [AAAA-MM] — resumo do mês: gastos × ganhos × saldo por categoria.\n"
+    "/resetchat — começo uma conversa nova (a memória fixa permanece).\n\n"
     "/aporte <valor> — crio o aporte e rodo o comitê inteiro (Opus · max). "
     "Te devolvo onde investir e quanto.\n"
     "/ordens — folha de ordens pendente do último aporte.\n"
@@ -93,6 +112,10 @@ _HELP = (
 )
 
 _BOT_COMMANDS = [
+    {"command": "gasto", "description": "Registrar um gasto (valor + descrição)"},
+    {"command": "ganho", "description": "Registrar um ganho (valor + descrição)"},
+    {"command": "financas", "description": "Resumo do mês: gastos × ganhos"},
+    {"command": "resetchat", "description": "Recomeçar a conversa do consultor"},
     {"command": "aporte", "description": "Criar aporte e rodar o comitê"},
     {"command": "ordens", "description": "Folha de ordens pendente"},
     {"command": "executei", "description": "Confirmar execução de uma ordem"},
@@ -124,6 +147,44 @@ def _parse_amount(raw: str) -> Decimal:
 
 def _send(text: str) -> None:
     telegram_service.send_message(text, chat_id=settings.telegram_chat_id)
+
+
+# --- consultant chat (free text → chained Claude session) -------------------
+
+_chat_queue: queue.Queue[str] = queue.Queue()
+
+
+def _typing_loop(stop: threading.Event) -> None:
+    """Keep the "typing…" indicator alive while a turn runs (it expires in ~5s)."""
+    while not stop.is_set():
+        telegram_service.send_chat_action("typing")
+        stop.wait(5)
+
+
+def _chat_worker() -> None:
+    """Serial consumer: one consultant turn at a time, in message order."""
+    while True:
+        text = _chat_queue.get()
+        stop = threading.Event()
+        threading.Thread(target=_typing_loop, args=(stop,), daemon=True).start()
+        try:
+            reply = chat_service.run_chat_turn(text)
+        except (chat_service.ChatBusyError, chat_service.ChatUnavailableError) as exc:
+            reply = str(exc)
+        except Exception as exc:  # noqa: BLE001 — the worker must survive anything
+            reply = f"✖ Erro inesperado no chat: {exc}"
+        finally:
+            stop.set()
+        _send(reply)
+        _chat_queue.task_done()
+
+
+def _enqueue_chat(text: str) -> str | None:
+    backlog = _chat_queue.qsize()
+    _chat_queue.put(text)
+    if backlog >= 2:
+        return f"📥 Na fila — ainda estou respondendo {backlog} mensagem(ns) antes dessa."
+    return None  # the worker replies when the turn finishes
 
 
 # --- command handlers -------------------------------------------------------
@@ -348,6 +409,99 @@ def _cmd_executei(args: list[str]) -> str:
     )
 
 
+def _parse_cashflow(args: list[str]) -> tuple[Decimal, str, str | None]:
+    """``<valor> [descrição ... #categoria]`` → (amount, category, description)."""
+    amount = _parse_amount(args[0])
+    if amount <= 0:
+        raise InvalidOperation("valor deve ser positivo")
+    category = "outros"
+    words: list[str] = []
+    for token in args[1:]:
+        if token.startswith("#") and len(token) > 1:
+            category = token[1:].lower()
+        else:
+            words.append(token)
+    return amount, category, " ".join(words) or None
+
+
+def _register_cashflow(kind: CashflowKind, args: list[str], usage: str) -> str:
+    if not args:
+        return usage
+    try:
+        amount, category, description = _parse_cashflow(args)
+    except (InvalidOperation, ValueError):
+        return f"Valor inválido: {args[0]}\n{usage}"
+    with Session(engine) as s:
+        entry = cashflow_service.add_entry(
+            s,
+            CashflowCreate(
+                kind=kind,
+                amount_brl=amount,
+                category=category,
+                description=description,
+                source=CashflowSource.BOT,
+            ),
+        )
+        summ = cashflow_service.month_summary(s)
+    label = "Gasto" if kind == CashflowKind.EXPENSE else "Ganho"
+    desc = f" — {entry.description}" if entry.description else ""
+    return (
+        f"✅ {label}: {_fmt_brl(float(entry.amount_brl))} ({entry.category}){desc}.\n"
+        f"Mês: gastos {_fmt_brl(summ.expense_brl)} · ganhos {_fmt_brl(summ.income_brl)} "
+        f"· saldo {_fmt_brl(summ.net_brl)}."
+    )
+
+
+def _cmd_gasto(args: list[str]) -> str:
+    return _register_cashflow(
+        CashflowKind.EXPENSE, args, "Uso: /gasto <valor> [descrição #categoria]"
+    )
+
+
+def _cmd_ganho(args: list[str]) -> str:
+    return _register_cashflow(
+        CashflowKind.INCOME, args, "Uso: /ganho <valor> [descrição #categoria]"
+    )
+
+
+def _cmd_financas(args: list[str]) -> str:
+    month = args[0] if args else None
+    with Session(engine) as s:
+        try:
+            summ = cashflow_service.month_summary(s, month)
+        except ValueError:
+            return "Uso: /financas [AAAA-MM]  ·  Ex: /financas 2026-07"
+    if not summ.entries:
+        return (
+            f"Nenhum lançamento em {summ.month}. Registre com /gasto, /ganho "
+            "ou simplesmente me conte no chat."
+        )
+    lines = [
+        f"💸 *Finanças {summ.month}*",
+        "",
+        f"Gastos: {_fmt_brl(summ.expense_brl)}",
+        f"Ganhos: {_fmt_brl(summ.income_brl)}",
+        f"Saldo: {_fmt_brl(summ.net_brl)}",
+        "",
+    ]
+    expenses = [c for c in summ.by_category if c.kind == CashflowKind.EXPENSE][:6]
+    if expenses:
+        lines.append("Maiores gastos por categoria:")
+        for c in expenses:
+            lines.append(f"• {c.category}: {_fmt_brl(c.total_brl)} ({c.count}x)")
+    lines.append("")
+    lines.append(f"{summ.entries} lançamento(s) no mês.")
+    return "\n".join(lines)
+
+
+def _cmd_resetchat() -> str:
+    chat_service.reset_session()
+    return (
+        "🧹 Conversa reiniciada. A memória fixa sobre você permanece — "
+        "só o histórico da sessão foi descartado."
+    )
+
+
 def _cmd_ir(args: list[str]) -> str:
     year = date.today().year
     if args:
@@ -451,9 +605,13 @@ def _cmd_relatorios() -> str:
 
 
 def _handle(text: str) -> str | None:
-    parts = text.strip().split()
-    if not parts:
+    stripped = text.strip()
+    if not stripped:
         return None
+    # Free text (no leading slash) = live conversation with the consultant.
+    if not stripped.startswith("/"):
+        return _enqueue_chat(stripped)
+    parts = stripped.split()
     cmd = parts[0].lower().lstrip("/")
     cmd = cmd.split("@")[0]  # strip @botname in group-style mentions
     args = parts[1:]
@@ -475,13 +633,24 @@ def _handle(text: str) -> str | None:
         return _cmd_executei(args)
     if cmd == "ir":
         return _cmd_ir(args)
+    if cmd == "gasto":
+        return _cmd_gasto(args)
+    if cmd == "ganho":
+        return _cmd_ganho(args)
+    if cmd in {"financas", "finanças"}:
+        return _cmd_financas(args)
+    if cmd == "resetchat":
+        return _cmd_resetchat()
     if cmd == "comprei":
         return _cmd_comprei(args)
     if cmd == "vender":
         return _cmd_vender(args)
     if cmd == "aporte":
         return _cmd_aporte(args)
-    return "Não entendi. Mande /ajuda para ver os comandos."
+    return (
+        "Não conheço esse comando — mande /ajuda para a lista. "
+        "(Texto sem / vai direto para o consultor.)"
+    )
 
 
 def _acquire_single_instance() -> bool:
@@ -525,6 +694,7 @@ def main() -> int:
     init_db()
     me = telegram_service.get_me()
     telegram_service.set_my_commands(_BOT_COMMANDS)
+    threading.Thread(target=_chat_worker, daemon=True).start()
     print(f"Bot @{me.get('username')} ativo. Travado no chat {settings.telegram_chat_id}.")
 
     # Skip any backlog so old commands aren't replayed on startup.

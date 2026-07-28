@@ -145,6 +145,27 @@ sem Playwright.
 - **Relatório mensal**: `monthly_report.py` (dias 1-2) → Report(monthly) +
   Telegram (texto + anexo .md): patrimônio, operações, IR do mês, custo de
   análise. `--force` gera do mês corrente.
+- **Consultor em tempo real (chat, 2026-07-28)**: qualquer texto SEM `/` no bot
+  é uma conversa com o consultor (`app/services/chat_service.py`) — sessão
+  Claude encadeada persistente (`storage/chat_workspace/session.json` sobrevive
+  a reinícios; rotaciona após `CHAT_MAX_TURNS` turnos), workspace PRÓPRIO
+  (`storage/chat_workspace/`) com CLAUDE.md de ordens do consultor (reescrito a
+  cada turno) + MEMORY.md (memória FIXA sobre o cliente, gerida pelo próprio
+  agente) + mesmos MCPs financeiros do comitê (baseline ∪ `.mcp.agent.json` do
+  chat, `--strict-mcp-config`). Modelo/effort próprios: `CHAT_MODEL` (opus) /
+  `CHAT_EFFORT` (high) / `CHAT_TURN_TIMEOUT` (900s). Ele registra gastos/ganhos
+  que o cliente contar via `POST /api/cashflow` (source=chat), consulta
+  carteira/IR/ordens pela API local e responde tickers com dados ao vivo
+  (yahoo-finance/coingecko). Lock de turno próprio (`_chat_turn.lock`) — NÃO usa
+  o lock global pesado, então chat funciona mesmo com comitê rodando; fila
+  serial no bot com indicador "digitando…". Limite de uso → mensagem amigável
+  (fail-fast, sem esperar horas). `/resetchat` descarta a sessão (memória fica).
+- **Ledger de finanças pessoais (`CashflowEntry`, 2026-07-28)**: gastos e
+  ganhos do dia a dia, separado do ledger `Trade`. API `/api/cashflow` (POST /
+  GET com `month=`+`kind=` / DELETE / `GET /summary?month=YYYY-MM` com totais e
+  por categoria). Bot: `/gasto <valor> [descrição #categoria]`, `/ganho ...`,
+  `/financas [AAAA-MM]`; categorias normalizadas p/ minúsculas; fontes:
+  chat | bot | api.
 
 ## Commands
 - `./start.sh`: Inicia backend + frontend, abre browser (uso diário; sem
@@ -182,20 +203,27 @@ sem Playwright.
 - `/app`: FastAPI backend
   - `agents_prompts/`: 5 templates Jinja2 (macro · seleção · DD ações · DD crypto · decisão)
   - `core/database.py`: SQLite + SQLModel
-  - `models/`: Asset, Contribution, ContributionPrompt, Report (weekly/maturity)
-  - `routers/`: portfolio, contributions, macro, cadence, reports
+  - `models/`: Asset, Contribution, ContributionPrompt, Report (weekly/
+    maturity), Order, Trade, PortfolioSnapshot, CashflowEntry (gastos/ganhos)
+  - `routers/`: portfolio, contributions, macro, cadence, reports, orders, tax,
+    cashflow
   - `services/`: portfolio_service, market_data_service, prompt_generator,
     contribution_service (cria aporte + renderiza prompts), analysis_runner
     (MOTOR: `run_chain` genérico encadeado + auto-resume por limite + workspace/
     memória; `run_analysis` p/ aporte), review_service (revisão semanal +
     maturidade via run_chain → Report), telegram_service (Bot API),
-    notification_service (marcos de 30 dias por lote)
+    notification_service (marcos de 30 dias por lote), chat_service (consultor
+    do Telegram: turno de chat = `_run_claude_step` no chat_workspace),
+    cashflow_service (ledger pessoal de gastos/ganhos)
 - `/scripts/`: run_analysis (aporte→análise), telegram_setup, telegram_bot,
   check_cadence, weekly_review, resume_pending (retoma análises interrompidas),
   install_cron
 - `/storage/agent_workspace/`: workspace persistente do agente (gitignored) —
   CLAUDE.md (ordens permanentes, reescrito a cada run), MEMORY.md (memória do
   agente), tools/ (ferramentas que ele cria)
+- `/storage/chat_workspace/`: workspace do consultor do Telegram (gitignored) —
+  CLAUDE.md (ordens do consultor), MEMORY.md (memória fixa sobre o cliente),
+  session.json (sessão encadeada + contagem de turnos)
 - `/frontend/src/app/(dashboard)`: páginas
 - `/storage/portfolio.db`: SQLite (auto-criado no boot)
 - `/storage/logs/`: logs do start.sh
