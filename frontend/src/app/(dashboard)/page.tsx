@@ -535,12 +535,6 @@ const DashboardPage = () => {
         </section>
       )}
 
-      <p
-        className="mt-8 text-[11px] md:hidden"
-        style={{ color: "var(--text-muted)" }}
-      >
-        100% local · SQLite · nada sai desta máquina
-      </p>
     </div>
   );
 };

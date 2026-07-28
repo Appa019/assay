@@ -5,16 +5,19 @@ around it.
 
 ## Color
 
-Warm parchment and ink with one cold accent. Every value is OKLCH, every
-neutral is tinted toward hue 75 (warm paper), so nothing is pure black or
-white. Strategy: **Restrained** — tinted neutrals plus a single teal accent
-carrying interaction and current state.
+Cool neutrals, white panels, one teal accent. Light only — there is no dark
+variant, by the owner's choice. Every value is OKLCH and every neutral is
+tinted toward hue 250; the earlier warm tint (hue 75) read as yellowed paper
+and was the "off-white" the owner disliked. Cards are pure white, which he
+prefers, and lift off the page by contrast plus a 1px border rather than a
+shadow. Strategy: **Restrained** — neutrals plus a single accent carrying
+interaction and current state.
 
 | Role | Token | Notes |
 |---|---|---|
-| Page | `--bg-primary` | Warm paper, the default surface |
+| Page | `--bg-primary` | Cool near-white, the default surface |
 | Panel | `--bg-secondary` | Sidebar, table headers, code blocks |
-| Raised | `--bg-card` / `--bg-elevated` | Barely lighter than the page |
+| Raised | `--bg-card` / `--bg-elevated` | Pure white, a shade above the page |
 | Ink | `--text-primary` / `--text-secondary` / `--text-muted` | Three steps, no more |
 | Accent | `--accent` / `--accent-light` / `--accent-strong` | Teal. Interaction and current state only |
 | Semantic | `--success` `--danger` `--warning` (+ `-light` pairs) | Money direction and risk |
@@ -26,9 +29,9 @@ Never introduce a gradient. Never use a colored `border-left` as an accent.
 
 ## Type
 
-- **Fraunces** (`--font-heading`) — headings and large monetary display only.
-  Never in labels, buttons, table cells, or form controls.
-- **Manrope** (`--font-body`) — everything else, including all data.
+- **Bricolage Grotesque** (`--font-heading`) — headings and large monetary
+  display only. Never in labels, buttons, table cells, or form controls.
+- **Plus Jakarta Sans** (`--font-body`) — everything else, including all data.
 - `.tabular` applies `tabular-nums` and must be on every figure that can change,
   so digits do not jitter between refreshes.
 - Section eyebrows: 11px, uppercase, `letter-spacing: 0.18em`, `--text-muted`.

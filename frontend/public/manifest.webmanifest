@@ -1,14 +1,14 @@
 {
   "name": "Mesa — finanças e investimentos",
   "short_name": "Mesa",
-  "description": "Finanças pessoais e carteira de investimentos, 100% local",
+  "description": "Finanças pessoais e carteira de investimentos",
   "lang": "pt-BR",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#faf8f4",
-  "theme_color": "#faf8f4",
+  "background_color": "#f8f9fb",
+  "theme_color": "#f8f9fb",
   "icons": [
     {
       "src": "/icon.svg",

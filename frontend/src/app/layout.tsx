@@ -1,15 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Manrope } from "next/font/google";
+import { Bricolage_Grotesque, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
-const heading = Fraunces({
+// Display face: contemporary grotesque with real character in the numerals,
+// which is what the money figures are set in.
+const heading = Bricolage_Grotesque({
   variable: "--font-heading",
   subsets: ["latin"],
-  axes: ["opsz", "SOFT"],
   display: "swap",
 });
 
-const body = Manrope({
+// Everything else, including all data. Wide apertures and a true tabular set,
+// so a column of figures stays aligned between refreshes.
+const body = Plus_Jakarta_Sans({
   variable: "--font-body",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
@@ -18,7 +21,7 @@ const body = Manrope({
 
 export const metadata: Metadata = {
   title: "Mesa",
-  description: "Finanças pessoais e carteira de investimentos, 100% local",
+  description: "Finanças pessoais e carteira de investimentos",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -33,7 +36,7 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   width: "device-width",
   initialScale: 1,
-  themeColor: "#faf8f4",
+  themeColor: "#f8f9fb",
 };
 
 const RootLayout = ({

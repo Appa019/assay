@@ -1,27 +1,31 @@
 @import "tailwindcss";
 
 :root {
-  /* Editorial palette — warm ink on a barely-tinted page, pure white panels.
-     The page sits a shade below the cards so white surfaces lift off it without
-     needing a shadow; the warmth stays in the ink and the neutrals. */
-  --bg-primary: oklch(0.972 0.004 75);
-  --bg-secondary: oklch(0.951 0.006 75);
+  /* Cool neutrals, white panels, one teal accent. Light only — there is no dark
+     variant by design.
+
+     Every neutral is tinted toward hue 250 rather than 75: the warm version
+     read as yellowed paper, which is exactly the "off-white" look this avoids.
+     The page sits a hair below the cards so a white panel lifts by contrast and
+     a 1px border, never a shadow. */
+  --bg-primary: oklch(0.976 0.003 250);
+  --bg-secondary: oklch(0.958 0.005 250);
   --bg-card: #ffffff;
   --bg-elevated: #ffffff;
-  --text-primary: oklch(0.18 0.02 75);
-  --text-secondary: oklch(0.42 0.018 75);
-  --text-muted: oklch(0.60 0.012 75);
-  --accent: oklch(0.52 0.13 200);
-  --accent-light: oklch(0.92 0.04 200);
-  --accent-strong: oklch(0.44 0.14 200);
-  --border: oklch(0.885 0.008 75);
-  --border-strong: oklch(0.80 0.012 75);
-  --success: oklch(0.58 0.14 145);
-  --success-light: oklch(0.95 0.04 145);
-  --danger: oklch(0.55 0.18 28);
-  --danger-light: oklch(0.95 0.05 28);
-  --warning: oklch(0.72 0.15 75);
-  --warning-light: oklch(0.96 0.06 75);
+  --text-primary: oklch(0.21 0.015 255);
+  --text-secondary: oklch(0.46 0.013 255);
+  --text-muted: oklch(0.62 0.011 255);
+  --accent: oklch(0.55 0.14 205);
+  --accent-light: oklch(0.94 0.035 205);
+  --accent-strong: oklch(0.46 0.15 205);
+  --border: oklch(0.905 0.005 250);
+  --border-strong: oklch(0.83 0.008 250);
+  --success: oklch(0.58 0.14 155);
+  --success-light: oklch(0.95 0.04 155);
+  --danger: oklch(0.56 0.19 22);
+  --danger-light: oklch(0.955 0.035 22);
+  --warning: oklch(0.72 0.15 70);
+  --warning-light: oklch(0.96 0.06 70);
 }
 
 @theme inline {
