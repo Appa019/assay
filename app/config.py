@@ -50,6 +50,27 @@ class Settings(BaseSettings):
     # the durable context across rotations so old turns can be dropped.
     chat_max_turns: int = 40
 
+    # Free-text expense/income classifier. Deliberately a small, fast model with
+    # no MCPs: this runs while the user waits with a thumb on the screen, so
+    # seconds matter far more than depth.
+    classifier_model: str = "haiku"
+    classifier_effort: str = "low"
+    classifier_timeout: int = 90
+
+    # Model router: a haiku triage picks the tier for each chat turn, so "oi"
+    # stops costing an opus run. Set CHAT_ROUTER_ENABLED=false to pin every turn
+    # to the deep tier (the pre-router behaviour).
+    chat_router_enabled: bool = True
+    chat_router_model: str = "haiku"
+    chat_router_effort: str = "low"
+    chat_router_timeout: int = 60
+    chat_fast_model: str = "haiku"
+    chat_fast_effort: str = "low"
+    chat_balanced_model: str = "sonnet"
+    chat_balanced_effort: str = "medium"
+    chat_deep_model: str = "opus"
+    chat_deep_effort: str = "high"
+
     # CDB accrual assumption: % of CDI the paper pays (mandate: CDB >= 100%).
     # Used to mark fixed-income lots to market from the BCB daily CDI series.
     cdb_pct_cdi: float = 100.0
