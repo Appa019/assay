@@ -57,3 +57,4 @@ storage/claude_session.json
 storage/analysis_runs/
 storage/agent_workspace/
 storage/notifications_state.json
+storage/chat_workspace/

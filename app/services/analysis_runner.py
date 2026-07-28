@@ -318,7 +318,7 @@ _KEY_GATED_MCP_SERVERS: tuple[tuple[str, str, dict[str, Any]], ...] = (
 )
 
 
-def _baseline_mcp_servers() -> dict[str, Any]:
+def _baseline_mcp_servers(workspace: Path | None = None) -> dict[str, Any]:
     """Curated, research-grade MCP servers always available to the analyst.
 
     Intentionally excludes the user's personal Gmail/Calendar/Drive MCPs (the
@@ -326,9 +326,13 @@ def _baseline_mcp_servers() -> dict[str, Any]:
     ``--strict-mcp-config`` so ONLY the effective set loads. The agent can add
     ANY extra server itself via ``.mcp.agent.json`` (see ``_effective_mcp_config``).
 
+    ``workspace`` roots the per-workspace servers (memory graph, git repo) so
+    other chained runners (e.g. the Telegram consultant chat) get their own.
+
     Tiers: (1) general research/runtime; (2) keyless financial-data servers,
     always on; (3) premium key-gated servers, added only when the key is set.
     """
+    workspace = workspace if workspace is not None else WORKSPACE
     home = str(Path.home())
     servers: dict[str, Any] = {
         # --- Tier 1: reasoning, filesystem, browser, memory, runtime ----------
@@ -352,12 +356,12 @@ def _baseline_mcp_servers() -> dict[str, Any]:
         "memory": {
             "command": "npx",
             "args": ["-y", "@modelcontextprotocol/server-memory"],
-            "env": {"MEMORY_FILE_PATH": str(WORKSPACE / "memory" / "graph.json")},
+            "env": {"MEMORY_FILE_PATH": str(workspace / "memory" / "graph.json")},
         },
         # Timezone/date math (COPOM/FOMC windows, usage-limit "resets at").
         "time": {"command": "uvx", "args": ["mcp-server-time"]},
         # Version-control the tools the agent builds in ./tools/.
-        "git": {"command": "uvx", "args": ["mcp-server-git", "--repository", str(WORKSPACE)]},
+        "git": {"command": "uvx", "args": ["mcp-server-git", "--repository", str(workspace)]},
         # --- Tier 2: keyless financial-data servers (always on) ----------------
         # Crypto market data: prices, market cap, volume, coin metadata. Public
         # remote endpoint (streamable HTTP), no API key required.
@@ -446,7 +450,7 @@ def _effective_mcp_config(workspace: Path) -> dict[str, Any]:
     This is what lets the agent provision ANY MCP it wants and have it stick:
     it edits ``.mcp.agent.json`` and the server loads on the next cycle.
     """
-    servers = _baseline_mcp_servers()
+    servers = _baseline_mcp_servers(workspace)
     servers.update(_load_agent_mcp_servers(workspace))
     return {"mcpServers": servers}
 

@@ -40,6 +40,16 @@ class Settings(BaseSettings):
     # contribution (prevents an endless paid retry loop on permanent failures).
     max_run_attempts: int = 5
 
+    # Telegram consultant chat (free-text conversation over the bot). Opus by
+    # default for advice quality; set CHAT_MODEL=sonnet for snappier replies.
+    chat_model: str = "opus"
+    chat_effort: str = "high"
+    # Per-turn subprocess ceiling (seconds) — one chat answer, not a committee run.
+    chat_turn_timeout: int = 900
+    # Rotate the chained chat session after this many turns; MEMORY.md carries
+    # the durable context across rotations so old turns can be dropped.
+    chat_max_turns: int = 40
+
     # CDB accrual assumption: % of CDI the paper pays (mandate: CDB >= 100%).
     # Used to mark fixed-income lots to market from the BCB daily CDI series.
     cdb_pct_cdi: float = 100.0
