@@ -84,16 +84,16 @@ export const AnalysisFlow = ({
       : "pending";
 
   return (
-    <div className="max-w-5xl space-y-10">
+    <div className="max-w-5xl space-y-8 md:space-y-10">
       <header>
         <p
-          className="text-[11px] uppercase tracking-[0.18em] font-medium mb-2"
+          className="text-[11px] uppercase tracking-[0.18em] font-medium mb-2 break-words"
           style={{ color: "var(--text-muted)" }}
         >
           Aporte #{contribution.id.slice(0, 8)} · {formatDateLong(contribution.created_at)}
         </p>
         <h2
-          className="text-4xl tracking-tight leading-tight"
+          className="text-3xl md:text-4xl tracking-tight leading-tight"
           style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
         >
           R${" "}
@@ -102,7 +102,8 @@ export const AnalysisFlow = ({
             maximumFractionDigits: 2,
           })}
         </h2>
-        <div className="flex items-center gap-4 mt-3">
+        {/* Wraps below md: the bar takes its own line, meta + badge the next. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3">
           <ProgressBar value={doneSteps} total={totalSteps} />
           <span className="text-xs font-medium tabular" style={{ color: "var(--text-secondary)" }}>
             {doneSteps} de {totalSteps} etapas
@@ -113,7 +114,7 @@ export const AnalysisFlow = ({
 
       {isRunning && (
         <section
-          className="p-5 rounded-md flex items-start gap-3"
+          className="p-4 md:p-5 rounded-md flex items-start gap-3"
           style={{ background: "var(--accent-light)", border: "1px solid var(--accent)" }}
         >
           <Sparkles size={16} style={{ color: "var(--accent-strong)" }} className="mt-0.5 shrink-0" />
@@ -127,12 +128,15 @@ export const AnalysisFlow = ({
 
       {failed && (
         <section
-          className="p-5 rounded-md flex items-start justify-between gap-4"
+          className="p-4 md:p-5 rounded-md flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4"
           style={{ background: "var(--danger-light)", border: "1px solid var(--danger)" }}
         >
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3 min-w-0">
             <AlertTriangle size={16} style={{ color: "var(--danger)" }} className="mt-0.5 shrink-0" />
-            <div className="text-xs leading-relaxed" style={{ color: "var(--text-primary)" }}>
+            <div
+              className="text-xs leading-relaxed min-w-0 break-words"
+              style={{ color: "var(--text-primary)" }}
+            >
               <strong>A análise falhou.</strong>{" "}
               <span style={{ color: "var(--text-secondary)" }}>{contribution.notes}</span>
               {retryError && (
@@ -144,7 +148,7 @@ export const AnalysisFlow = ({
           </div>
           <button
             onClick={() => void onRetry()}
-            className="flex items-center gap-2 px-4 py-2 rounded-md text-xs font-semibold shrink-0"
+            className="flex items-center justify-center gap-2 min-h-11 w-full px-4 py-2 rounded-md text-xs font-semibold shrink-0 md:min-h-0 md:w-auto"
             style={{ background: "var(--accent)", color: "white" }}
           >
             <RefreshCw size={13} />
@@ -164,10 +168,10 @@ export const AnalysisFlow = ({
         <SynthesisCard state={synthesisState} stepNumber={totalSteps} />
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 md:flex-row">
         <Link
           href="/aporte"
-          className="flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold"
+          className="flex items-center justify-center gap-2 min-h-11 px-5 py-2.5 rounded-md text-sm font-semibold md:min-h-0"
           style={{ background: "var(--accent)", color: "white" }}
         >
           <Plus size={14} />
@@ -175,7 +179,7 @@ export const AnalysisFlow = ({
         </Link>
         <Link
           href="/relatorios"
-          className="px-5 py-2.5 rounded-md text-sm font-medium"
+          className="flex items-center justify-center min-h-11 px-5 py-2.5 rounded-md text-sm font-medium md:min-h-0"
           style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)" }}
         >
           Ver histórico
@@ -211,7 +215,7 @@ const FinalSummary = ({ summary }: { summary: string }) => (
   <motion.section
     initial={{ opacity: 0, y: 12 }}
     animate={{ opacity: 1, y: 0 }}
-    className="p-7 rounded-md"
+    className="p-4 md:p-7 rounded-md"
     style={{ background: "var(--success-light)", border: "1px solid var(--success)" }}
   >
     <div className="flex items-center gap-2.5 mb-5">
@@ -231,8 +235,9 @@ const ProgressBar = ({ value, total }: { value: number; total: number }) => {
   const pct = total > 0 ? (value / total) * 100 : 0;
   return (
     <div
-      className="flex-1 h-1 rounded-full overflow-hidden"
-      style={{ background: "var(--bg-secondary)", maxWidth: 200 }}
+      // Full-width bar on its own line below md; capped 200px track at md+.
+      className="w-full h-1 rounded-full overflow-hidden md:w-auto md:flex-1 md:max-w-[200px]"
+      style={{ background: "var(--bg-secondary)" }}
     >
       <motion.div
         initial={{ width: 0 }}
@@ -310,18 +315,20 @@ const StepCard = ({ prompt, state }: { prompt: Prompt; state: StepState }) => {
         border: `1px solid ${state === "done" ? "var(--success)" : "var(--border)"}`,
       }}
     >
-      <header className="px-7 py-5 flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
+      {/* Below md the step is a compact vertical block: header row, then the
+          toggle as a full-width control. */}
+      <header className="px-4 py-4 md:px-7 md:py-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
+        <div className="flex items-start gap-3 min-w-0 md:gap-4">
           <StepIcon state={state} fallback={stepLabel} />
           <div className="min-w-0">
             <h3
-              className="text-xl tracking-tight leading-snug"
+              className="text-lg md:text-xl tracking-tight leading-snug break-words"
               style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
             >
               {prompt.title}
             </h3>
             <p
-              className="text-xs mt-1.5 max-w-2xl leading-relaxed"
+              className="text-xs mt-1.5 max-w-2xl leading-relaxed break-words"
               style={{ color: "var(--text-secondary)" }}
             >
               {state === "running" ? "Reunião em andamento…" : prompt.description}
@@ -337,7 +344,7 @@ const StepCard = ({ prompt, state }: { prompt: Prompt; state: StepState }) => {
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-md shrink-0"
+            className="flex items-center justify-center gap-1 min-h-11 w-full text-xs font-medium px-2.5 py-1.5 rounded-md shrink-0 md:min-h-0 md:w-auto"
             style={{ color: "var(--text-secondary)", background: "var(--bg-secondary)" }}
           >
             {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
@@ -345,7 +352,11 @@ const StepCard = ({ prompt, state }: { prompt: Prompt; state: StepState }) => {
           </button>
         ) : (
           state === "pending" && (
-            <Circle size={20} style={{ color: "var(--border-strong)" }} className="shrink-0" />
+            <Circle
+              size={20}
+              style={{ color: "var(--border-strong)" }}
+              className="hidden shrink-0 md:block"
+            />
           )
         )}
       </header>
@@ -358,16 +369,16 @@ const StepCard = ({ prompt, state }: { prompt: Prompt; state: StepState }) => {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="px-7 pb-7 space-y-4">
+            <div className="px-4 pb-5 space-y-4 md:px-7 md:pb-7">
               <details>
                 <summary
-                  className="cursor-pointer text-[11px] uppercase tracking-[0.16em] font-medium"
+                  className="cursor-pointer text-[11px] uppercase tracking-[0.16em] font-medium min-h-11 py-3.5 md:min-h-0 md:py-0"
                   style={{ color: "var(--text-muted)" }}
                 >
                   Ver prompt enviado
                 </summary>
                 <pre
-                  className="mt-3 p-4 rounded-md text-[12px] leading-relaxed whitespace-pre-wrap font-mono max-h-80 overflow-auto"
+                  className="mt-3 p-3 md:p-4 rounded-md text-[12px] leading-relaxed whitespace-pre-wrap break-words font-mono max-h-80 overflow-auto"
                   style={{
                     background: "var(--bg-secondary)",
                     color: "var(--text-secondary)",
@@ -378,7 +389,7 @@ const StepCard = ({ prompt, state }: { prompt: Prompt; state: StepState }) => {
                 </pre>
               </details>
               <div
-                className="rounded-md p-5"
+                className="rounded-md p-3 md:p-5 min-w-0"
                 style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
               >
                 <MarkdownViewer content={prompt.response} maxHeight={560} />
@@ -402,16 +413,19 @@ const SynthesisCard = ({ state, stepNumber }: { state: StepState; stepNumber: nu
       border: `1px solid ${state === "done" ? "var(--success)" : "var(--border)"}`,
     }}
   >
-    <header className="px-7 py-5 flex items-center gap-4">
+    <header className="px-4 py-4 gap-3 md:px-7 md:py-5 md:gap-4 flex items-center">
       <StepIcon state={state} fallback={String(stepNumber).padStart(2, "0")} />
-      <div>
+      <div className="min-w-0">
         <h3
-          className="text-xl tracking-tight leading-snug"
+          className="text-lg md:text-xl tracking-tight leading-snug break-words"
           style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
         >
           Fechamento executivo
         </h3>
-        <p className="text-xs mt-1.5 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+        <p
+          className="text-xs mt-1.5 leading-relaxed break-words"
+          style={{ color: "var(--text-secondary)" }}
+        >
           {state === "running"
             ? "Consolidando onde investir e quanto…"
             : "Folha de ordens final consolidada do comitê"}

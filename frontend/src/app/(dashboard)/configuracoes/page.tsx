@@ -26,7 +26,7 @@ const ConfiguracoesPage = () => {
     <div className="space-y-10 max-w-3xl">
       <header>
         <h2
-          className="text-5xl tracking-tight leading-[1.05]"
+          className="text-[2rem] md:text-5xl tracking-tight leading-[1.06]"
           style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
         >
           Ajustes
@@ -37,7 +37,7 @@ const ConfiguracoesPage = () => {
       </header>
 
       <section
-        className="p-6 rounded-md space-y-3"
+        className="p-5 md:p-6 rounded-md space-y-3"
         style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
       >
         <h3
@@ -46,12 +46,14 @@ const ConfiguracoesPage = () => {
         >
           Backend
         </h3>
-        <Row label="API base" value={API_BASE} />
+        {/* Empty base means the Next server proxies /api itself, which is how
+            the app is served behind a single TLS front. */}
+        <Row label="API base" value={API_BASE || "mesma origem (proxy do Next)"} />
         <Row label="Health" value={health ? `${health.status} · v${health.version}` : error ?? "..."} />
       </section>
 
       <section
-        className="p-6 rounded-md space-y-3"
+        className="p-5 md:p-6 rounded-md space-y-3"
         style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
       >
         <h3
@@ -106,10 +108,12 @@ const ConfiguracoesPage = () => {
 };
 
 const Row = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex justify-between text-sm">
-    <span style={{ color: "var(--text-muted)" }}>{label}</span>
+  <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm">
+    <span className="shrink-0" style={{ color: "var(--text-muted)" }}>
+      {label}
+    </span>
     <code
-      className="font-mono"
+      className="font-mono break-all text-right"
       style={{ color: "var(--text-primary)" }}
     >
       {value}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import {
   Area,
   AreaChart,
@@ -48,6 +48,42 @@ const ACTUAL_COLOR = CLASS_COLORS.fixed_income;
 const TARGET_COLOR = "#cfc9bd";
 
 const AXIS_TICK = { fill: "var(--text-muted)", fontSize: 11 } as const;
+/** Phone ticks drop a point so dense axes stop colliding at 390px. */
+const AXIS_TICK_MOBILE = { fill: "var(--text-muted)", fontSize: 10 } as const;
+
+/* ── Breakpoint ────────────────────────────────────────────────────── */
+
+/** Mirrors Tailwind's `md` breakpoint (768px). */
+const MOBILE_QUERY = "(max-width: 767px)";
+
+let mobileMediaQuery: MediaQueryList | null = null;
+
+const getMobileMediaQuery = (): MediaQueryList => {
+  mobileMediaQuery ??= window.matchMedia(MOBILE_QUERY);
+  return mobileMediaQuery;
+};
+
+const subscribeToBreakpoint = (onChange: () => void): (() => void) => {
+  const query = getMobileMediaQuery();
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+};
+
+/**
+ * Chart geometry (axis width, tick density, pie radii) lives inside the SVG
+ * and cannot be driven by CSS, so the breakpoint is read in JS.
+ * `useSyncExternalStore` subscribes to matchMedia without ever setting state
+ * from an effect body; the server snapshot assumes desktop and hydration
+ * corrects it.
+ */
+const useIsMobile = (): boolean =>
+  useSyncExternalStore(
+    subscribeToBreakpoint,
+    () => getMobileMediaQuery().matches,
+    () => false
+  );
+
+/* ── Formatters ────────────────────────────────────────────────────── */
 
 const compactBRL = (value: number): string => {
   const compact = new Intl.NumberFormat("pt-BR", {
@@ -57,9 +93,25 @@ const compactBRL = (value: number): string => {
   return `R$ ${compact}`;
 };
 
+/** "01 de jul." — roomy label for desktop time axes. */
+const formatTickDate = (ts: number): string =>
+  new Date(ts).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "short",
+  });
+
+/** "01/07" — half the width, so phone time axes keep more than two ticks. */
+const formatTickDateShort = (ts: number): string =>
+  new Date(ts).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+
 const TooltipShell = ({ children }: { children: React.ReactNode }) => (
   <div
-    className="px-3.5 py-2.5 rounded-md text-xs shadow-sm"
+    // The phone cap keeps the floating tooltip inside the chart box so it can
+    // never push the page wider than the viewport.
+    className="px-3.5 py-2.5 rounded-md text-xs shadow-sm max-w-[15rem] md:max-w-none"
     style={{
       background: "var(--bg-card)",
       border: "1px solid var(--border-strong)",
@@ -94,7 +146,7 @@ const ChartLegend = ({
 }: {
   items: { color: string; label: string }[];
 }) => (
-  <div className="flex items-center gap-5 text-xs">
+  <div className="flex items-center gap-4 md:gap-5 flex-wrap text-xs">
     {items.map((item) => (
       <span key={item.label} className="flex items-center gap-1.5">
         <span
@@ -139,6 +191,8 @@ export const AllocationVsTargetChart = ({
 }: {
   portfolio: PortfolioSummary;
 }) => {
+  const isMobile = useIsMobile();
+
   const data: AllocationDatum[] = [
     {
       name: CLASS_NAMES.fixed_income,
@@ -165,22 +219,26 @@ export const AllocationVsTargetChart = ({
           { color: TARGET_COLOR, label: "Alvo" },
         ]}
       />
-      <div style={{ width: "100%", height: 240 }}>
-        <ResponsiveContainer>
-          <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }} barGap={2}>
+      <div className="w-full min-w-0 h-[200px] md:h-[240px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            margin={{ top: 8, right: 8, bottom: 0, left: isMobile ? 0 : -12 }}
+            barGap={2}
+          >
             <CartesianGrid stroke="var(--border)" strokeWidth={1} vertical={false} />
             <XAxis
               dataKey="name"
-              tick={AXIS_TICK}
+              tick={isMobile ? AXIS_TICK_MOBILE : AXIS_TICK}
               tickLine={false}
               axisLine={{ stroke: "var(--border-strong)" }}
             />
             <YAxis
-              tick={AXIS_TICK}
+              tick={isMobile ? AXIS_TICK_MOBILE : AXIS_TICK}
               tickLine={false}
               axisLine={false}
               unit="%"
-              width={44}
+              width={isMobile ? 34 : 44}
             />
             <Tooltip
               content={AllocationTooltip}
@@ -235,6 +293,8 @@ export const AllocationDonut = ({
 }: {
   portfolio: PortfolioSummary;
 }) => {
+  const isMobile = useIsMobile();
+
   const data: DonutDatum[] = (
     [
       {
@@ -266,17 +326,18 @@ export const AllocationDonut = ({
   }
 
   return (
-    <div className="flex items-center gap-8">
-      <div style={{ width: 180, height: 180 }} className="shrink-0">
-        <ResponsiveContainer>
+    // The legend sits below the donut on phones instead of beside it.
+    <div className="flex flex-col md:flex-row items-center gap-6 md:gap-8">
+      <div className="shrink-0 w-[150px] h-[150px] md:w-[180px] md:h-[180px]">
+        <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Tooltip content={DonutTooltip} />
             <Pie
               data={data}
               dataKey="value"
               nameKey="name"
-              innerRadius={54}
-              outerRadius={84}
+              innerRadius={isMobile ? 44 : 54}
+              outerRadius={isMobile ? 70 : 84}
               stroke="var(--bg-card)"
               strokeWidth={2}
               isAnimationActive={false}
@@ -288,7 +349,7 @@ export const AllocationDonut = ({
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <ul className="space-y-2.5 text-sm min-w-0">
+      <ul className="w-full md:w-auto space-y-2.5 text-sm min-w-0">
         {data.map((entry) => (
           <li key={entry.key} className="flex items-center gap-2.5">
             <span
@@ -303,7 +364,7 @@ export const AllocationDonut = ({
               {entry.pct.toFixed(1)}%
             </span>
             <span
-              className="tabular text-xs w-24 text-right"
+              className="tabular text-xs w-24 text-right shrink-0"
               style={{ color: "var(--text-muted)" }}
             >
               {formatBRL(entry.value)}
@@ -341,6 +402,8 @@ export const EquityCurveChart = ({
 }: {
   history: PortfolioHistoryPoint[];
 }) => {
+  const isMobile = useIsMobile();
+
   const data: EquityDatum[] = useMemo(
     () =>
       [...history]
@@ -354,8 +417,8 @@ export const EquityCurveChart = ({
   );
 
   return (
-    <div style={{ width: "100%", height: 260 }}>
-      <ResponsiveContainer>
+    <div className="w-full min-w-0 h-[210px] md:h-[260px]">
+      <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 4 }}>
           <CartesianGrid stroke="var(--border)" strokeWidth={1} vertical={false} />
           <XAxis
@@ -363,23 +426,20 @@ export const EquityCurveChart = ({
             type="number"
             scale="time"
             domain={["dataMin", "dataMax"]}
-            tickFormatter={(ts: number) =>
-              new Date(ts).toLocaleDateString("pt-BR", {
-                day: "2-digit",
-                month: "short",
-              })
-            }
-            tick={AXIS_TICK}
+            tickFormatter={isMobile ? formatTickDateShort : formatTickDate}
+            tick={isMobile ? AXIS_TICK_MOBILE : AXIS_TICK}
             tickLine={false}
             axisLine={{ stroke: "var(--border-strong)" }}
-            minTickGap={48}
+            interval={isMobile ? "preserveStartEnd" : "preserveEnd"}
+            minTickGap={isMobile ? 44 : 48}
           />
           <YAxis
             tickFormatter={compactBRL}
-            tick={AXIS_TICK}
+            tick={isMobile ? AXIS_TICK_MOBILE : AXIS_TICK}
             tickLine={false}
             axisLine={false}
-            width={72}
+            width={isMobile ? 62 : 72}
+            tickCount={isMobile ? 4 : undefined}
             domain={["auto", "auto"]}
           />
           <Tooltip
@@ -466,6 +526,7 @@ const BenchmarkTooltip = ({ active, payload }: ChartTooltipProps) => {
 };
 
 export const BenchmarkChart = ({ series }: { series: BenchmarkPoint[] }) => {
+  const isMobile = useIsMobile();
   const [hidden, setHidden] = useState<Partial<Record<BenchKey, boolean>>>({});
 
   const data: BenchDatum[] = useMemo(
@@ -488,8 +549,9 @@ export const BenchmarkChart = ({ series }: { series: BenchmarkPoint[] }) => {
 
   return (
     <div className="space-y-3">
-      {/* Clickable legend: toggles each series on/off. */}
-      <div className="flex items-center gap-4 flex-wrap text-xs">
+      {/* Clickable legend: toggles each series on/off. Sits above the plot on
+          every width, with 44px touch targets on phones. */}
+      <div className="flex items-center gap-1 md:gap-4 flex-wrap text-xs">
         {BENCH_SERIES.map((entry) => {
           const off = hidden[entry.key] === true;
           return (
@@ -499,11 +561,11 @@ export const BenchmarkChart = ({ series }: { series: BenchmarkPoint[] }) => {
               onClick={() => toggle(entry.key)}
               aria-pressed={!off}
               title={off ? `Mostrar ${entry.label}` : `Ocultar ${entry.label}`}
-              className="flex items-center gap-1.5 px-1.5 py-1 rounded-md transition-opacity"
+              className="flex items-center justify-center md:justify-start gap-1.5 min-h-11 min-w-11 px-3 md:min-h-0 md:min-w-0 md:px-1.5 md:py-1 rounded-md transition-opacity"
               style={{ opacity: off ? 0.35 : 1 }}
             >
               <span
-                className="inline-block w-3.5 rounded-full"
+                className="inline-block w-3.5 rounded-full shrink-0"
                 style={{ background: entry.color, height: entry.width }}
               />
               <span
@@ -518,31 +580,31 @@ export const BenchmarkChart = ({ series }: { series: BenchmarkPoint[] }) => {
           );
         })}
       </div>
-      <div style={{ width: "100%", height: 280 }}>
-        <ResponsiveContainer>
-          <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
+      <div className="w-full min-w-0 h-[220px] md:h-[280px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            data={data}
+            margin={{ top: 8, right: 8, bottom: 0, left: isMobile ? 0 : -8 }}
+          >
             <CartesianGrid stroke="var(--border)" strokeWidth={1} vertical={false} />
             <XAxis
               dataKey="ts"
               type="number"
               scale="time"
               domain={["dataMin", "dataMax"]}
-              tickFormatter={(ts: number) =>
-                new Date(ts).toLocaleDateString("pt-BR", {
-                  day: "2-digit",
-                  month: "short",
-                })
-              }
-              tick={AXIS_TICK}
+              tickFormatter={isMobile ? formatTickDateShort : formatTickDate}
+              tick={isMobile ? AXIS_TICK_MOBILE : AXIS_TICK}
               tickLine={false}
               axisLine={{ stroke: "var(--border-strong)" }}
-              minTickGap={48}
+              interval={isMobile ? "preserveStartEnd" : "preserveEnd"}
+              minTickGap={isMobile ? 44 : 48}
             />
             <YAxis
-              tick={AXIS_TICK}
+              tick={isMobile ? AXIS_TICK_MOBILE : AXIS_TICK}
               tickLine={false}
               axisLine={false}
-              width={48}
+              width={isMobile ? 32 : 48}
+              tickCount={isMobile ? 4 : undefined}
               domain={["auto", "auto"]}
             />
             <Tooltip

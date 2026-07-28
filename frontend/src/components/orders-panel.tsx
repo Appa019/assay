@@ -72,7 +72,7 @@ export const OrdersPanel = ({
     <section className="space-y-4">
       <div>
         <h3
-          className="text-2xl tracking-tight flex items-center gap-2.5"
+          className="text-2xl tracking-tight flex flex-wrap items-center gap-2.5"
           style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
         >
           <ClipboardList size={18} style={{ color: "var(--text-muted)" }} />
@@ -99,7 +99,7 @@ export const OrdersPanel = ({
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="p-3 rounded-md text-sm font-medium"
+            className="p-3 rounded-md text-sm font-medium break-words"
             style={{
               background:
                 message.type === "success"
@@ -164,45 +164,50 @@ const OrderCard = ({
 
   return (
     <article
-      className="rounded-md px-5 py-4"
+      className="rounded-md px-4 py-4 md:px-5"
       style={{
         background: "var(--bg-card)",
         border: `1px solid ${executed ? "var(--success)" : "var(--border)"}`,
         opacity: order.status === "skipped" ? 0.55 : 1,
       }}
     >
-      <div className="flex items-start justify-between gap-4">
+      {/* Below md the card stacks: identity line, figures line, actions row. */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2.5 flex-wrap">
             <span
-              className="font-semibold text-base"
+              className="font-semibold text-base truncate"
               style={{ color: "var(--text-primary)" }}
             >
               {order.ticker}
             </span>
             <span
-              className="text-[11px] px-1.5 py-0.5 rounded font-medium"
+              className="text-[11px] px-1.5 py-0.5 rounded font-medium shrink-0"
               style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)" }}
             >
               {CLASS_LABELS[order.asset_class]}
             </span>
-            <span
-              className="tabular font-semibold text-sm"
-              style={{ color: "var(--text-primary)" }}
-            >
-              {formatBRL(order.amount_brl)}
-            </span>
-            {order.pct_of_contribution !== null && (
-              <span className="text-xs tabular" style={{ color: "var(--text-muted)" }}>
-                {order.pct_of_contribution.toFixed(1)}% do aporte
+            {/* w-full drops the figures to their own line on phones; at md they
+                rejoin the identity row with the exact same gap. */}
+            <span className="flex w-full items-center gap-2.5 flex-wrap md:w-auto">
+              <span
+                className="tabular font-semibold text-sm"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {formatBRL(order.amount_brl)}
               </span>
-            )}
-            <StatusChip status={order.status} />
+              {order.pct_of_contribution !== null && (
+                <span className="text-xs tabular" style={{ color: "var(--text-muted)" }}>
+                  {order.pct_of_contribution.toFixed(1)}% do aporte
+                </span>
+              )}
+              <StatusChip status={order.status} />
+            </span>
           </div>
 
           {(order.target_price !== null || order.stop_price !== null) && (
             <p
-              className="flex items-center gap-1.5 text-[11px] mt-1.5 tabular"
+              className="flex flex-wrap items-center gap-1.5 text-[11px] mt-1.5 tabular"
               style={{ color: "var(--text-muted)" }}
             >
               <Target size={11} />
@@ -228,7 +233,7 @@ const OrderCard = ({
 
           {order.thesis && (
             <p
-              className="text-xs mt-1.5 leading-relaxed max-w-3xl"
+              className="text-xs mt-1.5 leading-relaxed max-w-3xl break-words"
               style={{ color: "var(--text-secondary)" }}
             >
               {order.thesis}
@@ -236,7 +241,10 @@ const OrderCard = ({
           )}
 
           {executed && executedTotal !== null && (
-            <p className="text-xs mt-2 tabular" style={{ color: "var(--text-secondary)" }}>
+            <p
+              className="text-xs mt-2 tabular break-words"
+              style={{ color: "var(--text-secondary)" }}
+            >
               Executada: {formatNumber(order.executed_quantity)} un. a{" "}
               {formatBRL(order.executed_price)} = {formatBRL(executedTotal)}{" "}
               <span style={{ color: "var(--text-muted)" }}>
@@ -250,10 +258,10 @@ const OrderCard = ({
         </div>
 
         {pending && (
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:shrink-0">
             <button
               onClick={onExecute}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-md text-xs font-semibold"
+              className="flex items-center justify-center gap-1.5 min-h-11 px-3.5 py-2 rounded-md text-xs font-semibold md:min-h-0"
               style={{ background: "var(--success)", color: "white" }}
             >
               <Check size={12} />
@@ -261,7 +269,7 @@ const OrderCard = ({
             </button>
             <button
               onClick={onSkip}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium"
+              className="flex items-center justify-center gap-1.5 min-h-11 px-3 py-2 rounded-md text-xs font-medium md:min-h-0"
               style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)" }}
             >
               <SkipForward size={12} />
@@ -346,22 +354,24 @@ const ExecuteDialog = ({
     <dialog
       ref={ref}
       onClose={onClose}
-      className="p-7 rounded-md max-w-md w-full backdrop:bg-black/40"
+      className="p-5 md:p-7 rounded-md max-w-md w-[calc(100%-2rem)] m-4 md:m-0 md:w-full backdrop:bg-black/40"
       style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
     >
       {order && (
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-3">
             <h3
-              className="text-2xl tracking-tight"
+              className="text-2xl tracking-tight min-w-0 break-words"
               style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
             >
               Executei {order.ticker}
             </h3>
+            {/* 44px tap target on phones; the desktop icon button is untouched. */}
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-md"
+              aria-label="Fechar"
+              className="flex items-center justify-center min-h-11 min-w-11 shrink-0 p-1.5 rounded-md md:block md:min-h-0 md:min-w-0"
               style={{ color: "var(--text-muted)" }}
             >
               <X size={16} />
@@ -406,11 +416,11 @@ const ExecuteDialog = ({
             </p>
           )}
 
-          <div className="flex gap-3 pt-1">
+          <div className="flex flex-col gap-3 pt-1 md:flex-row">
             <button
               type="submit"
               disabled={submitting}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold disabled:opacity-40"
+              className="flex items-center justify-center gap-2 min-h-11 w-full px-5 py-2.5 rounded-md text-sm font-semibold disabled:opacity-40 md:min-h-0 md:w-auto"
               style={{ background: "var(--success)", color: "white" }}
             >
               <Check size={13} />
@@ -419,7 +429,7 @@ const ExecuteDialog = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-md text-sm font-medium"
+              className="flex items-center justify-center min-h-11 w-full px-5 py-2.5 rounded-md text-sm font-medium md:min-h-0 md:w-auto"
               style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)" }}
             >
               Cancelar
@@ -474,13 +484,13 @@ const SkipDialog = ({
     <dialog
       ref={ref}
       onClose={onClose}
-      className="p-7 rounded-md max-w-md w-full backdrop:bg-black/40"
+      className="p-5 md:p-7 rounded-md max-w-md w-[calc(100%-2rem)] m-4 md:m-0 md:w-full backdrop:bg-black/40"
       style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
     >
       {order && (
         <form onSubmit={handleSubmit} className="space-y-4">
           <h3
-            className="text-2xl tracking-tight"
+            className="text-2xl tracking-tight break-words"
             style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
           >
             Pular {order.ticker}?
@@ -502,7 +512,8 @@ const SkipDialog = ({
               maxLength={200}
               onChange={(e) => setReason(e.target.value)}
               placeholder="ex: preço fugiu do alvo"
-              className="w-full px-4 py-2.5 rounded-md text-sm outline-none"
+              // text-base keeps iOS from zooming the viewport on focus.
+              className="w-full px-4 py-2.5 rounded-md text-base outline-none md:text-sm"
               style={{
                 background: "var(--bg-secondary)",
                 border: "1px solid var(--border)",
@@ -517,11 +528,11 @@ const SkipDialog = ({
             </p>
           )}
 
-          <div className="flex gap-3 pt-1">
+          <div className="flex flex-col gap-3 pt-1 md:flex-row">
             <button
               type="submit"
               disabled={submitting}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold disabled:opacity-40"
+              className="flex items-center justify-center gap-2 min-h-11 w-full px-5 py-2.5 rounded-md text-sm font-semibold disabled:opacity-40 md:min-h-0 md:w-auto"
               style={{ background: "var(--accent)", color: "white" }}
             >
               <SkipForward size={13} />
@@ -530,7 +541,7 @@ const SkipDialog = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-md text-sm font-medium"
+              className="flex items-center justify-center min-h-11 w-full px-5 py-2.5 rounded-md text-sm font-medium md:min-h-0 md:w-auto"
               style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)" }}
             >
               Cancelar
@@ -574,7 +585,8 @@ const Field = ({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full px-4 py-2.5 rounded-md text-sm outline-none tabular"
+      // text-base keeps iOS from zooming the viewport on focus.
+      className="w-full px-4 py-2.5 rounded-md text-base outline-none tabular md:text-sm"
       style={{
         background: "var(--bg-secondary)",
         border: "1px solid var(--border)",

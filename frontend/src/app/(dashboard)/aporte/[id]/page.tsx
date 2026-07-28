@@ -95,7 +95,7 @@ const AporteDetailPage = () => {
         </p>
         <Link
           href="/relatorios"
-          className="inline-flex items-center gap-2 mt-5 px-5 py-2.5 rounded-md text-sm font-semibold"
+          className="inline-flex min-h-[2.75rem] items-center gap-2 mt-5 px-5 rounded-md text-sm font-semibold"
           style={{ background: "var(--accent)", color: "white" }}
         >
           <ArrowLeft size={13} />
