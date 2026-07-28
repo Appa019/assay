@@ -10,6 +10,7 @@ a message is never lost.
 
 import html as _html
 import re
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -278,6 +279,42 @@ def send_document(
     except (httpx.HTTPError, TelegramError) as exc:
         logger.error("telegram_send_document_failed", error=_redact(token, str(exc)))
         return False
+
+
+def download_file(
+    file_id: str,
+    dest_dir: Path,
+    *,
+    preferred_name: str | None = None,
+    token: str | None = None,
+) -> Path:
+    """Download a user-sent file (photo/document) into ``dest_dir``.
+
+    Resolves the ``file_id`` via ``getFile`` and fetches the content from
+    Telegram's file endpoint (bot downloads are capped at ~20 MB by Telegram).
+    Returns the saved path; raises ``TelegramError`` on any failure.
+    """
+    token = token or settings.telegram_bot_token
+    if not token:
+        raise TelegramError("TELEGRAM_BOT_TOKEN não configurado")
+    try:
+        with httpx.Client(timeout=120.0) as client:
+            resp = client.get(f"{_base(token)}/getFile", params={"file_id": file_id})
+            data = resp.json()
+            if not data.get("ok"):
+                raise TelegramError(f"getFile falhou: {data}")
+            file_path = (data.get("result") or {}).get("file_path")
+            if not file_path:
+                raise TelegramError("getFile não retornou file_path")
+            content = client.get(f"{_API}/file/bot{token}/{file_path}")
+            content.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise TelegramError(_redact(token, f"download falhou: {exc}")) from exc
+    name = preferred_name or Path(file_path).name or "arquivo.bin"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / name
+    dest.write_bytes(content.content)
+    return dest
 
 
 def send_chat_action(

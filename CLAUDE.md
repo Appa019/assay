@@ -160,6 +160,11 @@ sem Playwright.
   o lock global pesado, então chat funciona mesmo com comitê rodando; fila
   serial no bot com indicador "digitando…". Limite de uso → mensagem amigável
   (fail-fast, sem esperar horas). `/resetchat` descarta a sessão (memória fica).
+  Aceita **foto e arquivo** (≤20 MB, limite do Telegram): o bot baixa via
+  `getFile` p/ `storage/chat_workspace/inbox/` e o consultor lê (visão p/
+  imagem; parsing p/ PDF/CSV/planilha) — cupom/nota vira gasto registrado,
+  extrato/fatura vira lançamentos. Áudio/vídeo/sticker → aviso de não
+  suportado; mensagens de serviço ficam em silêncio.
 - **Ledger de finanças pessoais (`CashflowEntry`, 2026-07-28)**: gastos e
   ganhos do dia a dia, separado do ledger `Trade`. API `/api/cashflow` (POST /
   GET com `month=`+`kind=` / DELETE / `GET /summary?month=YYYY-MM` com totais e

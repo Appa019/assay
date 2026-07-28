@@ -6,6 +6,9 @@ Long-polls Telegram and speaks Portuguese only.
 
 Any NON-command text is a live conversation with the financial consultant
 (a chained Claude session with its own fixed memory — see chat_service).
+Photos and documents (≤20 MB) are downloaded into the consultant's inbox and
+read by it (vision for images, parsing for PDF/CSV) — a receipt photo becomes
+a registered expense.
 
 Commands:
     /aporte <valor>                 cria o aporte e roda o comitê inteiro
@@ -26,6 +29,7 @@ import atexit
 import json
 import os
 import queue
+import re
 import sys
 import threading
 import time
@@ -88,7 +92,9 @@ _HELP = (
     "💬 *Me mande qualquer mensagem sem /* e eu respondo como seu consultor "
     "financeiro em tempo real: dúvidas de tickers, cripto, CDB, carteira, IR — "
     'e registro gastos e ganhos que você me contar ("gastei 80 no mercado"). '
-    "Eu lembro das conversas (memória fixa).\n\n"
+    "Eu lembro das conversas (memória fixa).\n"
+    "📎 Pode mandar *foto* (cupom, nota, print) ou *arquivo* (PDF, CSV, "
+    "planilha, até 20 MB): eu leio, analiso e registro o que for gasto/ganho.\n\n"
     "/gasto <valor> [descrição #categoria] — registro rápido de um gasto.\n"
     "/ganho <valor> [descrição #categoria] — registro rápido de um ganho.\n"
     "/financas [AAAA-MM] — resumo do mês: gastos × ganhos × saldo por categoria.\n"
@@ -185,6 +191,78 @@ def _enqueue_chat(text: str) -> str | None:
     if backlog >= 2:
         return f"📥 Na fila — ainda estou respondendo {backlog} mensagem(ns) antes dessa."
     return None  # the worker replies when the turn finishes
+
+
+# --- incoming media (photos + documents → consultant inbox) -----------------
+
+_MAX_FILE_BYTES = 20 * 1024 * 1024  # Telegram's download ceiling for bots
+_UNSUPPORTED_MEDIA_KEYS = (
+    "voice",
+    "audio",
+    "video",
+    "video_note",
+    "sticker",
+    "animation",
+    "location",
+    "contact",
+)
+
+
+def _safe_filename(name: str, fallback: str) -> str:
+    """Basename with only ASCII word chars, dots and dashes (path-traversal safe)."""
+    base = re.sub(r"[^\w.\-]", "_", Path(name or "").name, flags=re.ASCII).strip("._")
+    return base[:80] or fallback
+
+
+def _extract_media(msg: dict) -> tuple[str, str, str, int] | None:
+    """(kind, file_id, filename, size) for a photo or document message."""
+    doc = msg.get("document")
+    if doc:
+        name = _safe_filename(doc.get("file_name") or "", "documento.bin")
+        return ("arquivo", doc["file_id"], name, int(doc.get("file_size") or 0))
+    photos = msg.get("photo") or []
+    if photos:
+        best = photos[-1]  # Telegram lists sizes ascending; last = largest
+        return ("imagem", best["file_id"], "foto.jpg", int(best.get("file_size") or 0))
+    return None
+
+
+def _media_turn_text(kind: str, path: Path, caption: str) -> str:
+    caption_line = f'Legenda do cliente: "{caption}"' if caption else "Sem legenda."
+    return (
+        f"[ARQUIVO RECEBIDO — {kind}] O cliente enviou um arquivo pelo Telegram, "
+        f"salvo em: {path}\n{caption_line}\n"
+        "Leia o arquivo (imagem pela visão; PDF/CSV/planilha pelas ferramentas de "
+        "leitura) e siga suas ordens permanentes: cupom/nota → registre o gasto; "
+        "extrato/fatura → resuma e registre os lançamentos; senão, responda ao "
+        "que o cliente pediu."
+    )
+
+
+def _unsupported_media(msg: dict) -> str | None:
+    """Notice for media kinds the consultant can't read; None for service msgs."""
+    if any(key in msg for key in _UNSUPPORTED_MEDIA_KEYS):
+        return (
+            "🎤 Esse tipo de mídia eu ainda não leio — me manda texto, imagem "
+            "(foto/print) ou arquivo (PDF, CSV, planilha)."
+        )
+    return None
+
+
+def _handle_media(msg: dict) -> str:
+    kind, file_id, name, size = _extract_media(msg)  # caller guarantees media
+    if size > _MAX_FILE_BYTES:
+        return "📎 Arquivo grande demais — o Telegram só me deixa baixar até 20 MB."
+    stamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+    inbox = chat_service.CHAT_WORKSPACE / "inbox"
+    try:
+        path = telegram_service.download_file(file_id, inbox, preferred_name=f"{stamp}_{name}")
+    except telegram_service.TelegramError as exc:
+        return f"✖ Não consegui baixar o arquivo: {exc}"
+    caption = (msg.get("caption") or "").strip()
+    queued = _enqueue_chat(_media_turn_text(kind, path, caption))
+    ack = f"📎 Recebi {'a imagem' if kind == 'imagem' else 'o arquivo'} — analisando…"
+    return f"{queued}\n{ack}" if queued else ack
 
 
 # --- command handlers -------------------------------------------------------
@@ -728,7 +806,12 @@ def main() -> int:
                 continue
             text = msg.get("text") or ""
             try:
-                reply = _handle(text)
+                if _extract_media(msg) is not None:
+                    reply = _handle_media(msg)
+                elif text.strip():
+                    reply = _handle(text)
+                else:
+                    reply = _unsupported_media(msg)
             except Exception as exc:  # noqa: BLE001
                 reply = f"Erro: {exc}"
             if reply:
