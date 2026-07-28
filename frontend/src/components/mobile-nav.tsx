@@ -6,8 +6,8 @@ import { NAV_ITEMS, isCurrentPath } from "@/lib/nav";
 
 /**
  * Bottom tab bar for the phone, hidden from `md` up where the sidebar takes
- * over. Three destinations, so every one gets a comfortable thumb target and
- * nothing hides behind an overflow menu.
+ * over. Four destinations, each still a comfortable thumb target, and nothing
+ * hidden behind an overflow menu.
  */
 export const MobileNav = () => {
   const pathname = usePathname();
@@ -15,7 +15,7 @@ export const MobileNav = () => {
   return (
     <nav
       aria-label="Navegação principal"
-      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t md:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t md:hidden"
       style={{
         background: "var(--bg-card)",
         borderColor: "var(--border)",
