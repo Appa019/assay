@@ -589,8 +589,18 @@ def history(limit: int = 60) -> list[ChatMessage]:
 
 
 def is_busy() -> bool:
-    """True while a turn holds the chat lock, whoever started it."""
-    return _chat_lock_path().exists()
+    """True while a LIVE turn holds the chat lock, whoever started it.
+
+    Liveness is the whole point: a hard kill — a deploy restarting the backend
+    mid-turn, an OOM, a power cut — leaves the lock file behind, because the
+    ``finally`` that releases it never runs. Testing mere existence would then
+    409 every web message AND every ``/reset`` forever, with no way out but
+    deleting the file by hand on the Pi. Telegram would keep working the whole
+    time, since the turn runner reclaims stale locks on acquire, which makes
+    the failure look inexplicable from the outside.
+    """
+    path = _chat_lock_path()
+    return path.exists() and analysis_runner._lock_is_active(path)
 
 
 def converse(

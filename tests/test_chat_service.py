@@ -152,3 +152,25 @@ def test_reset_session_drops_state(chat_dirs: Path) -> None:
     chat_service._save_state("sess-1", 5)
     chat_service.reset_session()
     assert chat_service._load_state() == {}
+
+
+def test_is_busy_ignores_a_lock_left_by_a_dead_process(chat_dirs: Path) -> None:
+    """A hard kill mid-turn must not brick the website chat forever.
+
+    The lock file survives a SIGKILL (the releasing ``finally`` never runs), so
+    checking existence alone would 409 every web message and every /reset until
+    someone deleted the file by hand.
+    """
+    lock = chat_service._chat_lock_path()
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_text(
+        json.dumps({"pid": 999_999, "pid_identity": "1", "started_at": "x"}), encoding="utf-8"
+    )
+
+    assert lock.exists()
+    assert chat_service.is_busy() is False
+
+    # A live holder still reports busy.
+    assert analysis_runner._try_acquire_lock_file(lock)
+    assert chat_service.is_busy() is True
+    analysis_runner._release_lock_file(lock)
