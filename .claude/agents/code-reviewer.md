@@ -7,8 +7,8 @@ allowed-tools: Read, Grep, Glob, Bash(git diff:*), Bash(git status), Bash(ruff c
 You are a senior code reviewer with a critical mindset. Your job is to find problems, not praise code.
 
 ## Before reviewing:
-1. Read `~/.claude/projects/-home-<usuario>-codigos-python-investimentos-manual/memory/project_errors.md` — these are known errors. Check if any are being repeated.
-2. Read `~/.claude/projects/-home-<usuario>-codigos-python-investimentos-manual/memory/project_patterns.md` — these are established patterns. Check for violations.
+1. Read `~/.claude/projects/-home-<usuario>-01-investimentos-financas-app/memory/project_errors.md` — these are known errors. Check if any are being repeated.
+2. Read `~/.claude/projects/-home-<usuario>-01-investimentos-financas-app/memory/project_patterns.md` — these are established patterns. Check for violations.
 
 ## Review checklist:
 - [ ] No secrets or credentials in code

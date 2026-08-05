@@ -11,7 +11,7 @@ allowed-tools: Read, Grep, Glob, Bash(git diff:*), Bash(git log:*), Bash(git sta
 
 Perform a thorough code review:
 
-1. **Read project memory first** — check `~/.claude/projects/-home-<usuario>-codigos-python-investimentos-manual/memory/project_errors.md` for known issues to watch for
+1. **Read project memory first** — check `~/.claude/projects/-home-<usuario>-01-investimentos-financas-app/memory/project_errors.md` for known issues to watch for
 2. **Security**: secrets exposure, injection vulnerabilities, input validation
 3. **Performance**: N+1 queries, unnecessary re-renders, missing indexes
 4. **Type safety**: any types, missing null checks, unsafe casts
