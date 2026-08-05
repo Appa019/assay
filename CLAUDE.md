@@ -1,4 +1,14 @@
-# Mesa — finanças pessoais + investimentos
+# Assay — finanças pessoais + investimentos
+
+> ## 📚 DOCUMENTAÇÃO COMPLETA: `docs/`
+>
+> **Comece por [`docs/README.md`](docs/README.md)** — é o índice, dá o modelo
+> mental do projeto inteiro em ~5 minutos e aponta qual dos 13 documentos abrir
+> para cada tipo de tarefa (arquitetura, domínio, motor de IA, fluxos, API,
+> frontend, bot, operação, config, qualidade, decisões, estado atual).
+>
+> Este `CLAUDE.md` é o **contrato operacional sempre carregado**: regras que
+> valem em toda sessão. O detalhe e o "por quê" moram em `docs/`.
 
 > ## ⚠️ ONDE ISTO RODA (leia antes de qualquer coisa)
 >
@@ -6,7 +16,7 @@
 > exclusivamente no Pi 4 (`pi`, `~/investimentos_manual`),
 > sob systemd, 24/7. O desktop é só onde se ESCREVE código.
 >
-> - **Acesso**: `https://raspberrypi.tail1d0148.ts.net` — VPN Tailscale privada,
+> - **Acesso**: `https://<host-do-pi>.<tailnet>.ts.net` — VPN Tailscale privada,
 >   nada exposto na internet. Só aparelhos logados na conta do Pedro enxergam.
 >   Home Assistant (bônus) na `:8443`.
 > - **Serviços no Pi** (`systemctl --user`): `investimentos-backend` (uvicorn em
@@ -230,28 +240,34 @@ portas: o bot e a página `/consultor`.
 
 ### Produto merged + mobile-first (2026-07-28)
 O app deixou de ser só "mesa de aportes": **finanças pessoais e investimentos
-são pares**, não um sub-tópico do outro. O wordmark é **Mesa**.
+são pares**, não um sub-tópico do outro. O wordmark é **Assay** (era "Mesa"
+até 2026-07-29). A marca de aplicativo é um hexágono isométrico subdividido em
+retículo rombóico, sobre campo `#060a11` — deliberadamente abstrata e sem
+relação com a palavra "assay". Fonte única: `scripts/build_icon.py`, que emite
+`frontend/src/app/icon.svg`, `public/icon.svg`, `apple-icon.png` e os PNGs do
+manifest. Não edite os assets à mão — rode o script.
 - **Superfície primária = iPhone via Tailscale**. Desenhe mobile-first; o
   desktop herda. `PRODUCT.md` e `DESIGN.md` na raiz são o contrato de design
-  (registro `product`, paleta editorial em oklch, Fraunces só em títulos,
-  Manrope no resto, ZERO gradiente). **Branco puro é PERMITIDO** e preferido
+  (registro `product`, paleta em oklch tintada no hue 250, **Bricolage
+  Grotesque** só em títulos/display monetário, **Plus Jakarta Sans** no resto,
+  ZERO gradiente). **Branco puro é PERMITIDO** e preferido
   pelo cliente: `--bg-card` é `#fff` e o texto sobre botões de accent é `white`.
-- **TRÊS abas, só** (`src/lib/nav.ts` é a fonte única — mexa lá, não nos
+- **QUATRO abas** (`src/lib/nav.ts` é a fonte única — mexa lá, não nos
   componentes):
   1. **`/` Visão geral** — patrimônio + saldo do mês + alocação vs mandato +
      benchmark + ordens pendentes + macro. É a única tela que mostra as duas
      metades do dinheiro juntas.
   2. **`/consultor`** — o chat. É por onde se registra gasto/ganho e se pede
      aporte. Aceita foto e arquivo.
-  3. **`/investimentos`** — casca com sub-abas na URL (`?aba=carteira|aportar|
+  3. **`/extrato`** — ledger pessoal do mês, somente leitura (por categoria,
+     com exclusão de lançamento). Substituiu a antiga `/financas`, que não
+     existe mais.
+  4. **`/investimentos`** — casca com sub-abas na URL (`?aba=carteira|aportar|
      analises|ir`) que hospeda as views de `/ativos`, `/aporte`, `/relatorios`
      e `/ir`. Essas 4 páginas exportam o componente por NOME (`AtivosView` etc.)
      além do default — as rotas antigas seguem vivas para deep links.
 - **Shell responsivo**: `<Sidebar>` some abaixo de `md` e dá lugar ao
-  `<MobileNav>` (barra inferior de 3 abas, respeita `env(safe-area-inset-bottom)`).
-- **`/financas`** ainda existe como rota (ledger detalhado com lançamento
-  inline + classificação por IA), mas saiu da navegação: o caminho normal é
-  contar ao consultor.
+  `<MobileNav>` (barra inferior de 4 abas, respeita `env(safe-area-inset-bottom)`).
 - **Regras de iOS** (em `globals.css`): controles ≥16px senão o Safari dá zoom
   e não volta; alvos de toque ≥44px; `viewport-fit=cover` + safe areas.
 - **PWA**: `manifest.webmanifest` + `apple-icon.png` — "Adicionar à Tela de
@@ -478,6 +494,11 @@ cross-check CIO → execution → folha de ordens → monitoramento → resumo. 
   folga larga.
 
 ## Memória do projeto
+- **Documentação no repo: `docs/` — comece por `docs/README.md`.** É lá que vive
+  o entendimento completo do projeto (13 documentos). Ao mudar comportamento,
+  atualize o doc da área; ao consertar um bug sutil, registre em
+  `docs/12-decisoes.md`; ao mudar o estado do repo, atualize
+  `docs/13-estado-atual.md`.
 - Memória persistente em `~/.claude/projects/<encoded>/memory/`
 - Consulte ao retomar sessão futura para recuperar contexto
 - Salve em `feedback_lessons.md` se descobrir erros de ticker / CG id

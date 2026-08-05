@@ -1,0 +1,286 @@
+# 04 · Motor de IA
+
+> Arquivo central: `app/services/analysis_runner.py` (1494 linhas). Se algo de
+> IA quebrou, começa aqui.
+
+## O princípio
+
+O sistema **não usa a API da Anthropic**. Ele abre o binário `claude` (Claude
+Code CLI) como subprocess:
+
+```bash
+claude -p --output-format json --dangerously-skip-permissions \
+       --model opus --effort max \
+       --add-dir $HOME \
+       --mcp-config <workspace>/.mcp.json --strict-mcp-config \
+       [--resume <session_id>]
+# prompt entra por stdin
+```
+
+A saída é um JSON com `result`, `session_id`, `total_cost_usd`, `num_turns`,
+`is_error`. A **primeira** etapa roda fresh e o `session_id` é capturado; as
+seguintes usam `--resume <id>` — é assim que as 5 reuniões herdam contexto uma
+da outra, exatamente como colar os prompts em sequência à mão.
+
+Consequência: o agente é um Claude Code completo. Tem Bash, WebSearch, WebFetch,
+MCPs e acesso ao filesystem. O "prompt" não é só texto — é um **workspace em
+disco** com `CLAUDE.md`, `MEMORY.md`, ferramentas e notas.
+
+## Os quatro workspaces
+
+| Workspace | Quem usa | Modelo | Tem `.mcp.json`? |
+|---|---|---|---|
+| `storage/agent_workspace/` | comitê (aporte, semanal, maturidade) | `opus` / effort `max` | sim, 8–17 servidores |
+| `storage/chat_workspace/` | consultor (chat) | roteado: haiku/sonnet/opus | sim, mesmo baseline |
+| `storage/router_workspace/` | triagem do roteador | `haiku` / `low` | **não, de propósito** |
+| `storage/classifier_workspace/` | classificador de gasto | `haiku` / `low` | **não, de propósito** |
+
+> A **ausência** do `.mcp.json` é o que mantém os dois últimos rápidos (~5s):
+> nenhum servidor MCP boota. Não "conserte" isso adicionando config.
+
+### Anatomia do `agent_workspace/`
+
+| Arquivo | Quem escreve | Sobrevive ao ciclo? |
+|---|---|---|
+| `CLAUDE.md` | **o código**, a cada run (`_STANDING_ORDERS`) | reescrito sempre — edite no Python, não no arquivo |
+| `MEMORY.md` | **o agente** | sim (é a memória dele entre ciclos) |
+| `.mcp.json` | **o código**, a cada run | regenerado = baseline ∪ `.mcp.agent.json` |
+| `.mcp.agent.json` | **o agente** | sim, **nunca sobrescrito** |
+| `tools/` | o agente | sim (workspace é repo git) |
+| `notes/` | o agente | sim (rascunhos por round; não use `/tmp`) |
+| `out/<contribution_id>/etapa_NN.json` | o agente | sim — fonte canônica entre etapas se o contexto truncar |
+| `memory/graph.json` | MCP `memory` | sim |
+
+O `chat_workspace/` é análogo, mais `session.json` (session_id + contagem de
+turnos) e `inbox/` (fotos e arquivos recebidos, ≤20 MB).
+
+## MCPs — três tiers
+
+Construídos em `_baseline_mcp_servers()` e mesclados em `_effective_mcp_config()`
+(o agente vence em conflito de nome). Sempre com `--strict-mcp-config`, então
+**só** esse conjunto carrega — Gmail/Calendar/Drive do usuário ficam de fora de
+propósito (o agente é autônomo e não deve agir neles).
+
+**Tier 1 — runtime e raciocínio (8, sempre):** `sequential-thinking`,
+`filesystem` ($HOME), `fetch`, `context7`, `playwright`, `memory`, `time`, `git`.
+
+**Tier 2 — dados financeiros sem chave (4, sempre):**
+- `coingecko` (HTTP remoto) — preços/market cap de qualquer cripto, fonte
+  canônica de identidade (CoinGecko-id)
+- `yahoo-finance` (uvx do GitHub) — ações B3 com sufixo `.SA`, fundamentos,
+  demonstrações, opções
+- `defillama` — TVL, yields/APY, receita de protocolos
+- `exa` (HTTP remoto) — busca semântica em fontes de qualidade
+
+**Tier 3 — premium key-gated (5, só se a chave existir no `.env`):**
+`glassnode` (on-chain), `coinglass` (derivativos), `messari` (tokenomics),
+`firecrawl` (scraping estruturado), `tavily` (research com citação).
+Definidos em `_KEY_GATED_MCP_SERVERS`; a chave chega ao run via
+`_agent_subprocess_env()` e o JSON usa `${VAR}` (segredo não vai para o disco).
+
+### Auto-provisionamento
+
+O agente pode adicionar **qualquer** MCP novo escrevendo em `.mcp.agent.json`.
+Ele é mesclado ao baseline a cada run e carrega no **próximo** ciclo (MCPs
+sobem no início do processo). Para uso imediato, o agente chama a CLI via Bash.
+
+### ⚠️ Playwright no Pi
+
+`@playwright/mcp` aponta para o Google Chrome, que **não tem build ARM64 para
+Linux**. `_playwright_mcp_args()` detecta a ausência de `/opt/google/chrome/chrome`
+e cai para o Chromium do sistema com `--headless`. **Não simplifique de volta.**
+
+### Higiene de ambiente
+
+`_agent_subprocess_env()` herda o env do pai **menos** uma deny-list:
+prefixos `AWS_`, `GCP_`, `AZURE_`, `OPENAI_`, `GOOGLE_API` e exatos
+`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GMAIL_APP_PASSWORD`, `GITHUB_TOKEN`,
+`GH_TOKEN`. O agente tem acesso total à máquina — não entregue a identidade do
+bot nem credencial de nuvem alheia a ele.
+
+## `run_chain()` — o encadeador genérico
+
+```python
+run_chain(steps: list[tuple[titulo, prompt]], *, run_id, model, effort,
+          step_timeout, persist=callback, on_event=callback,
+          resume_session_id=None, on_session_id=callback,
+          step_offset=0, total_steps=None, limit_backoff=None) -> RunSummary
+```
+
+- Etapa 1 fresh → captura `session_id` → etapas seguintes `--resume`.
+- Algumas versões da CLI **rotacionam** o session id no resume; o código sempre
+  adota o mais recente, senão o próximo resume miraria numa sessão morta.
+- `persist(index, title, result)` é chamado ao fim de cada etapa → progresso
+  durável e observável.
+- `step_offset`/`total_steps` mantêm a numeração absoluta em retomadas (a UI
+  mostra "etapa 4/6", não "1/3").
+- Segura o **lock global** durante toda a corrente.
+
+Usado por: aporte (5 reuniões + fechamento), revisão semanal (2 etapas),
+maturidade (2 etapas).
+
+## Resiliência — o que acontece quando falha
+
+### Classificação de erro (`_run_claude_step`)
+
+O stderr + `result` + `subtype` viram um blob minúsculo e são casados contra
+listas de padrões:
+
+| Classe | Padrões (exemplos) | Ação |
+|---|---|---|
+| `SessionNotFoundError` | "no conversation found", "session not found" | recomeça do zero (não retenta o resume) |
+| `AnalysisError` (duro) | "prompt is too long", "context length", "invalid api key" | desiste — o prompt é que está errado |
+| `LimitError` | "rate limit", "usage limit", "429", "resets at", "5-hour", "quota" | **espera e retoma** |
+| `RetryableError` | qualquer falha desconhecida, timeout, saída vazia | 3 retries rápidos (20s, 60s, 120s) |
+
+### Espera inteligente por limite
+
+`_seconds_until_reset()` parseia "resets 8:20pm" da mensagem e espera **exatamente**
+até a janela reabrir (+60s de folga, teto de 6h). Se anunciado às 23h que
+"resets 1am", rola para o dia seguinte. Sem hora anunciada, backoff escalonado:
+`60 → 300 → 900 → 1800 → 3600 → 3600 → 3600`.
+
+**Contadores independentes** para limite × transiente: uma noite inteira de
+espera por limite não pode consumir o orçamento de retry que um blip de rede
+precisa depois.
+
+### Retomada em três níveis
+
+1. **Dentro do processo** — `_run_step_resilient` espera e retoma a MESMA etapa.
+2. **Entre reinícios de processo** — `claude_session_id` está no banco e cada
+   resposta é salva ao concluir. Re-rodar `run_analysis` retoma da 1ª etapa sem
+   resposta, na MESMA sessão. Se a sessão sumiu, recomeça do zero **e limpa as
+   respostas antigas** (`_clear_stale_responses`) — senão uma retomada futura
+   contaria etapas que a nova sessão nunca viu.
+3. **Automática, sem ninguém mandar** — `scripts/resume_pending.py` roda a cada
+   15 min, acha análises incompletas (`pending_resumable_ids`) e retoma
+   fail-fast (uma espera curta; tenta de novo no próximo pass). Avisa no
+   Telegram. Desiste após `MAX_RUN_ATTEMPTS` (5) falhas consecutivas.
+
+### Locks (arquivos em `storage/analysis_runs/`)
+
+| Lock | Escopo | Por quê |
+|---|---|---|
+| `<contribution_id>.lock` | por aporte | a mesma análise nunca roda em dobro (CLI × API × bot × resume) |
+| `_global_run.lock` | máquina inteira | **uma** execução pesada de Claude por vez — comitê, semanal e maturidade dividem a mesma janela de uso |
+| `_chat_turn.lock` | chat | serializa turnos. **Não usa o lock global** — chat funciona mesmo com o comitê rodando |
+
+Todo teste de posse passa por `_lock_is_active` (pid + starttime). Nunca conclua
+"está ocupado" só porque o arquivo existe: um kill duro deixa lock órfão, e foi
+exatamente isso que travou o chat do site por tempo indeterminado (armadilha A25
+em `12-decisoes.md`). `is_run_active()` e `chat_service.is_busy()` são os dois
+lugares que respondem essa pergunta — ambos validam liveness.
+
+Implementação: criação atômica com `O_CREAT|O_EXCL`, payload com `pid` +
+`pid_identity` (starttime de `/proc/<pid>/stat`) + `started_at`. O lock só está
+"vivo" se o pid existe **e** é o mesmo processo — assim uma espera legítima de
+horas segura o lock, mas um pid reciclado após reboot não consegue fingir posse.
+**Não há reclaim por idade.**
+
+`is_run_active()` deixa a API distinguir "rodando de verdade" (409) de um
+`IN_PROGRESS` órfão deixado por um crash (re-run permitido).
+
+### Transcripts
+
+Todo `stdout`/`stderr` bruto de cada invocação vai para
+`storage/analysis_runs/transcripts/<tag>_<timestamp>.stdout.json`. É o flight
+recorder: um run de várias horas que morre deixava nada para trás. Best-effort,
+nunca derruba o run.
+
+### Matar a árvore de processos
+
+`claude` gera filhos npx/uvx (os MCPs). Matar só o pai deixa órfão comendo RAM
+para sempre. Por isso `start_new_session=True` + `os.killpg(proc.pid, SIGKILL)`
+em `_kill_process_tree`.
+
+## Contexto injetado no aporte
+
+Antes da Reunião nº 1, três blocos são prefixados ao primeiro prompt:
+
+1. **Preâmbulo** (`_build_preamble`) — valor do aporte, data, mandato, trava por
+   lote, ordem de ler/atualizar `MEMORY.md`, onde salvar os JSONs.
+2. **Consulta à última revisão semanal** (`_latest_weekly_context`) — até 6000
+   chars, cortado em fronteira de parágrafo.
+3. **Track record** (`_track_record_context`) — últimas 12 vendas com P&L e hit
+   rate. Sem isso o comitê é um oráculo sem memória de ter errado.
+
+## Fechamento e bloco de ordens
+
+Depois das 5 reuniões, roda `_SYNTHESIS_PROMPT`: um esqueleto **rígido** de
+"onde investir e quanto" (entradas numeradas, totais por classe, soma que bate
+±R$ 5), sem recap, sem próximos passos, sem disclaimer.
+
+Depois de `---`, um bloco ```json {"orders": [...]}``` legível por máquina.
+`order_service`:
+- `parse_orders_block` — pega o **último** bloco json válido
+- `_normalize_class` — tolerante: `equity_b3`, `fixed_income_cdb`,
+  `crypto_stablecoin` etc. caem nas 3 classes por substring
+- `_first(row, *sinônimos)` — modelos parafraseiam nomes de campo
+- `strip_machine_block` — o cliente vê **só** a estrutura limpa; o bloco fica no
+  banco para ingestão
+- `ingest_contribution_orders` — idempotente (pula se o aporte já tem ordens),
+  best-effort (linha malformada é logada e descartada, nunca falha o run)
+
+## Chat do consultor
+
+`chat_service.py`. Uma sessão encadeada persistente por `session.json`,
+rotacionada a cada `CHAT_MAX_TURNS` (40) turnos — o `MEMORY.md` carrega o
+contexto durável através da rotação.
+
+- Turno fresh recebe instrução de **ler `./MEMORY.md` antes de responder**.
+- Limite de uso → `ChatUnavailableError` com mensagem amigável e estimativa de
+  quando libera. **Fail-fast**: o chat não espera horas como o comitê.
+- `converse()` grava as duas pontas em `ChatMessage`; `start_turn()` dispara em
+  thread e volta na hora (um turno leva minutos; nenhum cliente HTTP segura isso).
+- Anexos: `save_attachment` → `inbox/`, nome saneado (`safe_filename`, ASCII,
+  sem traversal), 20 MB de teto. `media_turn_text` monta o prompt que manda o
+  consultor ler o arquivo e agir (cupom → registra gasto; extrato → resume e
+  lança).
+
+As **ordens permanentes do consultor** (`_CONSULTANT_ORDERS`, ~220 linhas) são o
+coração comportamental dele e cobrem: registrar gasto/ganho via API, análise
+"como estou indo?" com opinião, framework de **sourcing de liquidez** (caixa →
+CDB → lote livre, contando isenção de IR), disparar aporte sozinho, gestão da
+memória fixa, regra de recorrente ("lembrar não basta, tem que lançar"),
+anti-duplicação, MCPs disponíveis, anti-manipulação e formato de resposta
+(≤12 linhas, celular).
+
+## Roteador de modelo
+
+`model_router.py`. Antes, todo turno era opus/high — correto para "devo trocar
+CDB por PETR4?" e absurdo para "oi".
+
+```
+atalho: saudação (≤24 chars, regex)          → FAST,     sem custo de triagem
+atalho: verbo de lançamento + número         → FAST,     economiza ~6s
+        (e SEM palavra de mercado)
+senão:  triagem haiku (1 palavra)            → FAST | BALANCED | DEEP
+falha na triagem                             → BALANCED  (nunca derruba o chat)
+CHAT_ROUTER_ENABLED=false                    → DEEP sempre (comportamento antigo)
+```
+
+Tiers (configuráveis): FAST = haiku/low · BALANCED = sonnet/medium ·
+DEEP = opus/high. O modelo e o tier usados ficam gravados na `ChatMessage`.
+
+## Classificador de gasto
+
+`classifier_service.py`. "gastei 42,90 no mercado ontem" → JSON estruturado
+(`kind`, `amount_brl`, `category`, `description`, `occurred_on` com data
+relativa resolvida). haiku, workspace sem MCP, ~5s.
+
+**Devolve RASCUNHO e não grava** (`POST /api/cashflow/classify` → `CashflowCreate`).
+O usuário confirma no formulário — senão um erro de leitura entra calado no
+ledger. Data malformada cai para hoje em vez de falhar a entrada inteira.
+
+## Onde mexer quando…
+
+| Quero… | Mexa em |
+|---|---|
+| mudar o comportamento permanente do comitê | `_STANDING_ORDERS` em `analysis_runner.py` |
+| mudar o comportamento do consultor | `_CONSULTANT_ORDERS` em `chat_service.py` |
+| mudar o formato do fechamento | `_SYNTHESIS_PROMPT` em `analysis_runner.py` |
+| adicionar um MCP ao baseline | `_baseline_mcp_servers()` (ou `_KEY_GATED_MCP_SERVERS` se exigir chave) |
+| mudar o texto de uma reunião | `app/agents_prompts/0N_*.j2` |
+| mudar título/descrição das reuniões | `prompt_generator._PROMPT_DEFINITIONS` |
+| adicionar um tipo de análise novo | escreva os `steps` e chame `run_chain` (veja `review_service`) |
+| mudar timeouts, modelo ou effort | `app/config.py` / `.env` |
