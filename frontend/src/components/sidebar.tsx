@@ -21,7 +21,7 @@ export const Sidebar = () => {
             color: "var(--text-primary)",
           }}
         >
-          Mesa
+          Assay
         </h1>
         <p
           className="text-[11px] mt-1.5 uppercase tracking-[0.18em]"

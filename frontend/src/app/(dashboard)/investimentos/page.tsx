@@ -37,7 +37,7 @@ const Masthead = () => (
     className="text-[11px] font-medium uppercase tracking-[0.18em]"
     style={{ color: "var(--text-muted)" }}
   >
-    Mesa · investimentos
+    Assay · investimentos
   </p>
 );
 

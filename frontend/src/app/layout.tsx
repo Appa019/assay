@@ -20,12 +20,12 @@ const body = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Mesa",
+  title: "Assay",
   description: "Finanças pessoais e carteira de investimentos",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Mesa",
+    title: "Assay",
     // Renders the status bar over the page so the header can own the top inset.
     statusBarStyle: "default",
   },
@@ -36,7 +36,8 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   width: "device-width",
   initialScale: 1,
-  themeColor: "#f8f9fb",
+  // Matches --bg-primary, so the iOS status bar blends into the page.
+  themeColor: "#f6f7f9",
 };
 
 const RootLayout = ({
