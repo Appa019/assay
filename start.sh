@@ -69,7 +69,9 @@ free_port "$FRONTEND_PORT"
 RELOAD_FLAG=""
 [ "${START_RELOAD:-0}" = "1" ] && RELOAD_FLAG="--reload"
 info "Iniciando backend FastAPI na porta $BACKEND_PORT"
-.venv/bin/uvicorn app.main:app \
+# python -m: venv entry-point scripts hardcode the CREATION path in their
+# shebang, so renaming the project dir breaks them with exit 127 (it did).
+.venv/bin/python -m uvicorn app.main:app \
   --host 127.0.0.1 \
   --port "$BACKEND_PORT" \
   $RELOAD_FLAG \

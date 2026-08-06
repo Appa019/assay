@@ -81,8 +81,10 @@ WantedBy=timers.target
 UNIT
 }
 
+# python -m survives a project-dir rename; the uvicorn entry-point script
+# hardcodes its creation path in the shebang and dies with exit 127 after one.
 long_service backend "Investimentos Manual — backend FastAPI" \
-  "${PROJECT_ROOT}/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000"
+  "${PROJECT_ROOT}/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000"
 long_service bot "Investimentos Manual — bot do Telegram" \
   "${PY} ${PROJECT_ROOT}/scripts/telegram_bot.py"
 # Serves the production build; bound to loopback so a shared LAN cannot reach it

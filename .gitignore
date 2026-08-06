@@ -58,3 +58,5 @@ storage/analysis_runs/
 storage/agent_workspace/
 storage/notifications_state.json
 storage/chat_workspace/
+storage/router_workspace/
+storage/classifier_workspace/

@@ -8,7 +8,7 @@ dev:            ## backend + frontend + bot (daily use)
 	./start.sh
 
 backend:        ## backend only, with reload (development)
-	.venv/bin/uvicorn app.main:app --reload
+	.venv/bin/python -m uvicorn app.main:app --reload
 
 frontend:       ## frontend only (development)
 	cd frontend && pnpm dev
