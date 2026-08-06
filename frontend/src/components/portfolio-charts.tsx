@@ -195,7 +195,7 @@ export const AllocationDonut = ({
   if (data.length === 0) {
     return (
       <p className="text-sm py-10 text-center" style={{ color: "var(--text-muted)" }}>
-        Sem posições ainda — o donut aparece com a primeira compra.
+        Sem posições ainda: o donut aparece com a primeira compra.
       </p>
     );
   }

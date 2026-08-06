@@ -158,7 +158,7 @@ def build_report(session: Session, start: date, end: date) -> str:
         "",
         f"## Custo de análise no mês: US$ {cost:.2f}",
         "",
-        "_Gerado automaticamente. IR simplificado — confira com seu contador._",
+        "_Gerado automaticamente. IR simplificado: confira com seu contador._",
     ]
     return "\n".join(lines)
 
@@ -174,7 +174,7 @@ def main() -> int:
         start, end = today.replace(day=1), today
     else:
         start, end = _month_bounds(today)
-    title = f"Relatório mensal — {start.strftime('%Y-%m')}"
+    title = f"Relatório mensal · {start.strftime('%Y-%m')}"
 
     try:
         with Session(engine) as session:

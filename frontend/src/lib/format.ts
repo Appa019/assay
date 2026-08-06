@@ -7,7 +7,7 @@ export const formatBRL = (
   value: number | null | undefined,
   options?: BRLOptions,
 ): string => {
-  if (value === null || value === undefined) return "—";
+  if (value === null || value === undefined) return "–";
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
@@ -25,7 +25,7 @@ export const formatBRLCompact = (value: number | null | undefined): string =>
  * Intl inserts after the symbol.
  */
 export const formatAmount = (value: number | null | undefined): string => {
-  if (value === null || value === undefined) return "—";
+  if (value === null || value === undefined) return "–";
   return new Intl.NumberFormat("pt-BR", {
     style: "decimal",
     minimumFractionDigits: 2,
@@ -34,7 +34,7 @@ export const formatAmount = (value: number | null | undefined): string => {
 };
 
 export const formatNumber = (value: number | null | undefined): string => {
-  if (value === null || value === undefined) return "—";
+  if (value === null || value === undefined) return "–";
   return value >= 1
     ? new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 }).format(value)
     : new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 8 }).format(value);
@@ -44,7 +44,7 @@ export const formatPercent = (
   value: number | null | undefined,
   digits = 1,
 ): string => {
-  if (value === null || value === undefined) return "—";
+  if (value === null || value === undefined) return "–";
   return `${value.toFixed(digits)}%`;
 };
 
@@ -72,12 +72,12 @@ export const parseLocalDate = (value: string): Date => {
 };
 
 export const formatDate = (value: string | null | undefined): string => {
-  if (!value) return "—";
+  if (!value) return "–";
   return parseLocalDate(value).toLocaleDateString("pt-BR");
 };
 
 export const formatDateLong = (value: string | null | undefined): string => {
-  if (!value) return "—";
+  if (!value) return "–";
   return parseLocalDate(value).toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "long",
@@ -86,7 +86,7 @@ export const formatDateLong = (value: string | null | undefined): string => {
 };
 
 export const formatDateTime = (value: string | null | undefined): string => {
-  if (!value) return "—";
+  if (!value) return "–";
   return parseLocalDate(value).toLocaleString("pt-BR");
 };
 

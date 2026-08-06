@@ -25,7 +25,7 @@ const DashboardError = ({
       Algo quebrou nesta tela
     </h2>
     <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-      O resto do app continua funcionando — use o menu abaixo para sair daqui.
+      O resto do app continua funcionando. Use o menu abaixo para sair daqui.
       Se insistir, provavelmente é o backend devolvendo algo inesperado.
     </p>
 

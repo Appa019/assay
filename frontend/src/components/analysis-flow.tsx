@@ -120,7 +120,7 @@ export const AnalysisFlow = ({
           <Sparkles size={16} style={{ color: "var(--accent-strong)" }} className="mt-0.5 shrink-0" />
           <div className="text-xs leading-relaxed" style={{ color: "var(--text-primary)" }}>
             O comitê roda de forma autônoma no servidor (Opus · max · sessão única
-            encadeada). Cada reunião pode levar minutos — pode fechar esta aba: a
+            encadeada). Cada reunião pode levar minutos. Pode fechar esta aba: a
             análise continua e esta página retoma de onde estiver ao reabrir.
           </div>
         </section>

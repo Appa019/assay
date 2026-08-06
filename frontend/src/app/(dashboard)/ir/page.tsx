@@ -180,7 +180,7 @@ export const IrView = () => {
                 Sem vendas em {report.year}
               </p>
               <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                Nenhuma apuração mensal — não há DARF a pagar neste ano
+                Nenhuma apuração mensal: não há DARF a pagar neste ano
               </p>
             </div>
           ) : (
@@ -245,13 +245,13 @@ export const IrView = () => {
                             {formatMonth(m.month)}
                           </td>
                           <td className="px-4 py-3.5 text-right tabular">
-                            {m.stocks.sales_brl > 0 ? formatBRL(m.stocks.sales_brl) : "—"}
+                            {m.stocks.sales_brl > 0 ? formatBRL(m.stocks.sales_brl) : "–"}
                           </td>
                           <td className="px-4 py-3.5">
                             <TaxStatus cls={m.stocks} />
                           </td>
                           <td className="px-4 py-3.5 text-right tabular">
-                            {m.crypto.sales_brl > 0 ? formatBRL(m.crypto.sales_brl) : "—"}
+                            {m.crypto.sales_brl > 0 ? formatBRL(m.crypto.sales_brl) : "–"}
                           </td>
                           <td className="px-4 py-3.5">
                             <TaxStatus cls={m.crypto} />
@@ -272,7 +272,7 @@ export const IrView = () => {
                   className="text-xl tracking-tight"
                   style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
                 >
-                  Renda fixa — IR retido na fonte
+                  Renda fixa · IR retido na fonte
                 </h3>
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
                   Informativo: o imposto do CDB é retido pelo banco na tabela
@@ -314,14 +314,14 @@ export const IrView = () => {
                         />
                         <StackedField
                           label="Dias"
-                          value={row.days_held !== null ? String(row.days_held) : "—"}
+                          value={row.days_held !== null ? String(row.days_held) : "–"}
                         />
                         <StackedField
                           label="Alíquota retida"
                           value={
                             row.withheld_rate_pct !== null
                               ? `${row.withheld_rate_pct.toFixed(1)}%`
-                              : "—"
+                              : "–"
                           }
                         />
                       </div>
@@ -362,12 +362,12 @@ export const IrView = () => {
                             {formatBRL(row.income_brl)}
                           </td>
                           <td className="px-4 py-3 text-right tabular">
-                            {row.days_held ?? "—"}
+                            {row.days_held ?? "–"}
                           </td>
                           <td className="px-4 py-3 text-right tabular">
                             {row.withheld_rate_pct !== null
                               ? `${row.withheld_rate_pct.toFixed(1)}%`
-                              : "—"}
+                              : "–"}
                           </td>
                         </tr>
                       ))}
@@ -572,7 +572,7 @@ const MonthClassBlock = ({ label, cls }: { label: string; cls: TaxMonthClass }) 
   <div>
     <StackedField
       label={label}
-      value={cls.sales_brl > 0 ? formatBRL(cls.sales_brl) : "—"}
+      value={cls.sales_brl > 0 ? formatBRL(cls.sales_brl) : "–"}
     />
     <div className="mt-2">
       <TaxStatus cls={cls} />
@@ -584,7 +584,7 @@ const TaxStatus = ({ cls }: { cls: TaxMonthClass }) => {
   if (cls.sales_brl <= 0) {
     return (
       <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-        —
+        –
       </span>
     );
   }

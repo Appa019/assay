@@ -175,7 +175,7 @@ def _evaluate_projection(session: Session, today: date) -> tuple[bool, Insight |
 
     top = next((c for c in summary.by_category if c.kind == CashflowKind.EXPENSE), None)
     brake = (
-        f" — dá pra evitar segurando {top.category} ({_fmt(top.total_brl)} no mês)" if top else ""
+        f"; dá pra evitar segurando {top.category} ({_fmt(top.total_brl)} no mês)" if top else ""
     )
     month_name = _MONTH_NAMES[today.month - 1]
     text = (
@@ -341,7 +341,7 @@ def build_weekly_digest(session: Session, *, today: date | None = None) -> str |
     month_name = _MONTH_NAMES[today.month - 1]
     mood = "no azul" if summary.net_brl >= 0 else "no vermelho"
     lines = [
-        f"📒 Resumo financeiro — {month_name} até dia {today.day:02d}",
+        f"📒 Resumo financeiro · {month_name} até dia {today.day:02d}",
         "",
         f"Saldo do mês: {_fmt(summary.net_brl)} ({mood})",
         f"• Ganhos: {_fmt(summary.income_brl)} · Gastos: {_fmt(summary.expense_brl)}",
@@ -351,7 +351,7 @@ def build_weekly_digest(session: Session, *, today: date | None = None) -> str |
     if top_expenses:
         lines += ["", "Maiores gastos do mês:"]
         lines += [
-            f"{i}. {c.category} — {_fmt(c.total_brl)} ({c.count}x)"
+            f"{i}. {c.category}: {_fmt(c.total_brl)} ({c.count}x)"
             for i, c in enumerate(top_expenses, 1)
         ]
 

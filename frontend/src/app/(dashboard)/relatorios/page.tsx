@@ -312,7 +312,7 @@ const AgentReports = ({ reports }: { reports: ReportListItem[] }) => {
         Relatórios do comitê
       </h3>
       <p className="text-xs -mt-1" style={{ color: "var(--text-muted)" }}>
-        Revisões semanais, análises de maturidade e relatórios mensais — também consultados nos
+        Revisões semanais, análises de maturidade e relatórios mensais, também consultados nos
         aportes.
       </p>
       <div className="space-y-2">
@@ -431,19 +431,19 @@ const DetailView = ({ contribution }: { contribution: Contribution }) => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 tabular">
             <p>
               <span style={{ color: "var(--text-muted)" }}>Selic </span>
-              <strong>{macro.macro.selic ?? "—"}%</strong>
+              <strong>{macro.macro.selic ?? "–"}%</strong>
             </p>
             <p>
               <span style={{ color: "var(--text-muted)" }}>IPCA 12m </span>
-              <strong>{macro.macro.ipca_12m ?? "—"}%</strong>
+              <strong>{macro.macro.ipca_12m ?? "–"}%</strong>
             </p>
             <p>
               <span style={{ color: "var(--text-muted)" }}>CDI </span>
-              <strong>{macro.macro.cdi ?? "—"}%</strong>
+              <strong>{macro.macro.cdi ?? "–"}%</strong>
             </p>
             <p>
               <span style={{ color: "var(--text-muted)" }}>USD/BRL </span>
-              <strong>R$ {macro.macro.usd_brl ?? "—"}</strong>
+              <strong>R$ {macro.macro.usd_brl ?? "–"}</strong>
             </p>
           </div>
         </div>
@@ -506,7 +506,7 @@ const DetailView = ({ contribution }: { contribution: Contribution }) => {
                 className="text-sm italic"
                 style={{ color: "var(--text-muted)" }}
               >
-                Sem resposta ainda — reunião não concluída
+                Sem resposta ainda: reunião não concluída
               </p>
             )}
           </div>
@@ -527,7 +527,7 @@ const DetailView = ({ contribution }: { contribution: Contribution }) => {
             </p>
             <DownloadButton
               content={stripMachineBlocks(contribution.final_summary)}
-              title={`Aporte ${formatBRL(contribution.amount_brl)} — ${formatDate(contribution.created_at)}`}
+              title={`Aporte ${formatBRL(contribution.amount_brl)} · ${formatDate(contribution.created_at)}`}
             />
           </div>
           <MarkdownViewer content={stripMachineBlocks(contribution.final_summary)} withToc={false} />

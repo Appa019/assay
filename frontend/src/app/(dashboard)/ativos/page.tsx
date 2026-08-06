@@ -108,7 +108,7 @@ const realizedPnlColor = (trade: Trade): string =>
 
 const realizedPnlLabel = (trade: Trade): string =>
   trade.realized_pnl_brl === null
-    ? "—"
+    ? "–"
     : `${trade.realized_pnl_brl >= 0 ? "+" : ""}${formatBRL(trade.realized_pnl_brl)}${
         trade.realized_pnl_pct !== null
           ? ` (${trade.realized_pnl_pct >= 0 ? "+" : ""}${trade.realized_pnl_pct.toFixed(2)}%)`
@@ -901,7 +901,7 @@ export const AtivosView = () => {
                               disabled={locked}
                               title={
                                 lock.kind === "locked"
-                                  ? `Trava de ${MIN_HOLDING_DAYS} dias por lote — libera em ${lock.remainingDays}d (${lock.unlockDate.toLocaleDateString("pt-BR")})`
+                                  ? `Trava de ${MIN_HOLDING_DAYS} dias por lote: libera em ${lock.remainingDays}d (${lock.unlockDate.toLocaleDateString("pt-BR")})`
                                   : undefined
                               }
                               className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium disabled:opacity-45"
@@ -957,7 +957,7 @@ export const AtivosView = () => {
                 style={{ background: "var(--warning-light)", color: "var(--text-secondary)" }}
               >
                 <Lock size={13} className="mt-0.5 shrink-0" style={{ color: "var(--warning)" }} />
-                Lote travado: faltam {sellLock.remainingDays} dia(s) — o backend
+                Lote travado: faltam {sellLock.remainingDays} dia(s): o backend
                 vai recusar a venda antes de{" "}
                 {sellLock.unlockDate.toLocaleDateString("pt-BR")}.
               </p>

@@ -102,7 +102,7 @@ const ConfiguracoesPage = () => {
           </li>
           <li>
             O agente roda todas as reuniões encadeadas no <code style={{ background: "var(--bg-secondary)", padding: "1px 6px", borderRadius: 3 }}>claude</code>{" "}
-            headless (Opus · max) — acompanhe etapa por etapa na própria tela.
+            headless (Opus · max): acompanhe etapa por etapa na própria tela.
           </li>
           <li>Ao final, ele entrega onde investir e quanto; a folha de ordens também chega no Telegram.</li>
           <li>Registre o que comprou em <strong>Ativos</strong> (cada compra é um lote com trava própria).</li>
@@ -134,7 +134,7 @@ const Var = ({ name, desc }: { name: string; desc: string }) => (
     >
       {name}
     </code>
-    <span>— {desc}</span>
+    <span>· {desc}</span>
   </li>
 );
 

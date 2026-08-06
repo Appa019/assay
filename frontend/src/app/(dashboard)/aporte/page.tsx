@@ -69,7 +69,7 @@ export const AporteView = () => {
         >
           Informe o valor. O sistema captura o macro (BCB · Yahoo · CoinGecko),
           fotografa sua carteira e roda as 5 reuniões do comitê + fechamento no
-          Claude Code sozinho — cada reunião encadeada na anterior. Você
+          Claude Code sozinho, cada reunião encadeada na anterior. Você
           acompanha etapa por etapa e recebe, no fim, onde investir e quanto.
         </p>
       </header>
@@ -266,7 +266,7 @@ const MacroCard = ({
 }) => {
   const formatted =
     value === null || value === undefined
-      ? "—"
+      ? "–"
       : `${prefix ?? ""}${signed && value > 0 ? "+" : ""}${value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}${unit ?? ""}`;
 
   return (

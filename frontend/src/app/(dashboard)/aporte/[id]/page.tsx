@@ -113,7 +113,7 @@ const AporteDetailPage = () => {
           style={{ color: "var(--text-muted)" }}
         >
           <Loader2 size={16} className="animate-spin" />
-          {loadError ? `Backend indisponível — tentando de novo… (${loadError})` : "Carregando aporte…"}
+          {loadError ? `Backend indisponível, tentando de novo… (${loadError})` : "Carregando aporte…"}
         </div>
         <div className="animate-pulse h-40 rounded-md" style={{ background: "var(--bg-secondary)" }} />
       </div>
@@ -127,7 +127,7 @@ const AporteDetailPage = () => {
           className="max-w-5xl p-3 rounded-md text-xs font-medium"
           style={{ background: "var(--warning-light)", color: "var(--text-secondary)" }}
         >
-          Conexão com o backend instável — mostrando o último estado conhecido.
+          Conexão com o backend instável: mostrando o último estado conhecido.
         </div>
       )}
       <AnalysisFlow
@@ -141,7 +141,7 @@ const AporteDetailPage = () => {
         <div className="max-w-5xl">
           <OrdersPanel
             orders={orders}
-            subtitle="Recomendações do fechamento — registre a execução real ou pule o que não fizer"
+            subtitle="Recomendações do fechamento: registre a execução real ou pule o que não fizer"
             onChanged={loadOrders}
           />
         </div>

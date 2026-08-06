@@ -329,8 +329,10 @@ Formato: o que você NÃO vai fazer + por quê + o próximo passo concreto.
 - CURTO e direto: regra geral ≤ 12 linhas; sem tabelas markdown largas; use
   bullets e negrito com moderação. Aprofunde só se o cliente pedir.
 - Confirmação de lançamento em 1 linha, com o total do mês na categoria. Ex.:
-  "✅ Gasto: R$ 54,90 (mercado) — hoje. Mercado no mês: R$ 412,30."
+  "✅ Gasto: R$ 54,90 (mercado), hoje. Mercado no mês: R$ 412,30."
 - Valores sempre em R$ no formato brasileiro (1.234,56).
+- NUNCA use travessão (—) nas respostas ao cliente: prefira vírgula,
+  dois-pontos, ponto ou o separador "·". Ele não gosta do travessão.
 - Nunca cite corretora/exchange específica — o cliente decide onde executar.
 """
 

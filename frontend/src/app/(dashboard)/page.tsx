@@ -74,7 +74,7 @@ const num = (
   digits = 2,
   minDigits = 0
 ): string => {
-  if (value === null || value === undefined) return "—";
+  if (value === null || value === undefined) return "–";
   return `${prefix}${value.toLocaleString("pt-BR", {
     minimumFractionDigits: minDigits,
     maximumFractionDigits: digits,
@@ -240,7 +240,7 @@ const DashboardPage = () => {
 
       {stale && (
         <p className="mt-4 text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-          A última atualização falhou ({pError}) — os números abaixo são os da
+          A última atualização falhou ({pError}): os números abaixo são os da
           leitura anterior.
         </p>
       )}
@@ -256,7 +256,7 @@ const DashboardPage = () => {
             <Eyebrow>Patrimônio</Eyebrow>
             {backendDown ? (
               <>
-                <HeroFigure value="—" color="var(--text-muted)" />
+                <HeroFigure value="–" color="var(--text-muted)" />
                 <HeroNote>Sem conexão com o backend.</HeroNote>
               </>
             ) : portfolio === null ? (
@@ -291,7 +291,7 @@ const DashboardPage = () => {
             </Eyebrow>
             {cashflowFailed ? (
               <>
-                <HeroFigure value="—" color="var(--text-muted)" />
+                <HeroFigure value="–" color="var(--text-muted)" />
                 <HeroNote>Não foi possível carregar o mês.</HeroNote>
               </>
             ) : cashflow === null ? (
@@ -348,7 +348,7 @@ const DashboardPage = () => {
             // repeating it here would only cost a line.
             <div>
               <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                Conte um gasto ao consultor em uma frase — ou mande a foto do
+                Conte um gasto ao consultor em uma frase, ou mande a foto do
                 cupom, que ele lê, classifica e lança.
               </p>
               <Link
@@ -382,7 +382,7 @@ const DashboardPage = () => {
                     <CategoryBars slices={expenseSlices} />
                   ) : (
                     <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
-                      Nenhum gasto registrado — só entradas.
+                      Nenhum gasto registrado, só entradas.
                     </p>
                   )}
                 </div>
@@ -398,7 +398,7 @@ const DashboardPage = () => {
           <OrdersPanel
             orders={pendingOrders}
             title="Ordens pendentes"
-            subtitle="Folha do comitê aguardando execução — registre o que você executou ou pule"
+            subtitle="Folha do comitê aguardando execução: registre o que você executou ou pule"
             onChanged={loadPendingOrders}
           />
         </section>
@@ -466,7 +466,7 @@ const DashboardPage = () => {
             <Panel
               className="mt-3"
               title="Carteira vs CDI, Ibovespa e BTC"
-              sub="Retorno acumulado (TWR, base 100) — toque na legenda para ocultar uma série"
+              sub="Retorno acumulado (TWR, base 100) · toque na legenda para ocultar uma série"
             >
               <BenchmarkChart series={benchmark.series} />
             </Panel>
@@ -514,7 +514,7 @@ const DashboardPage = () => {
               <MacroCell
                 span
                 label="Fear & Greed"
-                value={macro.fear_greed_index?.toString() ?? "—"}
+                value={macro.fear_greed_index?.toString() ?? "–"}
                 note={
                   macro.fear_greed_index === null
                     ? undefined

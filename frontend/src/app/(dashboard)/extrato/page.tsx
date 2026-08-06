@@ -225,7 +225,7 @@ const ExtratoPage = () => {
             color: netColor,
           }}
         >
-          {loading && !summary ? "—" : formatBRL(net)}
+          {loading && !summary ? "–" : formatBRL(net)}
         </p>
 
         <div
@@ -307,7 +307,7 @@ const ExtratoPage = () => {
           >
             <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
               Nada em {monthLabel(month)}. Conte ao consultor o que você gastou ou
-              recebeu — em uma frase, ou mandando a foto do cupom — e aparece aqui.
+              recebeu, em uma frase ou mandando a foto do cupom, e aparece aqui.
             </p>
             <Link
               href="/consultor"

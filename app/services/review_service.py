@@ -212,7 +212,7 @@ def run_weekly_review(
         logger.info("weekly_review_skipped_empty")
         if notify and telegram_service.is_enabled():
             telegram_service.notify(
-                "📭 Carteira e ledger vazios — revisão semanal pulada. "
+                "📭 Carteira e ledger vazios: revisão semanal pulada. "
                 "Registre uma compra ou um gasto e eu volto a revisar toda semana."
             )
         return None
@@ -225,7 +225,7 @@ def run_weekly_review(
     report = _persist_report(
         session,
         kind=ReportKind.WEEKLY,
-        title=f"Revisão semanal — {today.isoformat()}",
+        title=f"Revisão semanal · {today.isoformat()}",
         summary=summary,
         macro_ctx=macro_ctx,
         portfolio_rows=rows,
@@ -258,14 +258,14 @@ def run_maturity_review(
     report = _persist_report(
         session,
         kind=ReportKind.MATURITY,
-        title=f"Maturidade — {today.isoformat()}",
+        title=f"Maturidade · {today.isoformat()}",
         summary=summary,
         macro_ctx=macro_ctx,
         portfolio_rows=matured_rows,
     )
     if notify and telegram_service.is_enabled():
         telegram_service.notify(
-            f"🔓 Lotes liberados para venda — análise do comitê ({today.isoformat()})"
+            f"🔓 Lotes liberados para venda · análise do comitê ({today.isoformat()})"
             f"\n\n{summary.final_summary}"
         )
     logger.info("maturity_review_done", report_id=str(report.id), assets=len(matured_rows))

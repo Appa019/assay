@@ -90,31 +90,31 @@ _SELL_CONFIRM_TTL_S = 120
 _HELP = (
     "🤖 *Agente de Investimentos*\n\n"
     "💬 *Me mande qualquer mensagem sem /* e eu respondo como seu consultor "
-    "financeiro em tempo real: dúvidas de tickers, cripto, CDB, carteira, IR — "
+    "financeiro em tempo real: dúvidas de tickers, cripto, CDB, carteira, IR, "
     'e registro gastos e ganhos que você me contar ("gastei 80 no mercado", '
     '"paguei 35 no VR", "caiu o VA"). Eu lembro das conversas (memória fixa).\n'
     "📎 Pode mandar *foto* (cupom, nota, print) ou *arquivo* (PDF, CSV, "
     "planilha, até 20 MB): eu leio, analiso e registro o que for gasto/ganho.\n\n"
-    "/gasto <valor> [descrição #categoria] [vr|va] — registro rápido de um gasto.\n"
-    "/ganho <valor> [descrição #categoria] [vr|va] — registro rápido de um ganho.\n"
-    "/financas [AAAA-MM] — resumo do mês: gastos × ganhos × saldo por categoria.\n"
-    "/resetchat — começo uma conversa nova (a memória fixa permanece).\n\n"
-    "/aporte <valor> — crio o aporte e rodo o comitê inteiro (Opus · max). "
+    "/gasto <valor> [descrição #categoria] [vr|va] · registro rápido de um gasto.\n"
+    "/ganho <valor> [descrição #categoria] [vr|va] · registro rápido de um ganho.\n"
+    "/financas [AAAA-MM] · resumo do mês: gastos × ganhos × saldo por categoria.\n"
+    "/resetchat · começo uma conversa nova (a memória fixa permanece).\n\n"
+    "/aporte <valor> · crio o aporte e rodo o comitê inteiro (Opus · max). "
     "Te devolvo onde investir e quanto.\n"
-    "/ordens — folha de ordens pendente do último aporte.\n"
-    "/executei <ticker> <qtd> <preço> — confirmo a execução de uma ordem "
+    "/ordens · folha de ordens pendente do último aporte.\n"
+    "/executei <ticker> <qtd> <preço> · confirmo a execução de uma ordem "
     "(o lote herda tese, alvo e stop do comitê).\n"
-    "/comprei <ticker> <classe> <qtd> <preço> — registro uma compra avulsa. "
+    "/comprei <ticker> <classe> <qtd> <preço> · registro uma compra avulsa. "
     "Classe: rf, acoes ou crypto.\n"
-    "/vender <ticker> — vendo (ações/crypto após 30 dias por lote; CDB quando "
+    "/vender <ticker> · vendo (ações/crypto após 30 dias por lote; CDB quando "
     "quiser). Peço confirmação antes de executar.\n"
-    "/carteira — suas posições e o que já pode ser vendido.\n"
-    "/atualizar — atualizo os preços de mercado de todas as posições.\n"
-    "/revisao — rodo agora a revisão semanal do comitê (macro + carteira).\n"
-    "/relatorios — últimos relatórios (semanais e de maturidade).\n"
-    "/ir [ano] — apuração simplificada de IR (DARF por mês).\n"
-    "/status — carteira, análises em andamento e saúde do sistema.\n"
-    "/ajuda — esta mensagem."
+    "/carteira · suas posições e o que já pode ser vendido.\n"
+    "/atualizar · atualizo os preços de mercado de todas as posições.\n"
+    "/revisao · rodo agora a revisão semanal do comitê (macro + carteira).\n"
+    "/relatorios · últimos relatórios (semanais e de maturidade).\n"
+    "/ir [ano] · apuração simplificada de IR (DARF por mês).\n"
+    "/status · carteira, análises em andamento e saúde do sistema.\n"
+    "/ajuda · esta mensagem."
 )
 
 _BOT_COMMANDS = [
@@ -215,7 +215,7 @@ def _warn_unknown_chat(chat_id: str, msg: dict) -> None:
         f"• Quem: {_describe_sender(msg)}\n\n"
         "Ignorei e vou continuar ignorando. Se for VOCÊ em outra conta ou "
         "aparelho, rode scripts/telegram_setup.py para autorizar o chat certo.\n"
-        "(Aviso único — não repito para esse chat.)"
+        "(Aviso único, não repito para esse chat.)"
     )
     # Mark only after a successful send: a network blip retries on the next
     # message from that chat instead of silencing the warning forever.
@@ -224,14 +224,14 @@ def _warn_unknown_chat(chat_id: str, msg: dict) -> None:
 
 
 _ONBOARDING = (
-    "👋 Oi! Eu sou o seu consultor financeiro em tempo real — e reparei que a "
+    "👋 Oi! Eu sou o seu consultor financeiro em tempo real, e reparei que a "
     "gente ainda não conversou.\n\n"
     "Me manda qualquer mensagem SEM barra e eu respondo na hora. Exemplos de "
     "primeira mensagem:\n"
-    '• "gastei 42 no mercado" — registro o gasto no seu extrato\n'
-    '• "como estou indo?" — resumo da carteira e do mês\n'
-    '• "quero investir 5000" — eu confirmo e disparo o comitê de aporte\n'
-    "• uma *foto do cupom fiscal* — eu leio e registro sozinho\n\n"
+    '• "gastei 42 no mercado": registro o gasto no seu extrato\n'
+    '• "como estou indo?": resumo da carteira e do mês\n'
+    '• "quero investir 5000": eu confirmo e disparo o comitê de aporte\n'
+    "• uma *foto do cupom fiscal*: eu leio e registro sozinho\n\n"
     "Para eu começar afiado: me conta sua *renda mensal* e seus *gastos fixos* "
     "(aluguel, contas, assinaturas). Guardo isso na minha memória e uso em "
     "toda análise daqui pra frente."
@@ -304,7 +304,7 @@ def _consume_chat_item(item: tuple[str, str | None, int]) -> str | None:
             _requeue_chat_later(text, display, attempt + 1)
             return None
         return (
-            f"{exc}\n(Tentei de novo e continuo ocupado com outro turno — "
+            f"{exc}\n(Tentei de novo e continuo ocupado com outro turno, "
             "me manda essa mensagem outra vez daqui a pouco.)"
         )
     except chat_service.ChatUnavailableError as exc:
@@ -337,7 +337,7 @@ def _enqueue_chat(text: str, display: str | None = None) -> str | None:
     backlog = _chat_queue.qsize()
     _chat_queue.put((text, display, 0))
     if backlog >= 1:
-        return f"📥 Na fila — ainda estou respondendo {backlog} mensagem(ns) antes dessa."
+        return f"📥 Na fila: ainda estou respondendo {backlog} mensagem(ns) antes dessa."
     return None  # the worker replies when the turn finishes
 
 
@@ -383,7 +383,7 @@ def _unsupported_media(msg: dict) -> str | None:
     """Notice for media kinds the consultant can't read; None for service msgs."""
     if any(key in msg for key in _UNSUPPORTED_MEDIA_KEYS):
         return (
-            "🎤 Esse tipo de mídia eu ainda não leio — me manda texto, imagem "
+            "🎤 Esse tipo de mídia eu ainda não leio. Me manda texto, imagem "
             "(foto/print) ou arquivo (PDF, CSV, planilha)."
         )
     return None
@@ -392,7 +392,7 @@ def _unsupported_media(msg: dict) -> str | None:
 def _handle_media(msg: dict) -> str:
     kind, file_id, name, size = _extract_media(msg)  # caller guarantees media
     if size > _MAX_FILE_BYTES:
-        return "📎 Arquivo grande demais — o Telegram só me deixa baixar até 20 MB."
+        return "📎 Arquivo grande demais: o Telegram só me deixa baixar até 20 MB."
     stamp = datetime.now().strftime("%Y%m%dT%H%M%S")
     inbox = chat_service.CHAT_WORKSPACE / "inbox"
     try:
@@ -402,7 +402,7 @@ def _handle_media(msg: dict) -> str:
     caption = (msg.get("caption") or "").strip()
     display = f"📎 {name}" + (f"\n{caption}" if caption else "")
     queued = _enqueue_chat(_media_turn_text(kind, path, caption), display)
-    ack = f"📎 Recebi {'a imagem' if kind == 'imagem' else 'o arquivo'} — analisando…"
+    ack = f"📎 Recebi {'a imagem' if kind == 'imagem' else 'o arquivo'}, analisando…"
     return f"{queued}\n{ack}" if queued else ack
 
 
@@ -484,7 +484,7 @@ def _cmd_carteira() -> str:
             lock = "🔓 liberado"
         else:
             lock = f"🔒 faltam {min_days - days}d"
-        lines.append(f"• {a.ticker} ({a.asset_class}) — {_fmt_brl(value)} — {days}d — {lock}")
+        lines.append(f"• {a.ticker} ({a.asset_class}) · {_fmt_brl(value)} · {days}d · {lock}")
     return "\n".join(lines)
 
 
@@ -512,11 +512,11 @@ def _cmd_comprei(args: list[str]) -> str:
             ),
         )
     if asset_class == AssetClass.FIXED_INCOME:
-        liquidez = "Liquidez diária — pode vender quando quiser."
+        liquidez = "Liquidez diária: pode vender quando quiser."
     else:
         liquidez = f"Liberado para venda em {settings.min_holding_days} dias (trava por lote)."
     return (
-        f"✅ Registrado: {asset.ticker} ({asset.asset_class}) — "
+        f"✅ Registrado: {asset.ticker} ({asset.asset_class}): "
         f"{float(asset.quantity)} @ {_fmt_brl(float(asset.avg_price))}.\n{liquidez}"
     )
 
@@ -544,7 +544,7 @@ def _cmd_vender(args: list[str]) -> str:
         if not sellable:
             soonest = min(min_days - (today - a.entry_date).days for a in lots)
             return (
-                f"🔒 {ticker} ainda travado — o lote mais próximo libera em {soonest} dia(s) "
+                f"🔒 {ticker} ainda travado: o lote mais próximo libera em {soonest} dia(s) "
                 f"(trava de {min_days}d vale só p/ ações e crypto)."
             )
         target = sellable[0]
@@ -559,7 +559,7 @@ def _cmd_vender(args: list[str]) -> str:
             _pending_sell[ticker] = time.monotonic()
             return (
                 f"⚠️ Confirma a venda do lote mais antigo de {ticker}?\n"
-                f"Lote de {target.entry_date.isoformat()} ({days}d) — "
+                f"Lote de {target.entry_date.isoformat()} ({days}d): "
                 f"{float(target.quantity)} @ {_fmt_brl(float(price))} ≈ {_fmt_brl(value)}.\n"
                 f"Para executar, envie: /vender {ticker} confirmar (vale por 2 min)"
             )
@@ -592,7 +592,7 @@ def _cmd_ordens() -> str:
         if o.stop_price is not None:
             levels.append(f"stop {_fmt_brl(float(o.stop_price))}")
         suffix = f" ({', '.join(levels)})" if levels else ""
-        lines.append(f"• {o.ticker} ({o.asset_class}) — {_fmt_brl(float(o.amount_brl))}{suffix}")
+        lines.append(f"• {o.ticker} ({o.asset_class}) · {_fmt_brl(float(o.amount_brl))}{suffix}")
         if o.thesis:
             lines.append(f"  _{o.thesis[:120]}_")
     lines.append("")
@@ -615,14 +615,14 @@ def _cmd_executei(args: list[str]) -> str:
         order = order_service.pending_order_for_ticker(s, ticker)
         if order is None:
             return (
-                f"Não achei ordem pendente de {ticker}. Veja /ordens — "
+                f"Não achei ordem pendente de {ticker}. Veja /ordens; "
                 "para compra fora da folha, use /comprei."
             )
         order = order_service.execute_order(s, order.id, quantity=qty, price=price)
     total = _fmt_brl(float(qty * price))
     planned = _fmt_brl(float(order.amount_brl))
     return (
-        f"✅ Ordem executada: {ticker} — {float(qty)} @ {_fmt_brl(float(price))} = {total} "
+        f"✅ Ordem executada: {ticker} · {float(qty)} @ {_fmt_brl(float(price))} = {total} "
         f"(planejado {planned}).\nO lote herdou a tese, o alvo e o stop do comitê; "
         f"trava de {settings.min_holding_days}d se ação/crypto."
     )
@@ -673,7 +673,7 @@ def _register_cashflow(kind: CashflowKind, args: list[str], usage: str) -> str:
         )
         summ = cashflow_service.month_summary(s)
     label = "Gasto" if kind == CashflowKind.EXPENSE else "Ganho"
-    desc = f" — {entry.description}" if entry.description else ""
+    desc = f" · {entry.description}" if entry.description else ""
     wallet_note = f" no {entry.wallet.value.upper()}" if entry.wallet.value != "conta" else ""
     return (
         f"✅ {label}{wallet_note}: {_fmt_brl(float(entry.amount_brl))} "
@@ -745,7 +745,7 @@ def _cmd_financas(args: list[str]) -> str:
 def _cmd_resetchat() -> str:
     chat_service.reset_session()
     return (
-        "🧹 Conversa reiniciada. A memória fixa sobre você permanece — "
+        "🧹 Conversa reiniciada. A memória fixa sobre você permanece, "
         "só o histórico da sessão foi descartado."
     )
 
@@ -760,7 +760,7 @@ def _cmd_ir(args: list[str]) -> str:
     with Session(engine) as s:
         report = tax_service.build_year_report(s, year)
     if not report["months"]:
-        return f"Sem vendas em {year} — nada a apurar. (Posições e compras não geram IR.)"
+        return f"Sem vendas em {year}: nada a apurar. (Posições e compras não geram IR.)"
     lines = [f"🧾 *IR {year} (simplificado)*", ""]
     for m in report["months"]:
         for label, key in (("Ações", "stocks"), ("Crypto", "crypto")):
@@ -779,7 +779,7 @@ def _cmd_ir(args: list[str]) -> str:
             f"Prejuízo a compensar: ações {_fmt_brl(carry['stocks'])} · "
             f"crypto {_fmt_brl(carry['crypto'])}"
         )
-    lines.append("_Apuração simplificada — confira com seu contador._")
+    lines.append("_Apuração simplificada: confira com seu contador._")
     return "\n".join(lines)
 
 
@@ -817,7 +817,7 @@ def _cmd_aporte(args: list[str]) -> str:
     threading.Thread(target=_run_aporte_async, args=(amount,), daemon=True).start()
     return (
         f"🔄 Rodando o comitê inteiro para um aporte de {_fmt_brl(float(amount))} "
-        "(Opus · max · carta branca). Pode levar dezenas de minutos — te aviso aqui "
+        "(Opus · max · carta branca). Pode levar dezenas de minutos. Te aviso aqui "
         "quando a folha de ordens ficar pronta."
     )
 
@@ -839,14 +839,14 @@ def _cmd_revisao() -> str:
         # thread that would only echo the skip note.
         if not review_service.has_reviewable_data(s):
             return (
-                "📭 Carteira e ledger vazios — não há nada para o comitê revisar. "
+                "📭 Carteira e ledger vazios: não há nada para o comitê revisar. "
                 "Registre uma compra (/comprei), um gasto (/gasto) ou me conte "
                 "algo no chat, e rode /revisao de novo."
             )
     threading.Thread(target=_run_weekly_async, daemon=True).start()
     return (
         "🗓️ Rodando a revisão semanal do comitê (macro + desempenho + maturidade). "
-        "Pode levar minutos — te mando o relatório aqui quando ficar pronto."
+        "Pode levar minutos. Te mando o relatório aqui quando ficar pronto."
     )
 
 
@@ -857,7 +857,7 @@ def _cmd_relatorios() -> str:
         return "Nenhum relatório ainda. Use /revisao para gerar o primeiro."
     lines = ["📄 *Últimos relatórios:*", ""]
     for r in reports:
-        lines.append(f"• {_local_date(r.created_at).isoformat()} — {r.kind} — {r.title}")
+        lines.append(f"• {_local_date(r.created_at).isoformat()} · {r.kind} · {r.title}")
     lines.append("\n(os relatórios também ficam salvos e entram como consulta nos aportes)")
     return "\n".join(lines)
 
@@ -906,7 +906,7 @@ def _handle(text: str) -> str | None:
     if cmd == "aporte":
         return _cmd_aporte(args)
     return (
-        "Não conheço esse comando — mande /ajuda para a lista. "
+        "Não conheço esse comando. Mande /ajuda para a lista. "
         "(Texto sem / vai direto para o consultor.)"
     )
 

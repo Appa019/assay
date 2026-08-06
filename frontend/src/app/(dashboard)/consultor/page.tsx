@@ -149,7 +149,7 @@ const ConsultorPage = () => {
           }}
         >
           <WifiOff size={17} strokeWidth={1.9} className="mt-0.5 shrink-0" />
-          <span>Backend fora do ar — a conversa não está atualizando.</span>
+          <span>Backend fora do ar: a conversa não está atualizando.</span>
         </div>
       )}
 

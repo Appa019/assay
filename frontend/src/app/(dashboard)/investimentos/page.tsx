@@ -71,7 +71,7 @@ const TabRail = ({
           {tab.label}
           {/* Appended rather than an aria-label so the accessible name still
               starts with the text on screen. */}
-          <span className="sr-only"> — {tab.hint}</span>
+          <span className="sr-only">: {tab.hint}</span>
           {selected && (
             /* Ink bar slides between segments — the only motion in the shell. */
             <motion.span

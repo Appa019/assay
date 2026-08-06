@@ -496,7 +496,7 @@ const SkipDialog = ({
             Pular {order.ticker}?
           </h3>
           <p className="text-xs -mt-2" style={{ color: "var(--text-muted)" }}>
-            A ordem fica registrada como não executada — sem efeito na carteira.
+            A ordem fica registrada como não executada, sem efeito na carteira.
           </p>
           <div>
             <label
