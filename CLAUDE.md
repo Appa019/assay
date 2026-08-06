@@ -96,9 +96,10 @@ completa 30 dias, um cron roda a análise de maturidade. Aporte é ad-hoc.
   cria arquivos e usa browser real. O `.mcp.json` efetivo é gerado a cada run
   como **baseline curado ∪ `.mcp.agent.json`** — este último é do AGENTE (ele
   adiciona QUALQUER MCP novo, nunca é sobrescrito, carrega no próximo ciclo).
-  Baseline em 3 tiers: **(1) runtime (8)** sequential-thinking, filesystem,
-  fetch, context7, playwright, memory, time, git; **(2) dados financeiros
-  sem-chave (4, sempre on)** coingecko, yahoo-finance (B3 `.SA`), defillama, exa;
+  Baseline em 3 tiers: **(1) runtime (6)** sequential-thinking, filesystem,
+  fetch, context7, playwright, memory (datas e git via Bash); **(2) dados
+  financeiros sem-chave (4, sempre on)** coingecko, yahoo-finance (B3 `.SA`),
+  defillama, exa;
   **(3) premium key-gated (5, ligam só se a chave existir no `.env`)** glassnode,
   coinglass, messari, firecrawl, tavily — definidos em `_KEY_GATED_MCP_SERVERS`,
   a chave chega ao run via `_agent_subprocess_env()` (injeta as env vars do
@@ -183,8 +184,9 @@ sem Playwright.
   a reinícios; rotaciona após `CHAT_MAX_TURNS` turnos), workspace PRÓPRIO
   (`storage/chat_workspace/`) com CLAUDE.md de ordens do consultor (reescrito a
   cada turno) + MEMORY.md (memória FIXA sobre o cliente, gerida pelo próprio
-  agente) + mesmos MCPs financeiros do comitê (baseline ∪ `.mcp.agent.json` do
-  chat, `--strict-mcp-config`). Modelo/effort próprios: `CHAT_MODEL` (opus) /
+  agente) + MCPs em **perfil enxuto** (`profile="chat"`: dados financeiros +
+  fetch + memory, ∪ `.mcp.agent.json` do chat, `--strict-mcp-config` — o
+  baseline completo do comitê NÃO carrega no chat, é latência; D23). Modelo/effort próprios: `CHAT_MODEL` (opus) /
   `CHAT_EFFORT` (high) / `CHAT_TURN_TIMEOUT` (900s). Ele registra gastos/ganhos
   que o cliente contar via `POST /api/cashflow` (source=chat), consulta
   carteira/IR/ordens pela API local e responde tickers com dados ao vivo

@@ -30,8 +30,8 @@ disco** com `CLAUDE.md`, `MEMORY.md`, ferramentas e notas.
 
 | Workspace | Quem usa | Modelo | Tem `.mcp.json`? |
 |---|---|---|---|
-| `storage/agent_workspace/` | comitê (aporte, semanal, maturidade) | `opus` / effort `max` | sim, 8–17 servidores |
-| `storage/chat_workspace/` | consultor (chat) | roteado: haiku/sonnet/opus | sim, mesmo baseline |
+| `storage/agent_workspace/` | comitê (aporte, semanal, maturidade) | `opus` / effort `max` | sim, baseline completo |
+| `storage/chat_workspace/` | consultor (chat) | roteado: haiku/sonnet/opus | sim, **perfil enxuto** (`profile="chat"`: só dados financeiros + fetch + memory) |
 | `storage/router_workspace/` | triagem do roteador | `haiku` / `low` | **não, de propósito** |
 | `storage/classifier_workspace/` | classificador de gasto | `haiku` / `low` | **não, de propósito** |
 
@@ -66,8 +66,18 @@ npm/PyPI, commit sha do git — D21). Eles rodam com permissão total na máquin
 um `@latest` comprometido seria execução arbitrária no Pi. Para atualizar um
 servidor, mude o pin deliberadamente e olhe o diff do pacote.
 
-**Tier 1 — runtime e raciocínio (8, sempre):** `sequential-thinking`,
-`filesystem` ($HOME), `fetch`, `context7`, `playwright`, `memory`, `time`, `git`.
+**Tier 1 — runtime e raciocínio (6, sempre no comitê):** `sequential-thinking`,
+`filesystem` ($HOME), `fetch`, `context7`, `playwright`, `memory`. Datas/fusos e
+git saem pelo Bash (`date`, `git`) — os servidores dedicados `time` e `git`
+foram removidos por redundância (2 processos uvx a menos por run).
+
+**Perfis por workload (D23)**: `_baseline_mcp_servers(workspace, profile=)`.
+O comitê carrega tudo; o chat (`profile="chat"`) só `fetch` + `memory` + os
+servidores de dados (coingecko, yahoo-finance, defillama, exa + key-gated).
+Cada turno de chat boota a lista inteira como subprocessos no Pi — e o turno
+mais frequente ("gastei X no mercado") não precisa de navegador nem
+filesystem. O `.mcp.agent.json` do chat continua mesclando por cima, então o
+agente readiciona o que sentir falta.
 
 **Tier 2 — dados financeiros sem chave (4, sempre):**
 - `coingecko` (HTTP remoto) — preços/market cap de qualquer cripto, fonte
@@ -248,6 +258,14 @@ rotacionada a cada `CHAT_MAX_TURNS` (40) turnos — o `MEMORY.md` carrega o
 contexto durável através da rotação e, desde 2026-08-06 (D20), a sessão nova é
 **semeada com os últimos ~10 turnos da transcrição** (`_transcript_tail`, lidos
 de `chat_message`), então o assunto em andamento sobrevive à rotação de fato.
+Desde o upgrade do consultor (D24), a rotação de uma conversa longa também
+gera um **resumo estruturado** (`_rotation_summary`: haiku no workspace pelado
+do roteador, 5 seções fixas, números copiados verbatim, best-effort) injetado
+antes da cauda verbatim. A sessão renascida por `SessionNotFoundError` zera o
+contador de turnos (A35) — antes herdava o da sessão morta e rotacionava de
+novo na mensagem seguinte. `converse()` persiste `cost_usd`/`duration_s` na
+`ChatMessage`, e `reconcile_orphan_turns()` (startup do backend) marca como
+FAILED bolhas RUNNING órfãs de um restart.
 
 - Turno fresh recebe instrução de **ler `./MEMORY.md` antes de responder**.
 - Limite de uso → `ChatUnavailableError` com mensagem amigável e estimativa de
@@ -274,12 +292,20 @@ CDB por PETR4?" e absurdo para "oi".
 
 ```
 atalho: saudação (≤24 chars, regex)          → FAST,     sem custo de triagem
-atalho: verbo de lançamento + número         → FAST,     economiza ~6s
-        (e SEM palavra de mercado)
-senão:  triagem haiku (1 palavra)            → FAST | BALANCED | DEEP
+atalho: verbo de lançamento + valor          → FAST,     economiza ~6s
+        (dígito OU por extenso: "mil reais";
+         e SEM palavra de mercado — ticker
+         B3 ancorado em sufixo real 3/4/5/6/11)
+senão:  triagem haiku (1 palavra), COM as    → FAST | BALANCED | DEEP
+        últimas mensagens como contexto
+        (follow-up curto herda o tier do
+         assunto em curso)
 falha na triagem                             → BALANCED  (nunca derruba o chat)
 CHAT_ROUTER_ENABLED=false                    → DEEP sempre (comportamento antigo)
 ```
+
+A triagem roda ANTES de o turno adquirir o `_chat_turn.lock` — o tempo dela
+não estende mais a janela em que outra mensagem leva `ChatBusyError`.
 
 Tiers (configuráveis): FAST = haiku/low · BALANCED = sonnet/medium ·
 DEEP = opus/high. O modelo e o tier usados ficam gravados na `ChatMessage`.

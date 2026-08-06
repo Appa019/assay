@@ -210,3 +210,56 @@ As DDs por nome (Reuniões 3/4) rodam com 2× `AGENT_STEP_TIMEOUT` via
 | A32 | BTC do benchmark ancorado em "days ago de AGORA" + `fromtimestamp` local → série sem começo e rebase em dias diferentes por linha | `market_chart/range` com timestamps UTC + rebase de TODAS as séries no 1º dia comum |
 | A33 | Aporte automático que morria ANTES da 1ª etapa (colisão com o lock global) ficava READY órfão para sempre | `pending_resumable_ids` inclui `READY + run_attempts > 0` |
 | A34 | `resume_pending` era o único cron sem alerta de falha — retomadas paravam em silêncio | notify no single-pass e no watch loop |
+
+---
+
+## Decisões e armadilhas de 2026-08-06 (madrugada) — upgrade do consultor
+
+> Origem: missão de melhoria do assessor (diagnóstico de código + conversas de
+> produção + pesquisa de estado da arte com verificação adversarial). Relatório
+> completo em `CONSULTOR_UPGRADE_REPORT.md` na raiz.
+
+### D23 · Perfil de MCP por workload
+O chat carregava o baseline INTEIRO do comitê — todo turno bootava ~12
+servidores (playwright, filesystem, context7…) num Pi de RAM escassa, inclusive
+para "gastei 42 no mercado". `_baseline_mcp_servers(profile="chat")` mantém só
+dados financeiros + fetch + memory; `time` e `git` saíram do baseline de TODOS
+(Bash cobre). O `.mcp.agent.json` continua mesclando por cima. A lição do
+classificador ("workspace vazio = rápido", D10) aplicada por tier.
+
+### D24 · Resumo estruturado na rotação (estende D20)
+A cauda verbatim guarda só 10 mensagens × 300 chars — decisões e números de uma
+sessão longa evaporavam. Ao rotacionar (ou renascer por sessão sumida), um
+haiku no workspace pelado do roteador destila a conversa em 5 seções fixas com
+números copiados VERBATIM (nunca parafraseados). Best-effort: qualquer falha
+cai no comportamento anterior. Custo: 1 chamada barata a cada 40 turnos.
+
+### D25 · Proatividade determinística — LLM nunca decide disparo
+`insight_service` + timers (`daily_insights` 09:07 · `weekly_digest` dom
+20:07): projeção de saldo por run-rate e anomalia por categoria são SQL +
+aritmética pura; f-strings redigem. Guardas: ≥6 semanas de histórico na
+categoria, ≥5 dias corridos no mês, teto de 2 pushes/semana com fila para o
+digest, dedupe mensal com rearme (padrão `check_alerts`). A infraestrutura de
+push já existia; o que faltava era a camada de decisão do que vale mensagem.
+
+### D26 · Custo não roda contra livro vazio
+`review_service.has_reviewable_data()`: sem Asset, sem Trade e sem
+CashflowEntry, a cadeia opus da revisão semanal NÃO abre (nota curta no
+Telegram, com throttle de 7d no cron). Invariante no service — qualquer caller
+(cron, /revisao, API futura) respeita. Motivado por produção: crons rodando
+análises caras sobre um banco zerado.
+
+### D27 · Ativação é feature
+Produção revelou uso ZERO do consultor (0 linhas em `chat_message`) e um chat
+não autorizado ignorado em silêncio — que pode ser o próprio dono no aparelho
+errado. O bot agora: avisa o DONO (1x por chat_id, `bot_state.json`) quando um
+desconhecido bate; manda onboarding na primeira execução com consultor nunca
+usado; re-enfileira (1x, com teto) mensagem que caiu em `ChatBusyError` em vez
+de descartá-la; avisa "na fila" a partir de 1 mensagem à frente.
+
+| # | Armadilha | O que a corrige hoje |
+|---|---|---|
+| A35 | **(variante de A9: estado derivado sem invalidação)** sessão renascida por `SessionNotFoundError` herdava o contador de turnos da sessão morta → rotacionava de novo na mensagem seguinte, jogando fora o contexto recém-semeado | `turns = 0` no restart; regressão em `test_chat_service.py` |
+| A36 | `ChatMessage.cost_usd`/`duration_s` existiam desde a criação da tabela e NUNCA eram preenchidos — custo do chat invisível (só grep no log) | `converse()` grava do `StepResult` em `_settle` |
+| A37 | Turno web interrompido por restart deixava a bolha "Pensando…" RUNNING para sempre na transcrição | `reconcile_orphan_turns()` no startup marca FAILED (só com lock morto) |
+| A38 | Triagem rodava DENTRO do lock do chat — os ~6s dela alargavam a janela de `ChatBusyError` para todo mundo | triagem antes do lock em `run_chat_turn` |

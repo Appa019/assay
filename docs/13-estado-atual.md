@@ -1,18 +1,39 @@
 # 13 · Estado atual
 
-> **Fotografia de 2026-08-06.** Este é o documento que envelhece — atualize-o
-> quando mudar algo estrutural. Os outros 12 descrevem como o sistema funciona;
-> este descreve como ele está **agora**.
+> **Fotografia de 2026-08-06 (madrugada).** Este é o documento que envelhece —
+> atualize-o quando mudar algo estrutural. Os outros 12 descrevem como o
+> sistema funciona; este descreve como ele está **agora**.
 
 ## Onde o repositório está
 
 | Item | Valor |
 |---|---|
-| Branch | `feat/state-of-art-overhaul` (a de trabalho; `main` é a principal) |
+| Branch | `feat/consultor-upgrade` (sobre `feat/state-of-art-overhaul`; `main` é a principal) |
 | Versão backend | `0.4.0` (`app/main.py`, `pyproject.toml`) |
 | Versão frontend | `0.3.0` (`frontend/package.json`) — desalinhada, cosmético |
-| Testes | **113 passando** (eram 68 antes do overhaul de 2026-08-06) |
+| Testes | **157 passando** (113 → 157 com o upgrade do consultor) |
 | Tamanho | ~10.700 linhas de Python · ~8.400 de TS/CSS |
+
+## O que aconteceu na madrugada de 2026-08-06 (upgrade do consultor)
+
+Missão de melhoria do assessor: diagnóstico do código + conversas de produção
+do Pi + pesquisa de estado da arte com verificação adversarial. **Achado
+central: o consultor nunca tinha sido usado** (0 linhas em `chat_message`,
+MEMORY.md intocado) — por isso metade da entrega é ativação, não feature.
+Detalhes em `CONSULTOR_UPGRADE_REPORT.md` (raiz) e docs/12 (D23–D27, A35–A38).
+
+- **Chat**: contador de turnos zerado no renascimento de sessão (A35); custo/
+  duração persistidos na `ChatMessage` (A36); bolha "Pensando…" órfã
+  reconciliada no startup (A37); perfil de MCP enxuto por turno (D23); resumo
+  estruturado na rotação (D24); triagem com contexto e fora do lock (A38);
+  atalho fast para valores por extenso; ordens permanentes com aritmética via
+  ferramenta, gatilhos de escalação, anti-sycophancy e memória
+  reconciliar-não-apendar; seed do MEMORY.md com bloco de suitability.
+- **Proatividade v1 (D25)**: `insight_service` determinístico + timers
+  `investimentos-insights` (09:07) e `investimentos-digest` (dom 20:07).
+- **Ativação (D27)**: aviso de chat desconhecido ao dono, onboarding no
+  primeiro boot, fila do bot sem descarte em busy.
+- **Custo (D26)**: revisão semanal não roda com carteira+ledger vazios.
 
 ## O que aconteceu em 2026-08-06 (overhaul pós-revisão extensiva)
 
@@ -79,6 +100,7 @@ acionável foi corrigido na mesma data — detalhes em `12-decisoes.md`
 | 2026-07-29 | Rebrand Mesa → **Assay** |
 | 2026-08-05 | Documentação `docs/` (13 arquivos) + fix do lock do chat (A25) |
 | 2026-08-06 | **Revisão extensiva + overhaul state-of-art** (D18–D22, A26–A34) + deploy no Pi |
+| 2026-08-06 (madrugada) | **Upgrade do consultor** (D23–D27, A35–A38): ativação, proatividade v1, MCP enxuto, rotação com resumo — pendente de deploy |
 
 ---
 
