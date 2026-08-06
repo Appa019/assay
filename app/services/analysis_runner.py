@@ -497,6 +497,9 @@ def _agent_subprocess_env() -> dict[str, str]:
         "MESSARI_SDK_API_KEY": settings.messari_api_key,
         "FIRECRAWL_API_KEY": settings.firecrawl_api_key,
         "TAVILY_API_KEY": settings.tavily_api_key,
+        # Headless CLI auth (claude setup-token) — makes the Pi independent of
+        # the copied-credentials file whose refresh token goes stale (A39).
+        "CLAUDE_CODE_OAUTH_TOKEN": settings.claude_code_oauth_token,
     }
     for var, val in injected.items():
         if val:

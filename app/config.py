@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     firecrawl_api_key: str = ""  # structured scraping of JS-heavy sources
     tavily_api_key: str = ""  # citation-grade web research
 
+    # Long-lived CLI auth for headless machines (`claude setup-token`). When
+    # set, every headless `claude` run authenticates with this token instead
+    # of ~/.claude/.credentials.json — which on the Pi went stale because two
+    # machines rotated the same refresh token (A39). Blank on the desktop.
+    claude_code_oauth_token: str = ""
+
     # Portfolio targets (used to compute deviation, in fraction of 1.0)
     target_fixed_income: float = 0.35
     target_stocks: float = 0.40
