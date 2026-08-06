@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  /* Cool neutrals, white panels, one teal accent. Light only — there is no dark
-     variant by design.
+  /* Cool neutrals, white panels, one deep indigo accent (#111184). Light only,
+     there is no dark variant by design.
 
      Every neutral is tinted toward hue 250 rather than 75: the warm version
      read as yellowed paper, which is exactly the "off-white" look this avoids.
@@ -15,9 +15,9 @@
   --text-primary: oklch(0.21 0.015 255);
   --text-secondary: oklch(0.46 0.013 255);
   --text-muted: oklch(0.62 0.011 255);
-  --accent: oklch(0.55 0.14 205);
-  --accent-light: oklch(0.94 0.035 205);
-  --accent-strong: oklch(0.46 0.15 205);
+  --accent: oklch(0.2982 0.1779 268.6); /* #111184 */
+  --accent-light: oklch(0.94 0.035 268.6);
+  --accent-strong: oklch(0.24 0.16 268.6);
   --border: oklch(0.905 0.005 250);
   --border-strong: oklch(0.83 0.008 250);
   --success: oklch(0.58 0.14 155);

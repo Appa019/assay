@@ -5,7 +5,7 @@ around it.
 
 ## Color
 
-Cool neutrals, white panels, one teal accent. Light only — there is no dark
+Cool neutrals, white panels, one deep indigo accent (#111184). Light only — there is no dark
 variant, by the owner's choice. Every value is OKLCH and every neutral is
 tinted toward hue 250; the earlier warm tint (hue 75) read as yellowed paper
 and was the "off-white" the owner disliked. Cards are pure white, which he
@@ -19,7 +19,7 @@ interaction and current state.
 | Panel | `--bg-secondary` | Sidebar, table headers, code blocks |
 | Raised | `--bg-card` / `--bg-elevated` | Pure white, a shade above the page |
 | Ink | `--text-primary` / `--text-secondary` / `--text-muted` | Three steps, no more |
-| Accent | `--accent` / `--accent-light` / `--accent-strong` | Teal. Interaction and current state only |
+| Accent | `--accent` / `--accent-light` / `--accent-strong` | Deep indigo `#111184` (oklch 0.2982 0.1779 268.6). Interaction and current state only |
 | Semantic | `--success` `--danger` `--warning` (+ `-light` pairs) | Money direction and risk |
 
 Green means money in, red means money out. That is the only place semantic
