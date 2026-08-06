@@ -18,7 +18,7 @@ import {
   type CashflowEntry,
   type CategoryTotal,
 } from "@/lib/api";
-import { formatBRL, parseLocalDate } from "@/lib/format";
+import { formatAmount, formatBRL, parseLocalDate } from "@/lib/format";
 
 const MONTH_NAMES = [
   "janeiro", "fevereiro", "março", "abril", "maio", "junho",
@@ -141,7 +141,7 @@ const ExtratoPage = () => {
     setDeleteError(null);
     try {
       await deleteCashflowEntry(id);
-      await refresh();
+      refresh();
     } catch {
       setDeleteError("Não foi possível excluir o lançamento.");
     }
@@ -351,7 +351,7 @@ const ExtratoPage = () => {
                         style={{ color: income ? "var(--success)" : "var(--text-primary)" }}
                       >
                         {income ? "+" : "−"}
-                        {formatBRL(entry.amount_brl).replace("R$", "").trim()}
+                        {formatAmount(entry.amount_brl)}
                       </span>
                       <ChevronDown
                         size={15}

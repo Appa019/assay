@@ -231,7 +231,18 @@ export const AtivosView = () => {
     }
     setSubmitting(true);
     try {
-      await createAsset(formData as AssetCreate);
+      // Explicit shape instead of a cast: a new required field on AssetCreate
+      // must fail HERE at compile time, not as a silent 422 at runtime.
+      const payload: AssetCreate = {
+        ticker: formData.ticker,
+        name: formData.name,
+        asset_class: formData.asset_class,
+        quantity: formData.quantity,
+        avg_price: formData.avg_price,
+        current_price: formData.current_price,
+        entry_date: formData.entry_date,
+      };
+      await createAsset(payload);
       setMessage({ type: "success", text: `${formData.ticker} adicionado à carteira` });
       setFormData({ asset_class: "stocks" });
       setShowBuyForm(false);

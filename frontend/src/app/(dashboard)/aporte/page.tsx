@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, RefreshCw, Send } from "lucide-react";
-import { createContribution } from "@/lib/api";
+import { createContribution, type MacroSnapshot } from "@/lib/api";
 import { useMacro } from "@/hooks/use-macro";
 
 /**
@@ -182,7 +182,7 @@ const MacroPreview = ({
   onRefresh,
 }: {
   loading: boolean;
-  macro: ReturnType<typeof useMacro>["data"];
+  macro: MacroSnapshot | null;
   onRefresh: () => void;
 }) => {
   return (

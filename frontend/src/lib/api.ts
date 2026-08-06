@@ -471,7 +471,7 @@ export const deleteContribution = async (id: string): Promise<void> => {
   if (!res.ok) throw new Error("Erro ao deletar aporte");
 };
 
-export type ReportKind = "weekly" | "maturity";
+export type ReportKind = "weekly" | "maturity" | "monthly";
 
 export type ReportListItem = {
   id: string;

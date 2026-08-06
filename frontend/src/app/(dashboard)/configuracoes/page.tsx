@@ -10,16 +10,21 @@ const ConfiguracoesPage = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     const load = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/health`);
         if (!res.ok) throw new Error(`status ${res.status}`);
-        setHealth(await res.json());
+        const body = (await res.json()) as Health; // own API — shape is ours
+        if (!cancelled) setHealth(body);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Erro");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Erro");
       }
     };
     void load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (

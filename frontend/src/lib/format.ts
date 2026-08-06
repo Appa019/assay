@@ -19,6 +19,20 @@ export const formatBRL = (
 export const formatBRLCompact = (value: number | null | undefined): string =>
   formatBRL(value, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
+/**
+ * pt-BR digits with no currency symbol — for rows that carry their own +/−
+ * sign. Stripping "R$" off formatBRL by hand broke on the non-breaking space
+ * Intl inserts after the symbol.
+ */
+export const formatAmount = (value: number | null | undefined): string => {
+  if (value === null || value === undefined) return "—";
+  return new Intl.NumberFormat("pt-BR", {
+    style: "decimal",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+};
+
 export const formatNumber = (value: number | null | undefined): string => {
   if (value === null || value === undefined) return "—";
   return value >= 1

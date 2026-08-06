@@ -4,8 +4,6 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
   Cell,
   Line,
@@ -43,9 +41,8 @@ const CLASS_NAMES: Record<"fixed_income" | "stocks" | "crypto", string> = {
   crypto: "Crypto",
 };
 
-/** Series color for "current" marks; de-emphasis gray for the target reference. */
+/** Series color for "current" marks (equity curve, benchmark portfolio line). */
 const ACTUAL_COLOR = CLASS_COLORS.fixed_income;
-const TARGET_COLOR = "#cfc9bd";
 
 const AXIS_TICK = { fill: "var(--text-muted)", fontSize: 11 } as const;
 /** Phone ticks drop a point so dense axes stop colliding at 390px. */
@@ -141,129 +138,7 @@ const SwatchRow = ({
   </div>
 );
 
-const ChartLegend = ({
-  items,
-}: {
-  items: { color: string; label: string }[];
-}) => (
-  <div className="flex items-center gap-4 md:gap-5 flex-wrap text-xs">
-    {items.map((item) => (
-      <span key={item.label} className="flex items-center gap-1.5">
-        <span
-          className="inline-block w-2.5 h-2.5 rounded-full"
-          style={{ background: item.color }}
-        />
-        <span style={{ color: "var(--text-secondary)" }}>{item.label}</span>
-      </span>
-    ))}
-  </div>
-);
-
-/* ── Allocation: actual vs target grouped bars ─────────────────────── */
-
-type AllocationDatum = {
-  name: string;
-  atual: number;
-  alvo: number;
-};
-
 type ChartTooltipProps = TooltipContentProps<TooltipValueType, number | string>;
-
-const AllocationTooltip = ({ active, payload, label }: ChartTooltipProps) => {
-  if (!active || !payload || payload.length === 0) return null;
-  return (
-    <TooltipShell>
-      <p className="font-semibold mb-1">{label}</p>
-      {payload.map((entry) => (
-        <SwatchRow
-          key={entry.dataKey?.toString() ?? String(entry.name)}
-          color={entry.color ?? "var(--text-muted)"}
-          label={entry.dataKey === "atual" ? "Atual" : "Alvo"}
-          value={`${Number(entry.value ?? 0).toFixed(1)}%`}
-        />
-      ))}
-    </TooltipShell>
-  );
-};
-
-export const AllocationVsTargetChart = ({
-  portfolio,
-}: {
-  portfolio: PortfolioSummary;
-}) => {
-  const isMobile = useIsMobile();
-
-  const data: AllocationDatum[] = [
-    {
-      name: CLASS_NAMES.fixed_income,
-      atual: portfolio.allocation.fixed_income_pct,
-      alvo: portfolio.target_allocation.fixed_income,
-    },
-    {
-      name: CLASS_NAMES.stocks,
-      atual: portfolio.allocation.stocks_pct,
-      alvo: portfolio.target_allocation.stocks,
-    },
-    {
-      name: CLASS_NAMES.crypto,
-      atual: portfolio.allocation.crypto_pct,
-      alvo: portfolio.target_allocation.crypto,
-    },
-  ];
-
-  return (
-    <div className="space-y-3">
-      <ChartLegend
-        items={[
-          { color: ACTUAL_COLOR, label: "Atual" },
-          { color: TARGET_COLOR, label: "Alvo" },
-        ]}
-      />
-      <div className="w-full min-w-0 h-[200px] md:h-[240px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={data}
-            margin={{ top: 8, right: 8, bottom: 0, left: isMobile ? 0 : -12 }}
-            barGap={2}
-          >
-            <CartesianGrid stroke="var(--border)" strokeWidth={1} vertical={false} />
-            <XAxis
-              dataKey="name"
-              tick={isMobile ? AXIS_TICK_MOBILE : AXIS_TICK}
-              tickLine={false}
-              axisLine={{ stroke: "var(--border-strong)" }}
-            />
-            <YAxis
-              tick={isMobile ? AXIS_TICK_MOBILE : AXIS_TICK}
-              tickLine={false}
-              axisLine={false}
-              unit="%"
-              width={isMobile ? 34 : 44}
-            />
-            <Tooltip
-              content={AllocationTooltip}
-              cursor={{ fill: "var(--bg-secondary)", opacity: 0.5 }}
-            />
-            <Bar
-              dataKey="atual"
-              fill={ACTUAL_COLOR}
-              radius={[4, 4, 0, 0]}
-              maxBarSize={24}
-              isAnimationActive={false}
-            />
-            <Bar
-              dataKey="alvo"
-              fill={TARGET_COLOR}
-              radius={[4, 4, 0, 0]}
-              maxBarSize={24}
-              isAnimationActive={false}
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-};
 
 /* ── Allocation donut ──────────────────────────────────────────────── */
 

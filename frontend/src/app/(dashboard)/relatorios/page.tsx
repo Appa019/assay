@@ -312,13 +312,15 @@ const AgentReports = ({ reports }: { reports: ReportListItem[] }) => {
         Relatórios do comitê
       </h3>
       <p className="text-xs -mt-1" style={{ color: "var(--text-muted)" }}>
-        Revisões semanais e análises de maturidade — também consultadas nos aportes.
+        Revisões semanais, análises de maturidade e relatórios mensais — também consultados nos
+        aportes.
       </p>
       <div className="space-y-2">
         {reports.map((r) => {
           const open = openId === r.id;
           const full = fullById[r.id];
-          const weekly = r.kind === "weekly";
+          const kindLabel =
+            r.kind === "weekly" ? "Semanal" : r.kind === "monthly" ? "Mensal" : "Maturidade";
           return (
             <article
               key={r.id}
@@ -333,8 +335,14 @@ const AgentReports = ({ reports }: { reports: ReportListItem[] }) => {
                 onClick={() => void toggle(r.id)}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  {weekly ? (
+                  {r.kind === "weekly" ? (
                     <CalendarClock
+                      size={16}
+                      className="shrink-0"
+                      style={{ color: "var(--accent-strong)" }}
+                    />
+                  ) : r.kind === "monthly" ? (
+                    <FileBarChart
                       size={16}
                       className="shrink-0"
                       style={{ color: "var(--accent-strong)" }}
@@ -347,8 +355,8 @@ const AgentReports = ({ reports }: { reports: ReportListItem[] }) => {
                       {r.title}
                     </p>
                     <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                      {formatDateTime(r.created_at)} ·{" "}
-                      {weekly ? "Semanal" : "Maturidade"} · US$ {r.cost_usd.toFixed(2)}
+                      {formatDateTime(r.created_at)} · {kindLabel} · US${" "}
+                      {r.cost_usd.toFixed(2)}
                     </p>
                   </div>
                 </div>
