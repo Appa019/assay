@@ -357,3 +357,47 @@ def test_auth_failure_tells_the_truth(chat_dirs: Path, monkeypatch: pytest.Monke
     message = str(excinfo.value)
     assert "autenticação" in message
     assert "manda a mensagem de novo" not in message
+
+
+def test_reset_clears_the_visible_history(
+    chat_dirs: Path, monkeypatch: pytest.MonkeyPatch, session
+) -> None:
+    """ "Nova sessão" must restart the SCREEN blank: history() hides everything
+    before the reset while the rows stay in chat_message (cost/tier stats)."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlmodel import select
+
+    from app.models.chat import ChatChannel, ChatMessage, ChatRole, ChatTurnStatus
+
+    monkeypatch.setattr(chat_service, "engine", session.get_bind())
+    before = datetime.now(UTC) - timedelta(minutes=1)
+    for role, content in ((ChatRole.USER, "oi"), (ChatRole.ASSISTANT, "olá!")):
+        session.add(
+            ChatMessage(
+                role=role,
+                content=content,
+                channel=ChatChannel.WEB,
+                status=ChatTurnStatus.DONE,
+                created_at=before,
+            )
+        )
+    session.commit()
+    assert len(chat_service.history()) == 2
+
+    chat_service.reset_session()
+    assert chat_service.history() == []
+
+    session.add(
+        ChatMessage(
+            role=ChatRole.USER,
+            content="recomeço",
+            channel=ChatChannel.WEB,
+            status=ChatTurnStatus.DONE,
+            created_at=datetime.now(UTC) + timedelta(seconds=1),
+        )
+    )
+    session.commit()
+    assert [m.content for m in chat_service.history()] == ["recomeço"]
+    # The old rows are hidden, not deleted.
+    assert len(list(session.exec(select(ChatMessage)).all())) == 3

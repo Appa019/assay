@@ -73,7 +73,11 @@ async def upload_attachment(
 
 @router.post("/reset", status_code=status.HTTP_204_NO_CONTENT)
 async def reset_chat() -> None:
-    """Drop the chained Claude session. The transcript and MEMORY.md survive."""
+    """Drop the chained Claude session and blank the visible history.
+
+    Rows stay in chat_message (cost/tier stats); the GET only serves
+    messages written after this moment. MEMORY.md survives untouched.
+    """
     if chat_service.is_busy():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

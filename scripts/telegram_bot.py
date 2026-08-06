@@ -745,8 +745,8 @@ def _cmd_financas(args: list[str]) -> str:
 def _cmd_resetchat() -> str:
     chat_service.reset_session()
     return (
-        "🧹 Conversa reiniciada. A memória fixa sobre você permanece, "
-        "só o histórico da sessão foi descartado."
+        "🧹 Conversa reiniciada: a tela do site recomeça em branco. "
+        "A memória fixa sobre você permanece."
     )
 
 

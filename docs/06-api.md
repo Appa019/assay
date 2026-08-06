@@ -72,7 +72,7 @@ Base: `http://127.0.0.1:8000` (o navegador nunca fala direto — o Next reescrev
 | `GET` | `?limit=60` | `{busy, messages[]}` — histórico em ordem de leitura, com `channel`, `status`, `model`, `tier` |
 | `POST` | `` | **202.** Enfileira o turno e volta na hora. **409** se ocupado. Body: `{text}` (1–8000 chars) |
 | `POST` | `/upload` | multipart `file` + `caption`. Salva no inbox e enfileira o turno. **413** acima de 20 MB |
-| `POST` | `/reset` | **204.** Descarta a sessão do Claude. Transcrição e MEMORY.md ficam. 409 no meio de um turno |
+| `POST` | `/reset` | **204.** Descarta a sessão do Claude e ZERA a tela: o GET passa a devolver só mensagens posteriores ao reset. As linhas antigas continuam no banco (custo/tier); MEMORY.md fica. 409 no meio de um turno |
 
 Polling do cliente: 2,5s ocupado / 12s ocioso.
 

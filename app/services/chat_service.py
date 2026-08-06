@@ -31,6 +31,7 @@ from sqlmodel import Session, select
 
 from app.config import settings
 from app.core.database import engine
+from app.core.json_state import load_json_state, save_json_state
 from app.models.chat import ChatChannel, ChatMessage, ChatRole, ChatTurnStatus
 from app.services import analysis_runner, model_router
 from app.services.analysis_runner import (
@@ -560,9 +561,34 @@ def _save_state(session_id: str, turns: int) -> None:
     )
 
 
+def _display_state_path() -> Path:
+    return CHAT_WORKSPACE / "display_state.json"
+
+
+def _history_cutoff() -> datetime | None:
+    """Naive-UTC moment of the last reset, or None if never reset."""
+    raw = load_json_state(_display_state_path()).get("cleared_at")
+    if not raw:
+        return None
+    try:
+        cut = datetime.fromisoformat(str(raw))
+    except ValueError:
+        return None
+    if cut.tzinfo is not None:
+        cut = cut.astimezone(UTC).replace(tzinfo=None)
+    return cut
+
+
 def reset_session() -> None:
-    """Drop the chained session; the next message starts fresh (memory stays)."""
+    """Drop the chained session; the next message starts fresh (memory stays).
+
+    Also stamps the visible-history cutoff: the client asked for "nova sessão"
+    to mean a blank screen, so ``history()`` only serves messages written after
+    this moment. The rows themselves stay in ``chat_message`` — they feed cost
+    tracking and the monthly tier stats, and deleting history is not undoable.
+    """
     _state_path().unlink(missing_ok=True)
+    save_json_state(_display_state_path(), {"cleared_at": datetime.now(UTC).isoformat()})
 
 
 # --- turn runner ---------------------------------------------------------------
@@ -877,14 +903,28 @@ def _settle(
 
 
 def history(limit: int = 60) -> list[ChatMessage]:
-    """Most recent messages, oldest first (reading order)."""
+    """Messages since the last reset, oldest first (reading order).
+
+    The cutoff is applied in Python, newest-first: every hidden row is by
+    definition older than every visible one, so the LIMIT window is never
+    wrong — and it sidesteps SQLite's string-typed datetime comparisons.
+    """
+    cutoff = _history_cutoff()
     with Session(engine) as session:
         rows = session.exec(
             select(ChatMessage)
             .order_by(ChatMessage.created_at.desc())
             .limit(max(1, min(limit, 500)))
         ).all()
+    if cutoff is not None:
+        rows = [r for r in rows if _as_naive_utc(r.created_at) > cutoff]
     return list(reversed(rows))
+
+
+def _as_naive_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(UTC).replace(tzinfo=None)
 
 
 def reconcile_orphan_turns() -> int:

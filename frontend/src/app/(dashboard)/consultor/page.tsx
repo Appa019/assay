@@ -26,7 +26,6 @@ const ConsultorPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
   const [attachment, setAttachment] = useState<File | null>(null);
-  const [resetNote, setResetNote] = useState(false);
   const [uploading, setUploading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -56,14 +55,13 @@ const ConsultorPage = () => {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, resetNote]);
+  }, [messages]);
 
   const send = async () => {
     const text = draft.trim();
     if (busy || uploading) return;
     if (!text && !attachment) return;
     setError(null);
-    setResetNote(false);
 
     // An attachment carries the typed text as its caption, so one tap sends
     // "aqui está o cupom" together with the photo.
@@ -112,7 +110,9 @@ const ConsultorPage = () => {
     try {
       await resetChatSession();
       setError(null);
-      setResetNote(true);
+      // The backend now hides pre-reset messages; clear immediately instead
+      // of waiting for the next poll so the tap feels instant.
+      setMessages([]);
     } catch {
       setError("Não consegui reiniciar a sessão.");
     }
@@ -188,14 +188,6 @@ const ConsultorPage = () => {
             <Turn key={message.id} message={message} />
           ))}
         </div>
-        {resetNote && (
-          <p
-            className="mt-5 text-center text-[12px] uppercase tracking-[0.14em]"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Sessão reiniciada · a memória sobre você continua
-          </p>
-        )}
         <div ref={bottomRef} />
       </div>
 

@@ -118,7 +118,10 @@ pelo roteador, custo e duração.
 
 > **Regra crítica:** todo caller deve usar `chat_service.converse(text, channel)`
 > — **nunca** `run_chat_turn` direto. É `converse` que persiste as duas pontas.
-> Rotacionar a sessão do Claude não apaga esta tabela.
+> Rotacionar a sessão do Claude não apaga esta tabela. O reset ("nova
+> sessão") também não: ele grava um corte em `display_state.json` e
+> `history()` só devolve o que veio depois — a tela recomeça em branco
+> com o banco intacto (custo e tiers do relatório mensal dependem dele).
 
 ## Regras de negócio invioláveis
 
