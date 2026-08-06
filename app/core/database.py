@@ -60,6 +60,9 @@ _ADDED_COLUMNS: dict[str, dict[str, str]] = {
         "target_price": "NUMERIC",
         "stop_price": "NUMERIC",
     },
+    "cashflow_entry": {
+        "wallet": "TEXT NOT NULL DEFAULT 'conta'",
+    },
 }
 
 

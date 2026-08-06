@@ -3,6 +3,8 @@ from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID, uuid4
 
+from sqlalchemy import Column
+from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, SQLModel
 
 
@@ -15,6 +17,16 @@ class CashflowSource(StrEnum):
     CHAT = "chat"  # registered by the Telegram consultant (Claude)
     BOT = "bot"  # quick /gasto and /ganho bot commands
     API = "api"  # direct API/frontend entry
+
+
+class CashflowWallet(StrEnum):
+    """Which pot of money moved. VR/VA are meal/food benefit cards — separate
+    balances that can only buy food, so they must never be mistaken for
+    investable account money."""
+
+    CONTA = "conta"  # bank account / pix / card — real, investable money
+    VR = "vr"  # vale-refeição (meal voucher)
+    VA = "va"  # vale-alimentação (grocery voucher)
 
 
 def _now_utc() -> datetime:
@@ -38,4 +50,21 @@ class CashflowEntry(SQLModel, table=True):
     description: str | None = Field(default=None, max_length=512)
     occurred_on: date = Field(default_factory=date.today, index=True)
     source: CashflowSource = Field(default=CashflowSource.API)
+    # Stored by VALUE ('conta'/'vr'/'va'), not by enum NAME as SQLModel would
+    # default to: rows added on old databases get the ALTER TABLE default
+    # 'conta', and the ORM must read that raw string back as an enum member.
+    wallet: CashflowWallet = Field(
+        default=CashflowWallet.CONTA,
+        sa_column=Column(
+            SAEnum(
+                CashflowWallet,
+                values_callable=lambda e: [m.value for m in e],
+                native_enum=False,
+                length=8,
+            ),
+            nullable=False,
+            server_default=CashflowWallet.CONTA.value,
+            index=True,
+        ),
+    )
     created_at: datetime = Field(default_factory=_now_utc)

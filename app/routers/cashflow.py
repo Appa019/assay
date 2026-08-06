@@ -6,12 +6,13 @@ from pydantic import BaseModel, Field
 from sqlmodel import Session
 
 from app.core.database import get_session
-from app.models.cashflow import CashflowKind
+from app.models.cashflow import CashflowKind, CashflowWallet
 from app.schemas.cashflow import (
     CashflowCreate,
     CashflowRead,
     CashflowSummary,
     MonthTotals,
+    WalletBalance,
 )
 from app.services import cashflow_service, classifier_service
 
@@ -61,12 +62,13 @@ def classify_entry(payload: CashflowClassify) -> CashflowCreate:
 async def list_entries(
     month: str | None = None,
     kind: CashflowKind | None = None,
+    wallet: CashflowWallet | None = None,
     limit: int = 100,
     session: Session = Depends(get_session),
 ) -> list[CashflowRead]:
     _validate_month(month)
     entries = cashflow_service.list_entries(
-        session, month=month, kind=kind, limit=max(1, min(limit, 1000))
+        session, month=month, kind=kind, wallet=wallet, limit=max(1, min(limit, 1000))
     )
     return [CashflowRead.model_validate(e, from_attributes=True) for e in entries]
 
@@ -78,6 +80,12 @@ async def summary(
     """Monthly totals (income, expense, net) grouped by category."""
     _validate_month(month)
     return cashflow_service.month_summary(session, month)
+
+
+@router.get("/wallets", response_model=list[WalletBalance])
+async def wallets(session: Session = Depends(get_session)) -> list[WalletBalance]:
+    """All-time balance per wallet — how much VR/VA credit is still unspent."""
+    return cashflow_service.wallet_balances(session)
 
 
 @router.get("/history", response_model=list[MonthTotals])

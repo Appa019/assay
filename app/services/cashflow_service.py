@@ -16,12 +16,14 @@ import structlog
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from app.models.cashflow import CashflowEntry, CashflowKind
+from app.models.cashflow import CashflowEntry, CashflowKind, CashflowWallet
 from app.schemas.cashflow import (
     CashflowCreate,
     CashflowSummary,
     CategoryTotal,
     MonthTotals,
+    WalletBalance,
+    WalletTotal,
 )
 
 logger = structlog.get_logger()
@@ -87,6 +89,45 @@ def normalize_category(raw: str | None) -> str:
     return _CATEGORY_ALIASES.get(value, value)
 
 
+# Ways people actually name their wallets (post accent-fold) → closed enum.
+# Unlike categories, wallets are a CLOSED vocabulary: money either sits in the
+# account or on a benefit card, and an invented wallet name would silently
+# split the balances the consultant reasons about.
+_WALLET_ALIASES: dict[str, str] = {
+    "banco": "conta",
+    "dinheiro": "conta",
+    "pix": "conta",
+    "cartao": "conta",
+    "credito": "conta",
+    "debito": "conta",
+    "salario": "conta",
+    "vale refeicao": "vr",
+    "vale-refeicao": "vr",
+    "refeicao": "vr",
+    "ticket refeicao": "vr",
+    "vale alimentacao": "va",
+    "vale-alimentacao": "va",
+    "ticket alimentacao": "va",
+}
+
+
+def normalize_wallet(raw: str | None) -> CashflowWallet:
+    """Fold whatever named the wallet onto conta/vr/va. Unknown → conta.
+
+    "conta" is the safe fallback: it is exactly what every entry meant before
+    wallets existed, so a misspelled wallet degrades to the old behaviour
+    instead of inventing a fourth balance.
+    """
+    value = _fold_accents((raw or "").strip().lower()).strip()
+    value = _WALLET_ALIASES.get(value, value)
+    try:
+        return CashflowWallet(value)
+    except ValueError:
+        if value:
+            logger.warning("cashflow_unknown_wallet", raw=(raw or "")[:32])
+        return CashflowWallet.CONTA
+
+
 class CashflowNotFoundError(LookupError):
     """The requested cashflow entry does not exist."""
 
@@ -118,6 +159,7 @@ def _recent_duplicate(session: Session, entry: CashflowEntry) -> CashflowEntry |
             CashflowEntry.category == entry.category,
             CashflowEntry.occurred_on == entry.occurred_on,
             CashflowEntry.description == entry.description,
+            CashflowEntry.wallet == entry.wallet,
             CashflowEntry.created_at >= cutoff,
         )
         .order_by(CashflowEntry.created_at.desc())
@@ -132,6 +174,7 @@ def add_entry(session: Session, data: CashflowCreate) -> CashflowEntry:
         description=(data.description or "").strip() or None,
         occurred_on=data.occurred_on or date.today(),
         source=data.source,
+        wallet=normalize_wallet(data.wallet),
     )
     existing = _recent_duplicate(session, entry)
     if existing is not None:
@@ -153,6 +196,7 @@ def list_entries(
     *,
     month: str | None = None,
     kind: CashflowKind | None = None,
+    wallet: CashflowWallet | None = None,
     limit: int = 100,
 ) -> list[CashflowEntry]:
     stmt = select(CashflowEntry)
@@ -161,6 +205,8 @@ def list_entries(
         stmt = stmt.where(CashflowEntry.occurred_on >= start, CashflowEntry.occurred_on <= end)
     if kind is not None:
         stmt = stmt.where(CashflowEntry.kind == kind)
+    if wallet is not None:
+        stmt = stmt.where(CashflowEntry.wallet == wallet)
     stmt = stmt.order_by(CashflowEntry.occurred_on.desc(), CashflowEntry.created_at.desc())
     return list(session.exec(stmt.limit(limit)).all())
 
@@ -195,6 +241,23 @@ def month_summary(session: Session, month: str | None = None) -> CashflowSummary
         reverse=True,
     )
 
+    wallet_buckets: dict[CashflowWallet, dict[str, float]] = {}
+    for e in entries:
+        bucket = wallet_buckets.setdefault(e.wallet, {"income": 0.0, "expense": 0.0, "count": 0})
+        bucket["income" if e.kind == CashflowKind.INCOME else "expense"] += float(e.amount_brl)
+        bucket["count"] += 1
+    by_wallet = [
+        WalletTotal(
+            wallet=wallet,
+            income_brl=round(bucket["income"], 2),
+            expense_brl=round(bucket["expense"], 2),
+            net_brl=round(bucket["income"] - bucket["expense"], 2),
+            entries=int(bucket["count"]),
+        )
+        for wallet in CashflowWallet  # fixed conta → vr → va order
+        if (bucket := wallet_buckets.get(wallet)) is not None
+    ]
+
     return CashflowSummary(
         month=month,
         income_brl=round(income, 2),
@@ -202,7 +265,44 @@ def month_summary(session: Session, month: str | None = None) -> CashflowSummary
         net_brl=round(income - expense, 2),
         entries=len(entries),
         by_category=by_category,
+        by_wallet=by_wallet,
     )
+
+
+def wallet_balances(session: Session) -> list[WalletBalance]:
+    """All-time credits minus spending per wallet, conta → vr → va order.
+
+    This is the number behind "quanto ainda tenho de VR?" — a month summary
+    cannot answer it because benefit credit rolls over between months. Only
+    wallets that ever moved appear.
+    """
+    rows = session.exec(
+        select(
+            CashflowEntry.wallet,
+            CashflowEntry.kind,
+            func.coalesce(func.sum(CashflowEntry.amount_brl), 0),
+            func.count(),
+        ).group_by(CashflowEntry.wallet, CashflowEntry.kind)
+    ).all()
+
+    totals: dict[CashflowWallet, dict[str, float]] = {}
+    for wallet_raw, kind, total, count in rows:
+        wallet = CashflowWallet(str(wallet_raw))
+        bucket = totals.setdefault(wallet, {"income": 0.0, "expense": 0.0, "count": 0})
+        bucket["income" if kind == CashflowKind.INCOME else "expense"] += float(total)
+        bucket["count"] += int(count)
+
+    return [
+        WalletBalance(
+            wallet=wallet,
+            income_brl=round(bucket["income"], 2),
+            expense_brl=round(bucket["expense"], 2),
+            balance_brl=round(bucket["income"] - bucket["expense"], 2),
+            entries=int(bucket["count"]),
+        )
+        for wallet in CashflowWallet
+        if (bucket := totals.get(wallet)) is not None
+    ]
 
 
 def month_history(session: Session, months: int = 6) -> list[MonthTotals]:

@@ -1,5 +1,5 @@
 from app.models.asset import Asset, AssetClass
-from app.models.cashflow import CashflowEntry, CashflowKind, CashflowSource
+from app.models.cashflow import CashflowEntry, CashflowKind, CashflowSource, CashflowWallet
 from app.models.chat import ChatChannel, ChatMessage, ChatRole, ChatTurnStatus
 from app.models.contribution import (
     Contribution,
@@ -18,6 +18,7 @@ __all__ = [
     "CashflowEntry",
     "CashflowKind",
     "CashflowSource",
+    "CashflowWallet",
     "ChatChannel",
     "ChatMessage",
     "ChatRole",

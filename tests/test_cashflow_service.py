@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 from sqlmodel import Session
 
-from app.models.cashflow import CashflowKind, CashflowSource
+from app.models.cashflow import CashflowKind, CashflowSource, CashflowWallet
 from app.schemas.cashflow import CashflowCreate
 from app.services import cashflow_service
 
@@ -138,3 +138,145 @@ def test_a_different_amount_still_creates_a_second_entry(session: Session) -> No
     cashflow_service.add_entry(session, CashflowCreate(amount_brl=Decimal("11.00"), **base))
 
     assert len(cashflow_service.list_entries(session)) == 2
+
+
+# --- wallets (conta / vr / va) ----------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("VR", CashflowWallet.VR),
+        (" va ", CashflowWallet.VA),
+        ("Vale Refeição", CashflowWallet.VR),
+        ("vale-alimentacao", CashflowWallet.VA),
+        ("pix", CashflowWallet.CONTA),
+        ("Salário", CashflowWallet.CONTA),
+        ("", CashflowWallet.CONTA),
+        (None, CashflowWallet.CONTA),
+        ("cartao misterioso", CashflowWallet.CONTA),  # unknown degrades to conta
+    ],
+)
+def test_normalize_wallet_folds_onto_closed_vocabulary(
+    raw: str | None, expected: CashflowWallet
+) -> None:
+    """Wallets are a CLOSED vocabulary: a typo must degrade to "conta" (the
+    pre-wallet behaviour), never mint a fourth balance."""
+    assert cashflow_service.normalize_wallet(raw) == expected
+
+
+def test_add_entry_stores_normalized_wallet(session: Session) -> None:
+    entry = cashflow_service.add_entry(
+        session,
+        CashflowCreate(
+            kind=CashflowKind.EXPENSE,
+            amount_brl=Decimal("35.00"),
+            category="restaurante",
+            wallet="Vale Refeição",
+        ),
+    )
+    assert entry.wallet == CashflowWallet.VR
+
+
+def test_same_line_on_a_different_wallet_is_not_a_duplicate(session: Session) -> None:
+    """Lunch on the VR and an identical pix expense minutes apart are two
+    different movements — the dedupe window must see the wallet."""
+    base = {
+        "kind": CashflowKind.EXPENSE,
+        "amount_brl": Decimal("42.00"),
+        "category": "mercado",
+        "description": "feira",
+    }
+    first = cashflow_service.add_entry(session, CashflowCreate(wallet="va", **base))
+    second = cashflow_service.add_entry(session, CashflowCreate(wallet="conta", **base))
+    assert first.id != second.id
+    assert len(cashflow_service.list_entries(session)) == 2
+
+
+def test_list_entries_filters_by_wallet(session: Session) -> None:
+    cashflow_service.add_entry(session, _entry(amount="10"))
+    vr = cashflow_service.add_entry(
+        session,
+        CashflowCreate(
+            kind=CashflowKind.EXPENSE,
+            amount_brl=Decimal("35.00"),
+            category="restaurante",
+            wallet="vr",
+        ),
+    )
+    only_vr = cashflow_service.list_entries(session, wallet=CashflowWallet.VR)
+    assert [e.id for e in only_vr] == [vr.id]
+
+
+def test_month_summary_breaks_down_by_wallet(session: Session) -> None:
+    """Salary + VR credit + VR lunch: totals keep counting everything, but
+    by_wallet must expose the investable (conta) slice on its own."""
+    when = date(2026, 7, 15)
+    cashflow_service.add_entry(
+        session,
+        CashflowCreate(
+            kind=CashflowKind.INCOME,
+            amount_brl=Decimal("8400"),
+            category="salario",
+            occurred_on=when,
+        ),
+    )
+    cashflow_service.add_entry(
+        session,
+        CashflowCreate(
+            kind=CashflowKind.INCOME,
+            amount_brl=Decimal("700"),
+            category="salario",
+            occurred_on=when,
+            wallet="vr",
+        ),
+    )
+    cashflow_service.add_entry(
+        session,
+        CashflowCreate(
+            kind=CashflowKind.EXPENSE,
+            amount_brl=Decimal("35"),
+            category="restaurante",
+            occurred_on=when,
+            wallet="vr",
+        ),
+    )
+
+    summ = cashflow_service.month_summary(session, "2026-07")
+    assert summ.income_brl == pytest.approx(9100.0)
+    by = {w.wallet: w for w in summ.by_wallet}
+    assert by[CashflowWallet.CONTA].net_brl == pytest.approx(8400.0)
+    assert by[CashflowWallet.VR].income_brl == pytest.approx(700.0)
+    assert by[CashflowWallet.VR].expense_brl == pytest.approx(35.0)
+    assert by[CashflowWallet.VR].net_brl == pytest.approx(665.0)
+    # Fixed conta → vr → va order, so prompts and UIs render deterministically.
+    assert [w.wallet for w in summ.by_wallet] == [CashflowWallet.CONTA, CashflowWallet.VR]
+
+
+def test_wallet_balances_accumulate_across_months(session: Session) -> None:
+    """ "Quanto ainda tenho de VR?" spans months — benefit credit rolls over."""
+    cashflow_service.add_entry(
+        session,
+        CashflowCreate(
+            kind=CashflowKind.INCOME,
+            amount_brl=Decimal("700"),
+            category="salario",
+            occurred_on=date(2026, 6, 1),
+            wallet="vr",
+        ),
+    )
+    cashflow_service.add_entry(
+        session,
+        CashflowCreate(
+            kind=CashflowKind.EXPENSE,
+            amount_brl=Decimal("200"),
+            category="restaurante",
+            occurred_on=date(2026, 7, 10),
+            wallet="vr",
+        ),
+    )
+
+    balances = cashflow_service.wallet_balances(session)
+    assert [b.wallet for b in balances] == [CashflowWallet.VR]
+    assert balances[0].balance_brl == pytest.approx(500.0)
+    assert balances[0].entries == 2

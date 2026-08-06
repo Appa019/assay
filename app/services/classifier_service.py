@@ -22,7 +22,7 @@ from app.models.cashflow import CashflowKind
 from app.schemas.cashflow import CashflowCreate
 from app.services import analysis_runner
 from app.services.analysis_runner import AnalysisError
-from app.services.cashflow_service import CANONICAL_CATEGORIES
+from app.services.cashflow_service import CANONICAL_CATEGORIES, normalize_wallet
 
 logger = structlog.get_logger()
 
@@ -57,7 +57,7 @@ Frase do usuário: "{text}"
 Responda APENAS com um bloco JSON, sem nenhum texto antes ou depois:
 
 ```json
-{{"kind": "expense|income", "amount_brl": 0.00, "category": "...", "description": "...", "occurred_on": "AAAA-MM-DD"}}
+{{"kind": "expense|income", "amount_brl": 0.00, "category": "...", "description": "...", "occurred_on": "AAAA-MM-DD", "wallet": "conta|vr|va"}}
 ```
 
 Regras:
@@ -73,6 +73,10 @@ Regras:
   relativas: "hoje" = {date.today().isoformat()}, "ontem" = o dia anterior,
   "sexta passada" = a sexta mais recente antes de hoje. Sem menção de data,
   use hoje.
+- `wallet`: de onde o dinheiro saiu/entrou. "vr" se a frase citar VR ou
+  vale-refeição; "va" se citar VA ou vale-alimentação. "no vale", sem
+  especificar qual: "vr" para restaurante/lanche, "va" para mercado. Sem
+  menção a benefício, use "conta" (banco, pix, cartão, dinheiro).
 - Hoje é {date.today().isoformat()} ({_WEEKDAYS[date.today().weekday()]}).
 """
 
@@ -141,11 +145,16 @@ def classify(text: str) -> CashflowCreate:
         except ValueError:
             logger.warning("cashflow_classify_bad_date", raw=raw_date[:20])
 
-    logger.info("cashflow_classified", kind=kind, amount=float(amount), category=category)
+    wallet = normalize_wallet(str(data.get("wallet") or "conta")).value
+
+    logger.info(
+        "cashflow_classified", kind=kind, amount=float(amount), category=category, wallet=wallet
+    )
     return CashflowCreate(
         kind=kind,
         amount_brl=amount,
         category=category,
         description=description,
         occurred_on=occurred_on,
+        wallet=wallet,
     )
