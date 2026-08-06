@@ -50,6 +50,16 @@ def _month_key(dt: datetime) -> tuple[int, int]:
     return (local.year, local.month)
 
 
+def _local_date(dt: datetime) -> date:
+    """Local calendar date for a stored UTC-naive timestamp.
+
+    A late-evening sale (21h+ in Brazil) is already "tomorrow" in UTC; taking
+    ``.date()`` raw would shift days_held by one — exactly at the 180/360/720
+    boundaries where the CDB rate changes bracket.
+    """
+    return (dt if dt.tzinfo else dt.replace(tzinfo=UTC)).astimezone().date()
+
+
 def build_year_report(session: Session, year: int) -> dict[str, Any]:
     """Monthly capital-gains breakdown + year-end positions for one year."""
     sells = list(
@@ -119,10 +129,12 @@ def build_year_report(session: Session, year: int) -> dict[str, Any]:
                     "ticker": t.ticker,
                     "income_brl": float(t.realized_pnl_brl or 0),
                     "days_held": (
-                        (t.executed_at.date() - t.lot_entry_date).days if t.lot_entry_date else None
+                        (_local_date(t.executed_at) - t.lot_entry_date).days
+                        if t.lot_entry_date
+                        else None
                     ),
                     "withheld_rate_pct": (
-                        _cdb_regressive_rate((t.executed_at.date() - t.lot_entry_date).days)
+                        _cdb_regressive_rate((_local_date(t.executed_at) - t.lot_entry_date).days)
                         if t.lot_entry_date
                         else None
                     ),

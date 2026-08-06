@@ -1,11 +1,29 @@
+import os
+import time
+from collections.abc import Iterator
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
+import pytest
 from sqlmodel import Session
 
 from app.models.asset import AssetClass
 from app.models.trade import Trade, TradeSide
 from app.services import tax_service
+
+
+@pytest.fixture()
+def brt_tz() -> Iterator[None]:
+    """Pin the process timezone so night-boundary assertions hold on UTC CI."""
+    old = os.environ.get("TZ")
+    os.environ["TZ"] = "America/Sao_Paulo"
+    time.tzset()
+    yield
+    if old is None:
+        os.environ.pop("TZ", None)
+    else:
+        os.environ["TZ"] = old
+    time.tzset()
 
 
 def _sell(
@@ -104,3 +122,63 @@ def test_cdb_reported_as_withheld_info(session: Session) -> None:
     info = report["months"][0]["fixed_income_info"][0]
     assert info["withheld_rate_pct"] == 22.5  # held ~4 months → top bracket
     assert report["total_darf_brl"] == 0.0
+
+
+def test_late_night_utc_sale_lands_in_local_month(session: Session, brt_tz: None) -> None:
+    """Regression for the documented UTC/local pattern: a sale at 22:30 BRT on
+    March 31st is April 1st in UTC — it must be reported in MARCH."""
+    _sell(
+        session,
+        ticker="PETR4",
+        asset_class=AssetClass.STOCKS,
+        total="25000",
+        pnl="1000",
+        when=datetime(2026, 4, 1, 1, 30),  # naive UTC = 2026-03-31 22:30 BRT
+    )
+    report = tax_service.build_year_report(session, 2026)
+    assert report["months"][0]["month"] == "2026-03"
+
+
+def test_cdb_days_held_uses_local_date_at_bracket_boundary(session: Session, brt_tz: None) -> None:
+    """The lot entered 2026-01-02 and was sold at 22:30 BRT exactly 180 local
+    days later. The UTC date says 181 days (20% bracket) — the local date says
+    180 (22.5%). The rate shown must follow the LOCAL day."""
+    _sell(
+        session,
+        ticker="CDB-BTG",
+        asset_class=AssetClass.FIXED_INCOME,
+        total="10100",
+        pnl="100",
+        when=datetime(2026, 7, 2, 1, 30),  # naive UTC = 2026-07-01 22:30 BRT
+    )
+    report = tax_service.build_year_report(session, 2026)
+    info = report["months"][0]["fixed_income_info"][0]
+    assert info["days_held"] == 180
+    assert info["withheld_rate_pct"] == 22.5
+
+
+def test_darf_below_minimum_flag(session: Session) -> None:
+    """A due amount under R$ 10 is not paid that month — the flag must mark it
+    (and only it) so the report can say 'accumulate to next month'."""
+    _sell(  # taxable month, tax due = 15% × 60 = R$ 9.00 → below minimum
+        session,
+        ticker="VALE3",
+        asset_class=AssetClass.STOCKS,
+        total="25000",
+        pnl="60",
+        when=datetime(2026, 2, 10, 12, tzinfo=UTC),
+    )
+    _sell(  # taxable month, tax due = 15% × 200 = R$ 30.00 → normal DARF
+        session,
+        ticker="VALE3",
+        asset_class=AssetClass.STOCKS,
+        total="25000",
+        pnl="200",
+        when=datetime(2026, 3, 10, 12, tzinfo=UTC),
+    )
+    report = tax_service.build_year_report(session, 2026)
+    feb, mar = report["months"][0]["stocks"], report["months"][1]["stocks"]
+    assert feb["tax_due_brl"] == 9.0
+    assert feb["darf_below_minimum"] is True
+    assert mar["tax_due_brl"] == 30.0
+    assert mar["darf_below_minimum"] is False
