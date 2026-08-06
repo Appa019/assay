@@ -14,10 +14,13 @@ from typing import Any
 from uuid import uuid4
 
 import structlog
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.config import settings
+from app.models.asset import Asset
+from app.models.cashflow import CashflowEntry
 from app.models.report import Report, ReportKind
+from app.models.trade import Trade
 from app.services import analysis_runner, market_data_service, portfolio_service, telegram_service
 
 logger = structlog.get_logger()
@@ -26,6 +29,21 @@ logger = structlog.get_logger()
 async def fetch_macro() -> dict[str, Any]:
     """Live macro snapshot (BCB · Yahoo · CoinGecko)."""
     return await market_data_service.build_full_context()
+
+
+def has_reviewable_data(session: Session) -> bool:
+    """True when the committee has ANYTHING to look at.
+
+    Cost guard for the expensive review chain: with no position, no trade
+    history and no personal ledger there is literally nothing to review, and
+    a full opus run would burn dollars describing an empty book. Lives here
+    (not in the callers) so every surface — cron, bot, future API — shares
+    the same invariant.
+    """
+    for model in (Asset, Trade, CashflowEntry):
+        if session.exec(select(model).limit(1)).first() is not None:
+            return True
+    return False
 
 
 def _positions_block(rows: list[dict[str, Any]], min_days: int) -> str:
@@ -186,7 +204,18 @@ def run_weekly_review(
     effort: str = analysis_runner.DEFAULT_EFFORT,
     notify: bool = True,
     on_event: analysis_runner.EventCallback | None = None,
-) -> Report:
+) -> Report | None:
+    if not has_reviewable_data(session):
+        # Empty book: never start the opus chain. Callers control whether the
+        # short note reaches Telegram via ``notify`` (the daily cron throttles
+        # it on its side; the bot's /revisao answers the user directly).
+        logger.info("weekly_review_skipped_empty")
+        if notify and telegram_service.is_enabled():
+            telegram_service.notify(
+                "📭 Carteira e ledger vazios — revisão semanal pulada. "
+                "Registre uma compra ou um gasto e eu volto a revisar toda semana."
+            )
+        return None
     today = date.today()
     rows = portfolio_service.build_portfolio_snapshot(session)
     steps = _weekly_steps(rows, macro_ctx, today)

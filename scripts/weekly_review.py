@@ -23,8 +23,37 @@ if str(_PROJECT_ROOT) not in sys.path:
 from sqlmodel import select  # noqa: E402
 
 from app.core.database import get_session, init_db  # noqa: E402
+from app.core.json_state import load_json_state, save_json_state  # noqa: E402
 from app.models.report import Report, ReportKind  # noqa: E402
 from app.services import analysis_runner, review_service, telegram_service  # noqa: E402
+
+_STATE_PATH = _PROJECT_ROOT / "storage" / "weekly_review_state.json"
+_SKIP_NOTE_KEY = "last_empty_skip_note"
+_SKIP_NOTE_INTERVAL = timedelta(days=7)
+
+_EMPTY_SKIP_NOTE = (
+    "📭 Carteira e ledger vazios — revisão semanal pulada. "
+    "Registre uma compra ou um gasto e eu volto a revisar toda semana."
+)
+
+
+def _should_send_skip_note(state: dict, now: datetime) -> bool:
+    """Throttle the 'skipped: empty' Telegram note to the review cadence.
+
+    The cron runs DAILY (self-gated to 7 days by the last WEEKLY report), but
+    a skip writes no Report row — without this throttle an empty book would
+    ping the owner every single day.
+    """
+    raw = state.get(_SKIP_NOTE_KEY)
+    if not isinstance(raw, str):
+        return True
+    try:
+        last = datetime.fromisoformat(raw)
+    except ValueError:
+        return True  # corrupt state: prefer one extra note over silence
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=UTC)
+    return now - last >= _SKIP_NOTE_INTERVAL
 
 
 def _is_due(session, interval_days: int = 7) -> bool:
@@ -64,6 +93,18 @@ def main() -> int:
         if not args.force and not _is_due(session):
             print("Revisão semanal ainda não venceu (menos de 7 dias). Use --force.")
             return 0
+        if not review_service.has_reviewable_data(session):
+            # Cost guard: no assets, no trades, no cashflow — skip the whole
+            # opus chain (and the price/macro fetches) instead of paying to
+            # describe an empty book.
+            print("Carteira e ledger vazios — revisão semanal pulada.")
+            now = datetime.now(UTC)
+            state = load_json_state(_STATE_PATH)
+            if not args.no_telegram and _should_send_skip_note(state, now):
+                telegram_service.notify(_EMPTY_SKIP_NOTE)
+                state[_SKIP_NOTE_KEY] = now.isoformat()
+                save_json_state(_STATE_PATH, state)
+            return 0
         print("Atualizando preços…")
         try:
             from sqlmodel import Session
@@ -85,6 +126,11 @@ def main() -> int:
             notify=not args.no_telegram,
             on_event=_printer,
         )
+        if report is None:
+            # Backstop: the service re-checks the same guard (data could have
+            # been deleted between our check and the run); it already notified.
+            print("Carteira e ledger vazios — revisão semanal pulada.")
+            return 0
         print(f"\n✓ Revisão semanal salva (id {report.id}, US$ {report.cost_usd:.2f}).")
         print("─" * 60)
         print(report.content)

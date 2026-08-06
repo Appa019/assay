@@ -43,9 +43,10 @@ from sqlmodel import Session, select  # noqa: E402
 
 from app.config import settings  # noqa: E402
 from app.core.database import engine, init_db  # noqa: E402
+from app.core.json_state import load_json_state, save_json_state  # noqa: E402
 from app.models.asset import Asset, AssetClass  # noqa: E402
 from app.models.cashflow import CashflowKind, CashflowSource  # noqa: E402
-from app.models.chat import ChatChannel  # noqa: E402
+from app.models.chat import ChatChannel, ChatMessage  # noqa: E402
 from app.models.contribution import Contribution  # noqa: E402
 from app.models.order import OrderStatus  # noqa: E402
 from app.models.report import Report, ReportKind  # noqa: E402
@@ -150,14 +151,126 @@ def _parse_amount(raw: str) -> Decimal:
     return Decimal(s)
 
 
-def _send(text: str) -> None:
-    telegram_service.send_message(text, chat_id=settings.telegram_chat_id)
+def _send(text: str) -> bool:
+    """Send to the OWNER chat. Returns False on failure (never raises)."""
+    return telegram_service.send_message(text, chat_id=settings.telegram_chat_id)
+
+
+# --- persistent bot state + activation nudges (storage/bot_state.json) ------
+
+_STATE_PATH = _PROJECT_ROOT / "storage" / "bot_state.json"
+
+
+def _load_bot_state() -> dict:
+    """Tolerant read: a missing or malformed file is just empty state."""
+    return load_json_state(_STATE_PATH)
+
+
+def _save_bot_state(state: dict) -> None:
+    save_json_state(_STATE_PATH, state)
+
+
+def _should_notify_unknown_chat(state: dict, chat_id: str) -> bool:
+    """Warn the owner about a given unauthorized chat only once, ever."""
+    notified = state.get("unknown_chats_notified")
+    if not isinstance(notified, list):
+        return True
+    return str(chat_id) not in {str(c) for c in notified}
+
+
+def _mark_unknown_chat_notified(state: dict, chat_id: str) -> dict:
+    """Record that the owner was warned about this chat (idempotent)."""
+    notified = state.get("unknown_chats_notified")
+    if not isinstance(notified, list):
+        notified = []
+    if str(chat_id) not in {str(c) for c in notified}:
+        notified = [*notified, str(chat_id)]
+    state["unknown_chats_notified"] = notified
+    return state
+
+
+def _describe_sender(msg: dict) -> str:
+    """Best-effort "who was it" line from a Telegram message envelope."""
+    frm = msg.get("from") or {}
+    chat = msg.get("chat") or {}
+    name = " ".join(p for p in (frm.get("first_name"), frm.get("last_name")) if p)
+    username = frm.get("username") or chat.get("username")
+    parts = [p for p in (name, f"@{username}" if username else None) if p]
+    return " ".join(parts) or "sem nome"
+
+
+def _warn_unknown_chat(chat_id: str, msg: dict) -> None:
+    """Tell the OWNER (once per chat_id) that a stranger knocked.
+
+    The unknown chat itself never gets a reply — but the owner must know:
+    it may be the owner themselves on another account or device, silently
+    locked out (observed in production: 2 attempts, 0 conversations ever).
+    """
+    state = _load_bot_state()
+    if not _should_notify_unknown_chat(state, chat_id):
+        return
+    text = (
+        "🚫 Um chat NÃO autorizado tentou falar comigo.\n"
+        f"• Chat id: {chat_id}\n"
+        f"• Quem: {_describe_sender(msg)}\n\n"
+        "Ignorei e vou continuar ignorando. Se for VOCÊ em outra conta ou "
+        "aparelho, rode scripts/telegram_setup.py para autorizar o chat certo.\n"
+        "(Aviso único — não repito para esse chat.)"
+    )
+    # Mark only after a successful send: a network blip retries on the next
+    # message from that chat instead of silencing the warning forever.
+    if _send(text):
+        _save_bot_state(_mark_unknown_chat_notified(state, chat_id))
+
+
+_ONBOARDING = (
+    "👋 Oi! Eu sou o seu consultor financeiro em tempo real — e reparei que a "
+    "gente ainda não conversou.\n\n"
+    "Me manda qualquer mensagem SEM barra e eu respondo na hora. Exemplos de "
+    "primeira mensagem:\n"
+    '• "gastei 42 no mercado" — registro o gasto no seu extrato\n'
+    '• "como estou indo?" — resumo da carteira e do mês\n'
+    '• "quero investir 5000" — eu confirmo e disparo o comitê de aporte\n'
+    "• uma *foto do cupom fiscal* — eu leio e registro sozinho\n\n"
+    "Para eu começar afiado: me conta sua *renda mensal* e seus *gastos fixos* "
+    "(aluguel, contas, assinaturas). Guardo isso na minha memória e uso em "
+    "toda análise daqui pra frente."
+)
+
+
+def _chat_history_empty() -> bool:
+    """True while the consultant was never used (no line in chat_message)."""
+    with Session(engine) as s:
+        return s.exec(select(ChatMessage).limit(1)).first() is None
+
+
+def _should_send_onboarding(state: dict, history_empty: bool) -> bool:
+    """Introduce the consultant once: never after sent, never after first use."""
+    return history_empty and not state.get("onboarding_sent")
+
+
+def _maybe_send_onboarding() -> None:
+    """On boot, if the consultant was never used, introduce it to the owner."""
+    try:
+        state = _load_bot_state()
+        if not _should_send_onboarding(state, _chat_history_empty()):
+            return
+        # Mark only on success so a failed send retries on the next boot —
+        # and NEVER resends once delivered.
+        if _send(_ONBOARDING):
+            state["onboarding_sent"] = True
+            _save_bot_state(state)
+    except Exception as exc:  # noqa: BLE001 — onboarding must never block startup
+        print(f"onboarding skipped: {exc}")
 
 
 # --- consultant chat (free text → chained Claude session) -------------------
 
-# (prompt sent to the consultant, human-readable line for the shared transcript)
-_chat_queue: queue.Queue[tuple[str, str | None]] = queue.Queue()
+# (prompt sent to the consultant, human-readable transcript line, attempt no.)
+_chat_queue: queue.Queue[tuple[str, str | None, int]] = queue.Queue()
+
+_BUSY_RETRY_DELAY_S = 15.0
+_BUSY_MAX_ATTEMPTS = 2  # first pass + exactly ONE delayed retry — never loops
 
 
 def _typing_loop(stop: threading.Event) -> None:
@@ -167,29 +280,63 @@ def _typing_loop(stop: threading.Event) -> None:
         stop.wait(5)
 
 
+def _requeue_chat_later(text: str, display: str | None, attempt: int) -> None:
+    """Put a message back on the queue after a short delay (daemon timer)."""
+    timer = threading.Timer(_BUSY_RETRY_DELAY_S, _chat_queue.put, args=((text, display, attempt),))
+    timer.daemon = True
+    timer.start()
+
+
+def _consume_chat_item(item: tuple[str, str | None, int]) -> str | None:
+    """One consultant turn. Returns the reply to send, or None when requeued.
+
+    A ChatBusyError means a concurrent WEB turn holds the chat lock — the
+    message is re-queued ONCE (bounded by the attempt counter carried in the
+    item, so this can never loop) instead of being dropped; on the second
+    failure the user is told. Never raises: the worker must survive anything.
+    """
+    text, display, attempt = item
+    try:
+        # converse() persists both sides so the website shows this exchange.
+        return chat_service.converse(text, ChatChannel.TELEGRAM, display=display)
+    except chat_service.ChatBusyError as exc:
+        if attempt + 1 < _BUSY_MAX_ATTEMPTS:
+            _requeue_chat_later(text, display, attempt + 1)
+            return None
+        return (
+            f"{exc}\n(Tentei de novo e continuo ocupado com outro turno — "
+            "me manda essa mensagem outra vez daqui a pouco.)"
+        )
+    except chat_service.ChatUnavailableError as exc:
+        return str(exc)
+    except Exception as exc:  # noqa: BLE001 — the worker must survive anything
+        return f"✖ Erro inesperado no chat: {exc}"
+
+
 def _chat_worker() -> None:
     """Serial consumer: one consultant turn at a time, in message order."""
     while True:
-        text, display = _chat_queue.get()
+        item = _chat_queue.get()
         stop = threading.Event()
         threading.Thread(target=_typing_loop, args=(stop,), daemon=True).start()
         try:
-            # converse() persists both sides so the website shows this exchange.
-            reply = chat_service.converse(text, ChatChannel.TELEGRAM, display=display)
-        except (chat_service.ChatBusyError, chat_service.ChatUnavailableError) as exc:
-            reply = str(exc)
-        except Exception as exc:  # noqa: BLE001 — the worker must survive anything
+            reply = _consume_chat_item(item)
+        except Exception as exc:  # noqa: BLE001 — belt and braces: never die
             reply = f"✖ Erro inesperado no chat: {exc}"
         finally:
             stop.set()
-        _send(reply)
+        if reply:
+            try:
+                _send(reply)
+            except Exception as exc:  # noqa: BLE001 — a send failure can't kill us
+                print(f"chat reply send failed: {exc}")
         _chat_queue.task_done()
 
 
 def _enqueue_chat(text: str, display: str | None = None) -> str | None:
     backlog = _chat_queue.qsize()
-    _chat_queue.put((text, display))
-    if backlog >= 2:
+    _chat_queue.put((text, display, 0))
+    if backlog >= 1:
         return f"📥 Na fila — ainda estou respondendo {backlog} mensagem(ns) antes dessa."
     return None  # the worker replies when the turn finishes
 
@@ -657,6 +804,16 @@ def _run_weekly_async() -> None:
 
 
 def _cmd_revisao() -> str:
+    with Session(engine) as s:
+        # Same invariant enforced inside review_service.run_weekly_review;
+        # checking it here answers the user instantly instead of spawning a
+        # thread that would only echo the skip note.
+        if not review_service.has_reviewable_data(s):
+            return (
+                "📭 Carteira e ledger vazios — não há nada para o comitê revisar. "
+                "Registre uma compra (/comprei), um gasto (/gasto) ou me conte "
+                "algo no chat, e rode /revisao de novo."
+            )
     threading.Thread(target=_run_weekly_async, daemon=True).start()
     return (
         "🗓️ Rodando a revisão semanal do comitê (macro + desempenho + maturidade). "
@@ -769,6 +926,9 @@ def main() -> int:
     # Skip any backlog so old commands aren't replayed on startup.
     offset = _drain_backlog()
 
+    # First boot with a never-used consultant → introduce it to the owner.
+    _maybe_send_onboarding()
+
     consecutive_errors = 0
     while True:
         try:
@@ -791,9 +951,14 @@ def main() -> int:
                 continue
             chat_id = str((msg.get("chat") or {}).get("id"))
             if chat_id != str(settings.telegram_chat_id):
-                # Locked: only the owner can talk to this bot. Ignore (no reply)
-                # and log the attempt for auditability.
+                # Locked: only the owner can talk to this bot. Ignore (no reply
+                # to the stranger), log, and warn the OWNER once per chat_id —
+                # it may be the owner on the wrong account/device.
                 print(f"ignored message from unauthorized chat {chat_id}")
+                try:
+                    _warn_unknown_chat(chat_id, msg)
+                except Exception as exc:  # noqa: BLE001 — never kill the poll loop
+                    print(f"unknown-chat warning failed: {exc}")
                 continue
             text = msg.get("text") or ""
             try:

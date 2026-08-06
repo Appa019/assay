@@ -66,11 +66,12 @@ def test_handle_media_downloads_and_enqueues_turn(
     }
     reply = bot._handle_media(msg)
     assert "Recebi a imagem" in reply
-    # The queue carries (prompt for the consultant, line for the transcript).
-    prompt, display = bot._chat_queue.get_nowait()
+    # The queue carries (consultant prompt, transcript line, attempt number).
+    prompt, display, attempt = bot._chat_queue.get_nowait()
     assert str(saved) in prompt
     assert "cupom do mercado" in prompt
     assert display is not None and "cupom do mercado" in display
+    assert attempt == 0
 
 
 def test_handle_media_reports_download_failure(
