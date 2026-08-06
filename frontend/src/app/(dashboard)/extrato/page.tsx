@@ -135,6 +135,10 @@ const ExtratoPage = () => {
         .sort((a, b) => b.total_brl - a.total_brl),
     [summary],
   );
+  const benefitWallets = useMemo(
+    () => (summary?.by_wallet ?? []).filter((w) => w.wallet !== "conta"),
+    [summary],
+  );
 
   const remove = async (id: string) => {
     setOpenId(null);
@@ -247,6 +251,20 @@ const ExtratoPage = () => {
             </div>
           ))}
         </div>
+
+        {benefitWallets.length > 0 && (
+          <div
+            className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[12px]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            {benefitWallets.map((w) => (
+              <span key={w.wallet} className="tabular">
+                <span className="font-semibold uppercase tracking-[0.08em]">{w.wallet}</span>
+                {` entrou ${formatBRL(w.income_brl)} · saiu ${formatBRL(w.expense_brl)}`}
+              </span>
+            ))}
+          </div>
+        )}
       </section>
 
       {expenses.length > 0 && (
@@ -344,6 +362,7 @@ const ExtratoPage = () => {
                           style={{ color: "var(--text-muted)" }}
                         >
                           {entry.category}
+                          {entry.wallet !== "conta" && ` · ${entry.wallet.toUpperCase()}`}
                         </span>
                       </span>
                       <span

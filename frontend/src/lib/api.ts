@@ -506,6 +506,8 @@ export const fetchReport = async (id: string): Promise<ReportRead> =>
 
 export type CashflowKind = "expense" | "income";
 export type CashflowSource = "chat" | "bot" | "api";
+/** Which pot of money moved: bank account, or the VR/VA benefit cards. */
+export type CashflowWallet = "conta" | "vr" | "va";
 
 export type CashflowEntry = {
   id: string;
@@ -515,6 +517,7 @@ export type CashflowEntry = {
   description: string | null;
   occurred_on: string;
   source: CashflowSource;
+  wallet: CashflowWallet;
   created_at: string;
 };
 
@@ -524,6 +527,7 @@ export type CashflowCreate = {
   category?: string;
   description?: string | null;
   occurred_on?: string;
+  wallet?: CashflowWallet;
 };
 
 export type CategoryTotal = {
@@ -533,6 +537,14 @@ export type CategoryTotal = {
   count: number;
 };
 
+export type WalletTotal = {
+  wallet: CashflowWallet;
+  income_brl: number;
+  expense_brl: number;
+  net_brl: number;
+  entries: number;
+};
+
 export type CashflowSummary = {
   month: string;
   income_brl: number;
@@ -540,6 +552,7 @@ export type CashflowSummary = {
   net_brl: number;
   entries: number;
   by_category: CategoryTotal[];
+  by_wallet: WalletTotal[];
 };
 
 /** Current month as YYYY-MM in local time, the format the API expects. */
