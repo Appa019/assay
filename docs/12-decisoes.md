@@ -263,6 +263,7 @@ de descartá-la; avisa "na fila" a partir de 1 mensagem à frente.
 | A36 | `ChatMessage.cost_usd`/`duration_s` existiam desde a criação da tabela e NUNCA eram preenchidos — custo do chat invisível (só grep no log) | `converse()` grava do `StepResult` em `_settle` |
 | A37 | Turno web interrompido por restart deixava a bolha "Pensando…" RUNNING para sempre na transcrição | `reconcile_orphan_turns()` no startup marca FAILED (só com lock morto) |
 | A38 | Triagem rodava DENTRO do lock do chat — os ~6s dela alargavam a janela de `ChatBusyError` para todo mundo | triagem antes do lock em `run_chat_turn` |
+| A39 | "Failed to authenticate" (OAuth do CLI expirado no Pi) não casava com nenhum padrão e caía em `RetryableError` — o chat pedia "manda de novo" para um erro que só um novo login resolve | `_AUTH_PATTERNS` → `AuthError` (não-retryable); mensagem do consultor diz para renovar o login |
 
 ### D28 · Carteiras no ledger pessoal (conta · vr · va) — vocabulário FECHADO
 O cliente recebe salário + VR + VA. Todo `CashflowEntry` ganhou `wallet`
