@@ -647,16 +647,49 @@ export const classifyCashflow = async (text: string): Promise<CashflowCreate> =>
     }),
   );
 
-/** Send a photo or document to the consultant's inbox and start a turn. */
-export const uploadChatAttachment = async (
-  file: File,
+/** How many files one chat message may carry (mirrors the backend cap). */
+export const MAX_CHAT_ATTACHMENTS = 3;
+
+/** Send up to 3 photos/documents to the consultant as ONE message/turn. */
+export const uploadChatAttachments = async (
+  files: File[],
   caption = "",
 ): Promise<ChatState> => {
   const form = new FormData();
-  form.append("file", file);
+  for (const file of files) form.append("files", file);
   form.append("caption", caption);
   // No Content-Type header: the browser must set the multipart boundary.
   return json<ChatState>(
     await fetch(`${API_BASE}/api/chat/upload`, { method: "POST", body: form }),
   );
 };
+
+// ── Web Push (PWA notifications on the phone) ─────────────────────────────
+
+export const fetchVapidPublicKey = async (): Promise<string> =>
+  (await json<{ key: string }>(await fetch(`${API_BASE}/api/push/vapid-public-key`))).key;
+
+export const savePushSubscription = async (subscription: PushSubscriptionJSON): Promise<void> => {
+  const res = await fetch(`${API_BASE}/api/push/subscriptions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(subscription),
+  });
+  if (!res.ok) throw new ApiError(res.status, "Não foi possível registrar o aparelho");
+};
+
+export const deletePushSubscription = async (endpoint: string): Promise<void> => {
+  const res = await fetch(`${API_BASE}/api/push/subscriptions`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ endpoint }),
+  });
+  if (!res.ok && res.status !== 404) {
+    throw new ApiError(res.status, "Não foi possível remover o aparelho");
+  }
+};
+
+export const sendPushTest = async (): Promise<number> =>
+  (await json<{ sent: number }>(
+    await fetch(`${API_BASE}/api/push/test`, { method: "POST" }),
+  )).sent;

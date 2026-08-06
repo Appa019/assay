@@ -11,7 +11,7 @@
 | Branch | `feat/consultor-upgrade` (sobre `feat/state-of-art-overhaul`; `main` é a principal) |
 | Versão backend | `0.4.0` (`app/main.py`, `pyproject.toml`) |
 | Versão frontend | `0.3.0` (`frontend/package.json`) — desalinhada, cosmético |
-| Testes | **181 passando** (113 → 157 upgrade do consultor → 181 carteiras VR/VA) |
+| Testes | **191 passando** (113 → 157 upgrade do consultor → 181 carteiras VR/VA → 191 push + anexos) |
 | Tamanho | ~10.700 linhas de Python · ~8.400 de TS/CSS |
 
 ## O que aconteceu na madrugada de 2026-08-06 (upgrade do consultor)
@@ -102,6 +102,7 @@ acionável foi corrigido na mesma data — detalhes em `12-decisoes.md`
 | 2026-08-06 | **Revisão extensiva + overhaul state-of-art** (D18–D22, A26–A34) + deploy no Pi |
 | 2026-08-06 (madrugada) | **Upgrade do consultor** (D23–D27, A35–A38): ativação, proatividade v1, MCP enxuto, rotação com resumo + deploy no Pi |
 | 2026-08-06 | **Carteiras no ledger** (D28): `wallet` conta/vr/va em todo o cashflow — API, classificador, bot, ordens do consultor, extrato |
+| 2026-08-06 (noite) | Consultor fixado em opus/max (.env do Pi); token de auth de 1 ano; reset zera a tela; push nativo do PWA + até 3 fotos por mensagem no site |
 
 ---
 

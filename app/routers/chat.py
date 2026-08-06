@@ -44,30 +44,48 @@ async def send_message(payload: ChatSend) -> ChatState:
 
 
 @router.post("/upload", response_model=ChatState, status_code=status.HTTP_202_ACCEPTED)
-async def upload_attachment(
-    file: UploadFile = File(...),
+async def upload_attachments(
+    files: list[UploadFile] = File(...),
     caption: str = Form(""),
 ) -> ChatState:
-    """Send a photo or document to the consultant.
+    """Send up to 3 photos/documents to the consultant in ONE message.
 
-    Lands in the same inbox the Telegram bot writes to, so a receipt photo
-    becomes a registered expense exactly the same way from either door.
+    They land in the same inbox the Telegram bot writes to and become a single
+    turn — a receipt photographed front and back is one purchase, not two.
     """
+    if not 1 <= len(files) <= chat_service.MAX_ATTACHMENTS_PER_TURN:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Envie de 1 a {chat_service.MAX_ATTACHMENTS_PER_TURN} arquivos.",
+        )
     if chat_service.is_busy():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Ainda estou terminando a resposta anterior.",
         )
-    data = await file.read()
-    if not data:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Arquivo vazio.")
+    # Read (and size-check) everything BEFORE saving anything, so a too-big
+    # third file doesn't leave half a message sitting in the inbox.
+    contents: list[tuple[str, bytes]] = []
+    for file in files:
+        data = await file.read()
+        if not data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Arquivo vazio: {file.filename or 'sem nome'}.",
+            )
+        if len(data) > chat_service.MAX_ATTACHMENT_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Arquivo grande demais (limite de 20 MB): {file.filename}.",
+            )
+        contents.append((file.filename or "arquivo.bin", data))
     try:
-        path = chat_service.save_attachment(file.filename or "arquivo.bin", data)
+        paths = [chat_service.save_attachment(name, data) for name, data in contents]
+        chat_service.start_attachments_turn(paths, caption.strip(), ChatChannel.WEB)
     except chat_service.ChatUnavailableError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)
         ) from exc
-    chat_service.start_attachment_turn(path, caption.strip(), ChatChannel.WEB)
     return _state()
 
 

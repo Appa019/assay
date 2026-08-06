@@ -71,10 +71,26 @@ Base: `http://127.0.0.1:8000` (o navegador nunca fala direto — o Next reescrev
 |---|---|---|
 | `GET` | `?limit=60` | `{busy, messages[]}` — histórico em ordem de leitura, com `channel`, `status`, `model`, `tier` |
 | `POST` | `` | **202.** Enfileira o turno e volta na hora. **409** se ocupado. Body: `{text}` (1–8000 chars) |
-| `POST` | `/upload` | multipart `file` + `caption`. Salva no inbox e enfileira o turno. **413** acima de 20 MB |
+| `POST` | `/upload` | multipart `files` (1 a 3) + `caption`. Salva no inbox e enfileira UM turno sobre o conjunto. **413** acima de 20 MB por arquivo · **422** mais de 3 |
 | `POST` | `/reset` | **204.** Descarta a sessão do Claude e ZERA a tela: o GET passa a devolver só mensagens posteriores ao reset. As linhas antigas continuam no banco (custo/tier); MEMORY.md fica. 409 no meio de um turno |
 
 Polling do cliente: 2,5s ocupado / 12s ocioso.
+
+---
+
+## Web Push — `/api/push`
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `GET` | `/vapid-public-key` | Chave pública VAPID (gerada e persistida em `storage/webpush/` no primeiro uso) |
+| `POST` | `/subscriptions` | Registra o aparelho (JSON do `PushSubscription.toJSON()` do browser). Upsert por `endpoint` |
+| `DELETE` | `/subscriptions` | Body `{endpoint}`. Remove o aparelho. 404 se não existir |
+| `POST` | `/test` | Dispara um push real para todos os aparelhos; devolve `{sent}` |
+
+Produtor atual: resposta do consultor concluída (ou falha) em turno iniciado
+pelo SITE — turnos do Telegram já entregam a resposta como mensagem. Payload
+criptografado de ponta a ponta (RFC 8291); endpoint que responder 404/410 é
+removido. iOS: exige o PWA aberto pela Tela de Início (iOS 16.4+).
 
 ---
 

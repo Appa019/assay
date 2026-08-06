@@ -5,9 +5,10 @@ import { Loader2, Paperclip, RotateCcw, Send, WifiOff, X } from "lucide-react";
 import {
   ApiError,
   fetchChat,
+  MAX_CHAT_ATTACHMENTS,
   resetChatSession,
   sendChatMessage,
-  uploadChatAttachment,
+  uploadChatAttachments,
   type ChatMessage,
 } from "@/lib/api";
 import { MarkdownViewer } from "@/components/markdown-viewer";
@@ -25,7 +26,7 @@ const ConsultorPage = () => {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
-  const [attachment, setAttachment] = useState<File | null>(null);
+  const [attachments, setAttachments] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -86,30 +87,30 @@ const ConsultorPage = () => {
   const send = async () => {
     const text = draft.trim();
     if (busy || uploading) return;
-    if (!text && !attachment) return;
+    if (!text && attachments.length === 0) return;
     setError(null);
 
-    // An attachment carries the typed text as its caption, so one tap sends
-    // "aqui está o cupom" together with the photo.
-    if (attachment) {
-      const file = attachment;
+    // Attachments carry the typed text as their caption, so one tap sends
+    // "frente e verso do cupom" together with the photos — one single turn.
+    if (attachments.length > 0) {
+      const files = attachments;
       setUploading(true);
       setDraft("");
-      setAttachment(null);
+      setAttachments([]);
       try {
-        const state = await uploadChatAttachment(file, text);
+        const state = await uploadChatAttachments(files, text);
         stickRef.current = true;
         setMessages(state.messages);
         setBusy(true);
       } catch (err) {
-        setAttachment(file);
+        setAttachments(files);
         setDraft(text);
         setError(
           err instanceof ApiError && err.status === 413
-            ? "Arquivo grande demais (limite de 20 MB)."
+            ? "Arquivo grande demais (limite de 20 MB por arquivo)."
             : err instanceof Error
               ? err.message
-              : "Não foi possível enviar o arquivo.",
+              : "Não foi possível enviar os arquivos.",
         );
       } finally {
         setUploading(false);
@@ -228,27 +229,32 @@ const ConsultorPage = () => {
             {error}
           </p>
         )}
-        {attachment && (
-          <div
-            className="mb-2 flex items-center gap-2 rounded-md border px-3 py-2"
-            style={{ borderColor: "var(--accent)", background: "var(--accent-light)" }}
-          >
-            <Paperclip size={14} strokeWidth={1.9} style={{ color: "var(--accent-strong)" }} />
-            <span
-              className="min-w-0 flex-1 truncate text-[13px]"
-              style={{ color: "var(--text-primary)" }}
-            >
-              {attachment.name}
-            </span>
-            <button
-              type="button"
-              onClick={() => setAttachment(null)}
-              aria-label="Remover anexo"
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-full"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              <X size={15} strokeWidth={2} />
-            </button>
+        {attachments.length > 0 && (
+          <div className="mb-2 flex flex-col gap-1.5">
+            {attachments.map((file, index) => (
+              <div
+                key={`${file.name}-${index}`}
+                className="flex items-center gap-2 rounded-md border px-3 py-2"
+                style={{ borderColor: "var(--accent)", background: "var(--accent-light)" }}
+              >
+                <Paperclip size={14} strokeWidth={1.9} style={{ color: "var(--accent-strong)" }} />
+                <span
+                  className="min-w-0 flex-1 truncate text-[13px]"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {file.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAttachments(attachments.filter((_, i) => i !== index))}
+                  aria-label={`Remover ${file.name}`}
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <X size={15} strokeWidth={2} />
+                </button>
+              </div>
+            ))}
           </div>
         )}
 
@@ -256,12 +262,19 @@ const ConsultorPage = () => {
           <input
             ref={fileRef}
             type="file"
+            multiple
             className="hidden"
             accept="image/*,.pdf,.csv,.txt,.xls,.xlsx,.ofx"
             onChange={(e) => {
-              const file = e.target.files?.[0] ?? null;
-              setAttachment(file);
-              setError(null);
+              const picked = Array.from(e.target.files ?? []);
+              if (picked.length === 0) return;
+              const merged = [...attachments, ...picked];
+              setAttachments(merged.slice(0, MAX_CHAT_ATTACHMENTS));
+              setError(
+                merged.length > MAX_CHAT_ATTACHMENTS
+                  ? `No máximo ${MAX_CHAT_ATTACHMENTS} arquivos por mensagem.`
+                  : null,
+              );
               // Reset so picking the same file twice still fires onChange.
               e.target.value = "";
             }}
@@ -269,8 +282,8 @@ const ConsultorPage = () => {
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            disabled={busy || uploading}
-            aria-label="Anexar foto ou arquivo"
+            disabled={busy || uploading || attachments.length >= MAX_CHAT_ATTACHMENTS}
+            aria-label="Anexar fotos ou arquivos (até 3)"
             className="grid h-11 w-11 shrink-0 place-items-center rounded-md border disabled:opacity-40"
             style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
           >
@@ -289,7 +302,11 @@ const ConsultorPage = () => {
             }}
             rows={1}
             placeholder={
-              attachment ? "Quer dizer algo sobre o arquivo?" : "Pergunte, registre um gasto, peça um aporte…"
+              attachments.length > 1
+                ? "Quer dizer algo sobre os arquivos?"
+                : attachments.length === 1
+                  ? "Quer dizer algo sobre o arquivo?"
+                  : "Pergunte, registre um gasto, peça um aporte…"
             }
             aria-label="Mensagem"
             className="min-h-[2.75rem] w-full min-w-0 resize-none rounded-md border bg-transparent px-3.5 py-3 text-base outline-none"
@@ -298,7 +315,7 @@ const ConsultorPage = () => {
           <button
             type="button"
             onClick={() => void send()}
-            disabled={busy || uploading || (draft.trim().length === 0 && !attachment)}
+            disabled={busy || uploading || (draft.trim().length === 0 && attachments.length === 0)}
             aria-label="Enviar"
             className="grid h-11 w-11 shrink-0 place-items-center rounded-md disabled:opacity-40"
             style={{ background: "var(--accent)", color: "white" }}

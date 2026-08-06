@@ -9,6 +9,7 @@ from app.models.contribution import (
 )
 from app.models.order import Order, OrderStatus
 from app.models.portfolio_snapshot import PortfolioSnapshot
+from app.models.push_subscription import PushSubscription
 from app.models.report import Report, ReportKind
 from app.models.trade import Trade, TradeSide
 
@@ -30,6 +31,7 @@ __all__ = [
     "OrderStatus",
     "PortfolioSnapshot",
     "PromptKey",
+    "PushSubscription",
     "Report",
     "ReportKind",
     "Trade",

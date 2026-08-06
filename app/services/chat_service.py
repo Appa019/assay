@@ -982,11 +982,18 @@ def converse(
     pending = _record(ChatRole.ASSISTANT, "", channel, status=ChatTurnStatus.RUNNING)
     try:
         reply, picked, step = run_chat_turn(text)
-    except (ChatBusyError, ChatUnavailableError) as exc:
+    except ChatBusyError as exc:
+        # No push here: the sender is looking at the app right now (they just
+        # hit send) and the message never actually ran.
         _settle(pending, str(exc), ChatTurnStatus.FAILED)
+        raise
+    except ChatUnavailableError as exc:
+        _settle(pending, str(exc), ChatTurnStatus.FAILED)
+        _push_reply_ready(channel, str(exc))
         raise
     except Exception as exc:  # noqa: BLE001 — the transcript must never dangle
         _settle(pending, f"✖ Erro inesperado: {exc}", ChatTurnStatus.FAILED)
+        _push_reply_ready(channel, f"✖ Erro inesperado: {exc}")
         raise
     _settle(
         pending,
@@ -997,7 +1004,19 @@ def converse(
         cost_usd=step.cost_usd,
         duration_s=step.duration_s,
     )
+    _push_reply_ready(channel, reply)
     return reply
+
+
+def _push_reply_ready(channel: ChatChannel, body: str) -> None:
+    """Web Push when a SITE turn finishes — an opus/max reply takes minutes
+    and the phone should buzz instead of the user babysitting a spinner.
+    Telegram turns already deliver their reply as a Telegram message."""
+    if channel != ChatChannel.WEB:
+        return
+    from app.services import webpush_service  # local: keep module import light
+
+    webpush_service.notify("Consultor respondeu", body.strip()[:200], url="/consultor")
 
 
 def start_turn(
@@ -1054,6 +1073,11 @@ def attachment_kind(path: Path) -> str:
     return "imagem" if path.suffix.lower() in _IMAGE_SUFFIXES else "arquivo"
 
 
+# One message may carry a few photos (both sides of a receipt, pages of a
+# statement) — but each file is a vision/parsing pass for the model, so cap it.
+MAX_ATTACHMENTS_PER_TURN = 3
+
+
 def media_turn_text(kind: str, path: Path, caption: str, origin: str) -> str:
     """The prompt the consultant actually receives for an attachment."""
     caption_line = f'Legenda do cliente: "{caption}"' if caption else "Sem legenda."
@@ -1067,10 +1091,42 @@ def media_turn_text(kind: str, path: Path, caption: str, origin: str) -> str:
     )
 
 
+def _media_group_turn_text(paths: list[Path], caption: str, origin: str) -> str:
+    caption_line = f'Legenda do cliente: "{caption}"' if caption else "Sem legenda."
+    listing = "\n".join(f"{i}. {attachment_kind(p)}: {p}" for i, p in enumerate(paths, 1))
+    return (
+        f"[ARQUIVOS RECEBIDOS — {len(paths)}] O cliente enviou {len(paths)} "
+        f"arquivos {origin}, numa única mensagem:\n{listing}\n{caption_line}\n"
+        "Leia TODOS (imagem pela visão; PDF/CSV/planilha pelas ferramentas de "
+        "leitura) e trate como um CONJUNTO — podem ser páginas ou fotos do mesmo "
+        "cupom/extrato. Siga suas ordens permanentes: cupom/nota → registre o "
+        "gasto; extrato/fatura → resuma e registre os lançamentos; senão, "
+        "responda ao que o cliente pediu. Não registre o mesmo valor duas vezes "
+        "se dois arquivos mostrarem a mesma compra."
+    )
+
+
+def _display_name(path: Path) -> str:
+    return path.name.split("_", 1)[-1]
+
+
 def start_attachment_turn(path: Path, caption: str, channel: ChatChannel) -> None:
-    """Queue a turn about an uploaded file, showing the human a readable line."""
-    kind = attachment_kind(path)
+    """Queue a turn about one uploaded file (the Telegram door sends one at a time)."""
+    start_attachments_turn([path], caption, channel)
+
+
+def start_attachments_turn(paths: list[Path], caption: str, channel: ChatChannel) -> None:
+    """Queue ONE turn about up to MAX_ATTACHMENTS_PER_TURN uploaded files."""
+    if not paths:
+        raise ChatUnavailableError("Nenhum arquivo recebido.")
+    if len(paths) > MAX_ATTACHMENTS_PER_TURN:
+        raise ChatUnavailableError(f"No máximo {MAX_ATTACHMENTS_PER_TURN} arquivos por mensagem.")
     origin = "pelo Telegram" if channel is ChatChannel.TELEGRAM else "pelo site"
-    prompt = media_turn_text(kind, path, caption, origin)
-    display = f"📎 {path.name.split('_', 1)[-1]}" + (f"\n{caption}" if caption else "")
+    if len(paths) == 1:
+        prompt = media_turn_text(attachment_kind(paths[0]), paths[0], caption, origin)
+    else:
+        prompt = _media_group_turn_text(paths, caption, origin)
+    display = (
+        "📎 " + " · ".join(_display_name(p) for p in paths) + (f"\n{caption}" if caption else "")
+    )
     start_turn(prompt, channel, display=display)

@@ -1,7 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { API_BASE } from "@/lib/api";
+import { useCallback, useEffect, useState } from "react";
+import { API_BASE, sendPushTest } from "@/lib/api";
+import {
+  currentSubscription,
+  disablePush,
+  enablePush,
+  pushEnvironment,
+  type PushEnvironment,
+} from "@/lib/push";
 
 type Health = { status: string; version: string } | null;
 
@@ -56,6 +63,8 @@ const ConfiguracoesPage = () => {
         <Row label="API base" value={API_BASE || "mesma origem (proxy do Next)"} />
         <Row label="Health" value={health ? `${health.status} · v${health.version}` : error ?? "..."} />
       </section>
+
+      <NotificationsCard />
 
       <section
         className="p-5 md:p-6 rounded-md space-y-3"
@@ -139,3 +148,124 @@ const Var = ({ name, desc }: { name: string; desc: string }) => (
 );
 
 export default ConfiguracoesPage;
+
+type PushState = "loading" | "off" | "on" | "busy";
+
+/** Enable/disable Web Push for THIS device, with a real test button. */
+const NotificationsCard = () => {
+  const [env, setEnv] = useState<PushEnvironment>("unsupported");
+  const [state, setState] = useState<PushState>("loading");
+  const [note, setNote] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    const environment = pushEnvironment();
+    setEnv(environment);
+    if (environment !== "ready") {
+      setState("off");
+      return;
+    }
+    try {
+      setState((await currentSubscription()) ? "on" : "off");
+    } catch {
+      setState("off");
+    }
+  }, []);
+
+  useEffect(() => {
+    // Deferred a tick: the sync part of refresh() sets state, and React's
+    // lint (rightly) refuses synchronous setState inside an effect body.
+    const timer = setTimeout(() => void refresh(), 0);
+    return () => clearTimeout(timer);
+  }, [refresh]);
+
+  const toggle = async () => {
+    setNote(null);
+    setState("busy");
+    try {
+      if (await currentSubscription()) {
+        await disablePush();
+        setNote("Notificações desativadas neste aparelho.");
+      } else {
+        await enablePush();
+        setNote("Ativado. Toque em \u201cEnviar teste\u201d para conferir.");
+      }
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : "Não foi possível alterar.");
+    }
+    void refresh();
+  };
+
+  const test = async () => {
+    setNote(null);
+    try {
+      const sent = await sendPushTest();
+      setNote(
+        sent > 0
+          ? `Teste enviado para ${sent} aparelho(s). A notificação chega em segundos.`
+          : "Nenhum aparelho inscrito ainda.",
+      );
+    } catch {
+      setNote("Falha ao enviar o teste.");
+    }
+  };
+
+  return (
+    <section
+      className="p-5 md:p-6 rounded-md space-y-3"
+      style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
+    >
+      <h3
+        className="text-xl tracking-tight"
+        style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
+      >
+        Notificações
+      </h3>
+      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+        O aparelho vibra quando o consultor termina uma resposta iniciada pelo
+        site. O conteúdo viaja criptografado de ponta a ponta.
+      </p>
+
+      {env === "needs-install" && (
+        <p className="text-sm" style={{ color: "var(--warning)" }}>
+          No iPhone, notificações só funcionam com o app aberto pela Tela de
+          Início. Compartilhar → &quot;Adicionar à Tela de Início&quot;, abra por lá e
+          volte aqui.
+        </p>
+      )}
+      {env === "unsupported" && (
+        <p className="text-sm" style={{ color: "var(--danger)" }}>
+          Este navegador não suporta notificações push.
+        </p>
+      )}
+
+      {env === "ready" && (
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void toggle()}
+            disabled={state === "busy" || state === "loading"}
+            className="min-h-[2.75rem] rounded-md px-5 text-sm font-semibold disabled:opacity-40"
+            style={{ background: "var(--accent)", color: "white" }}
+          >
+            {state === "on" ? "Desativar neste aparelho" : "Ativar neste aparelho"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void test()}
+            disabled={state !== "on"}
+            className="min-h-[2.75rem] rounded-md border px-5 text-sm font-medium disabled:opacity-40"
+            style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+          >
+            Enviar teste
+          </button>
+        </div>
+      )}
+
+      {note && (
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          {note}
+        </p>
+      )}
+    </section>
+  );
+};

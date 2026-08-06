@@ -401,3 +401,58 @@ def test_reset_clears_the_visible_history(
     assert [m.content for m in chat_service.history()] == ["recomeço"]
     # The old rows are hidden, not deleted.
     assert len(list(session.exec(select(ChatMessage)).all())) == 3
+
+
+def test_web_turn_completion_fires_a_push(
+    chat_dirs: Path, monkeypatch: pytest.MonkeyPatch, session
+) -> None:
+    """An opus/max reply takes minutes; a turn asked through the SITE must buzz
+    the phone when it lands. Telegram turns already deliver as a message."""
+    from app.models.chat import ChatChannel
+    from app.services import webpush_service
+
+    monkeypatch.setattr(chat_service, "engine", session.get_bind())
+    monkeypatch.setattr(analysis_runner, "_run_claude_step", lambda *a, **k: _step("pronto!"))
+    pushed: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        webpush_service,
+        "notify",
+        lambda title, body, url="/consultor": pushed.append((title, body)),
+    )
+
+    chat_service.converse("como está o mês?", ChatChannel.WEB)
+    assert len(pushed) == 1
+    assert "respondeu" in pushed[0][0].lower()
+    assert pushed[0][1] == "pronto!"
+
+    pushed.clear()
+    chat_service.converse("e agora?", ChatChannel.TELEGRAM)
+    assert pushed == []
+
+
+def test_attachment_group_becomes_one_turn(
+    chat_dirs: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Up to 3 files ride in ONE message: a receipt front and back is one
+    purchase, and the prompt must tell the model to read them as a set."""
+    from app.models.chat import ChatChannel
+
+    captured: dict[str, object] = {}
+
+    def fake_start(prompt: str, channel, *, display=None) -> None:  # noqa: ANN001
+        captured.update(prompt=prompt, display=display)
+
+    monkeypatch.setattr(chat_service, "start_turn", fake_start)
+    front = tmp_path / "20260806T1_frente.jpg"
+    back = tmp_path / "20260806T1_verso.jpg"
+    front.write_bytes(b"x")
+    back.write_bytes(b"x")
+
+    chat_service.start_attachments_turn([front, back], "cupom do mercado", ChatChannel.WEB)
+    prompt = str(captured["prompt"])
+    assert str(front) in prompt and str(back) in prompt
+    assert "CONJUNTO" in prompt
+    assert str(captured["display"]).startswith("📎 frente.jpg · verso.jpg")
+
+    with pytest.raises(chat_service.ChatUnavailableError):
+        chat_service.start_attachments_turn([front] * 4, "", ChatChannel.WEB)

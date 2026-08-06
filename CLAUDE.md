@@ -199,6 +199,11 @@ sem Playwright.
   imagem; parsing p/ PDF/CSV/planilha) — cupom/nota vira gasto registrado,
   extrato/fatura vira lançamentos. Áudio/vídeo/sticker → aviso de não
   suportado; mensagens de serviço ficam em silêncio.
+- **Push nativo do PWA (2026-08-06)**: Web Push padrão (VAPID auto-gerado em
+  `storage/webpush/`, payload cifrado ponta a ponta). Aparelho se inscreve em
+  `/configuracoes` (PWA pela Tela de Início, iOS 16.4+); dispara quando um
+  turno do SITE conclui/falha (`chat_service._push_reply_ready`). API
+  `/api/push`. O site aceita até 3 fotos/arquivos POR MENSAGEM (um turno só).
 - **Ledger de finanças pessoais (`CashflowEntry`, 2026-07-28)**: gastos e
   ganhos do dia a dia, separado do ledger `Trade`. API `/api/cashflow` (POST /
   GET com `month=`+`kind=`+`wallet=` / DELETE / `GET /summary?month=YYYY-MM`
