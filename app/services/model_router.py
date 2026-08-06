@@ -12,6 +12,7 @@ falls through to BALANCED: routing must never be the reason a chat fails.
 """
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -74,18 +75,26 @@ _LOGGING_VERB_RE = re.compile(
     r"anota|anote|lan[çc]a|registra|registre)\b",
     re.IGNORECASE,
 )
-_HAS_AMOUNT_RE = re.compile(r"\d")
+# Digits, or the amounts people actually type ("gastei mil reais no mercado" is
+# the most frequent message written out in full — it must hit the shortcut too).
+_HAS_AMOUNT_RE = re.compile(
+    r"\d|\b(mil|cem|duzentos|trezentos|quatrocentos|quinhentos|seiscentos|"
+    r"setecentos|oitocentos|novecentos|vinte|trinta|quarenta|cinquenta|"
+    r"sessenta|setenta|oitenta|noventa)\b",
+    re.IGNORECASE,
+)
 # ...unless the sentence is actually about the portfolio, where "comprei" means
-# an asset and the answer needs live market data.
+# an asset and the answer needs live market data. The ticker shape is anchored
+# to real B3 suffixes (3/4/5/6/11) so "sala12" doesn't count as a ticker.
 _MARKET_RE = re.compile(
     r"\b(a[çc][ãa]o|a[çc][õo]es|ativo|carteira|aporte|investi|investir|"
     r"bitcoin|btc|eth|cripto|crypto|cdb|cdi|selic|ipca|tesouro|dividendo|"
-    r"rebalance|tese|valuation|[a-z]{4}\d{1,2})\b",
+    r"rebalance|tese|valuation|[a-z]{4}(?:3|4|5|6|11))\b",
     re.IGNORECASE,
 )
 
 _TRIAGE_PROMPT = """Classifique a dificuldade desta mensagem para um consultor financeiro.
-
+{context}
 Mensagem: "{text}"
 
 Responda com UMA palavra, nada mais:
@@ -99,13 +108,25 @@ Responda com UMA palavra, nada mais:
   compra/venda, cenário macro, risco, tributação complexa, qualquer coisa que
   exija pesquisa na web ou dados de mercado ao vivo.
 
+Se a mensagem for uma continuação curta ("e vale a pena?", "faz sentido?"),
+classifique pelo ASSUNTO em curso no contexto, não pelo tamanho da mensagem.
+
 Uma palavra:"""
 
 
-def _triage(text: str) -> Tier:
+def _context_block(context: str) -> str:
+    if not context:
+        return ""
+    return (
+        "\nContexto — últimas mensagens da conversa (só para você entender do "
+        f"que se trata):\n{context[:1200]}\n"
+    )
+
+
+def _triage(text: str, context: str = "") -> Tier:
     _WORKSPACE.mkdir(parents=True, exist_ok=True)
     result = analysis_runner._run_claude_step(
-        _TRIAGE_PROMPT.format(text=text[:1500]),
+        _TRIAGE_PROMPT.format(text=text[:1500], context=_context_block(context)),
         resume_session_id=None,
         model=settings.chat_router_model,
         effort=settings.chat_router_effort,
@@ -120,8 +141,15 @@ def _triage(text: str) -> Tier:
     raise ValueError(f"triagem devolveu algo inesperado: {answer[:60]!r}")
 
 
-def route(text: str) -> Route:
-    """Choose a model for this message. Never raises."""
+def route(text: str, context_provider: Callable[[], str] | None = None) -> Route:
+    """Choose a model for this message. Never raises.
+
+    ``context_provider`` lazily supplies a short transcript tail for the triage
+    prompt — a terse follow-up ("e vale a pena?") in the middle of a deep
+    investment discussion looks trivial on its own and would be misrouted to a
+    small model answering a continuation opus built. Only consulted when triage
+    actually runs (the regex shortcuts never need it), and best-effort.
+    """
     text = text.strip()
 
     if not settings.chat_router_enabled:
@@ -138,8 +166,15 @@ def route(text: str) -> Route:
     ):
         return _route_for(Tier.FAST, "lançamento no ledger")
 
+    context = ""
+    if context_provider is not None:
+        try:
+            context = context_provider() or ""
+        except Exception:  # noqa: BLE001 — context is a hint, never a gate
+            context = ""
+
     try:
-        tier = _triage(text)
+        tier = _triage(text, context)
     except Exception as exc:  # noqa: BLE001 — triage is an optimisation, not a gate
         logger.warning("model_router_fallback", error=str(exc))
         return _route_for(Tier.BALANCED, "triagem falhou, usando o padrão")

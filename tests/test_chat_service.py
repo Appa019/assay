@@ -40,6 +40,21 @@ def test_ensure_workspace_seeds_and_preserves_memory(chat_dirs: Path) -> None:
     assert "/api/cashflow" in orders
 
 
+def test_chat_mcp_profile_is_lean(chat_dirs: Path) -> None:
+    """Chat turns boot every configured MCP server as a subprocess on the Pi;
+    the chat profile must keep only the financial-data set."""
+    ws = chat_service._ensure_chat_workspace()
+    servers = set(json.loads((ws / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"])
+    assert {"coingecko", "yahoo-finance", "defillama", "exa", "fetch", "memory"} <= servers
+    assert not {"playwright", "filesystem", "context7", "sequential-thinking"} & servers
+
+
+def test_committee_baseline_has_no_time_or_git_servers() -> None:
+    servers = analysis_runner._baseline_mcp_servers()
+    assert "time" not in servers and "git" not in servers  # Bash covers both
+    assert "playwright" in servers  # the committee keeps the research stack
+
+
 def test_first_turn_starts_fresh_and_persists_session(
     chat_dirs: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -51,9 +66,10 @@ def test_first_turn_starts_fresh_and_persists_session(
         return _step()
 
     monkeypatch.setattr(analysis_runner, "_run_claude_step", fake_step)
-    reply, route = chat_service.run_chat_turn("quanto está o BTC?")
+    reply, route, step = chat_service.run_chat_turn("quanto está o BTC?")
     assert reply == "olá!"
     assert route.model  # the router always picks something
+    assert step.cost_usd == 0.01  # the step result rides along for persistence
 
     assert seen["resume"] is None
     assert "Nova sessão" in str(seen["prompt"])
@@ -104,6 +120,9 @@ def test_vanished_session_restarts_fresh_once(
 ) -> None:
     chat_service._ensure_chat_workspace()
     chat_service._save_state("sess-gone", 2)
+    # Keep the restart deterministic: no transcript tail and no rotation
+    # summary, whatever the local dev database happens to contain.
+    monkeypatch.setattr(chat_service, "history", lambda limit=60: [])
     calls: list[str | None] = []
 
     def fake_step(prompt: str, *, resume_session_id, **kwargs) -> StepResult:
@@ -115,7 +134,11 @@ def test_vanished_session_restarts_fresh_once(
     monkeypatch.setattr(analysis_runner, "_run_claude_step", fake_step)
     assert chat_service.run_chat_turn("oi")[0] == "recomecei"
     assert calls == ["sess-gone", None]
-    assert chat_service._load_state()["session_id"] == "sess-new"
+    state = chat_service._load_state()
+    assert state["session_id"] == "sess-new"
+    # The reborn session must start counting from zero — inheriting the dead
+    # session's counter would rotate it again on the very next message.
+    assert state["turns"] == 1
 
 
 @pytest.mark.parametrize(
@@ -244,6 +267,41 @@ def test_fresh_session_is_seeded_with_recent_transcript(
     assert prompt.count("e depois de impostos?") == 1
 
 
+def test_rotation_builds_structured_summary(
+    chat_dirs: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A long conversation being rotated gets a structured summary in the new
+    session's first prompt — the truncated verbatim tail alone drops decisions
+    and exact figures from earlier in the session."""
+    from app.models.chat import ChatChannel, ChatMessage, ChatRole, ChatTurnStatus
+
+    fake_history = [
+        ChatMessage(
+            role=ChatRole.USER if i % 2 == 0 else ChatRole.ASSISTANT,
+            content=f"mensagem {i} sobre a carteira",
+            channel=ChatChannel.TELEGRAM,
+            status=ChatTurnStatus.DONE,
+        )
+        for i in range(14)
+    ]
+    monkeypatch.setattr(chat_service, "history", lambda limit=60: fake_history)
+    chat_service._ensure_chat_workspace()
+    chat_service._save_state("sess-old", settings.chat_max_turns)
+    prompts: list[str] = []
+
+    def fake_step(prompt: str, *, resume_session_id, **kwargs) -> StepResult:
+        prompts.append(prompt)
+        if prompt.startswith("Você vai receber a transcrição"):
+            return _step(result="## Números exatos\n- PETR4 a R$ 38,20")
+        return _step(session_id="sess-new")
+
+    monkeypatch.setattr(analysis_runner, "_run_claude_step", fake_step)
+    chat_service.run_chat_turn("bora continuar")
+    turn_prompt = prompts[-1]
+    assert "Resumo do estado da conversa" in turn_prompt
+    assert "PETR4 a R$ 38,20" in turn_prompt
+
+
 def test_resumed_turn_carries_no_transcript_block(
     chat_dirs: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -255,9 +313,9 @@ def test_resumed_turn_carries_no_transcript_block(
         seen["prompt"] = prompt
         return _step(session_id="sess-1")
 
-    monkeypatch.setattr(
-        chat_service, "history", lambda limit=60: pytest.fail("resume must not read history")
-    )
+    # History may be read for triage context, but a resumed turn's PROMPT must
+    # not re-inject the transcript — the session already carries it.
+    monkeypatch.setattr(chat_service, "history", lambda limit=60: [])
     monkeypatch.setattr(analysis_runner, "_run_claude_step", fake_step)
     chat_service.run_chat_turn("continua")
     assert "Últimos turnos" not in str(seen["prompt"])

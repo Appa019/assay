@@ -98,8 +98,7 @@ analista só. Rigor máximo institucional, sempre.
   · **filesystem** — navegar/ler/escrever em QUALQUER lugar da máquina ($HOME);
   · **context7** — docs atualizadas de bibliotecas quando você programar ferramentas;
   · **memory** — grafo de conhecimento estruturado (complementa o ./MEMORY.md);
-  · **time** — fuso/datas (janelas COPOM/FOMC, agendamentos);
-  · **git** — versione as ferramentas que você cria (o workspace é um repo git).
+  · datas/fusos e git direto pelo Bash (`date`, `git` — o workspace é um repo).
 - Acesso TOTAL à máquina: rode QUALQUER comando (Bash), navegue o sistema, leia e
   CRIE ARQUIVOS onde precisar, escreva scripts e CRIE SUAS PRÓPRIAS FERRAMENTAS em
   ./tools/ e reutilize nos próximos ciclos. Crie um venv local e instale libs
@@ -288,8 +287,6 @@ _MCP_PINS = {
     "memory": "@modelcontextprotocol/server-memory@2026.7.4",
     "defillama": "@iqai/defillama-mcp@1.0.8",
     "fetch": "mcp-server-fetch==2026.7.10",
-    "time": "mcp-server-time==2026.7.10",
-    "git": "mcp-server-git==2026.7.10",
     "yahoo-finance": (
         "git+https://github.com/Alex2Yang97/yahoo-finance-mcp"
         "@241e52316729474cabfb3e338a74c0e6ad4b25e0"
@@ -359,6 +356,13 @@ _KEY_GATED_MCP_SERVERS: tuple[tuple[str, str, dict[str, Any]], ...] = (
 )
 
 
+# The consultant chat's lean baseline: financial data + web fetch + its own
+# knowledge graph. Everything else (playwright, filesystem, context7,
+# sequential-thinking) is committee-only — chat turns boot every listed server
+# as a subprocess, and that boot dominates the latency of the cheapest turns.
+_CHAT_MCP_SERVERS = frozenset({"fetch", "memory", "coingecko", "yahoo-finance", "defillama", "exa"})
+
+
 def _playwright_mcp_args() -> list[str]:
     """Browser MCP args, with a Chromium fallback for ARM hosts.
 
@@ -376,7 +380,9 @@ def _playwright_mcp_args() -> list[str]:
     return args
 
 
-def _baseline_mcp_servers(workspace: Path | None = None) -> dict[str, Any]:
+def _baseline_mcp_servers(
+    workspace: Path | None = None, profile: str = "committee"
+) -> dict[str, Any]:
     """Curated, research-grade MCP servers always available to the analyst.
 
     Intentionally excludes the user's personal Gmail/Calendar/Drive MCPs (the
@@ -384,8 +390,15 @@ def _baseline_mcp_servers(workspace: Path | None = None) -> dict[str, Any]:
     ``--strict-mcp-config`` so ONLY the effective set loads. The agent can add
     ANY extra server itself via ``.mcp.agent.json`` (see ``_effective_mcp_config``).
 
-    ``workspace`` roots the per-workspace servers (memory graph, git repo) so
-    other chained runners (e.g. the Telegram consultant chat) get their own.
+    ``workspace`` roots the per-workspace servers (memory graph) so other
+    chained runners (e.g. the Telegram consultant chat) get their own.
+
+    ``profile`` sizes the set to the workload. The committee gets the full
+    research stack; the ``chat`` profile keeps only the financial-data servers —
+    every chat turn boots this list as subprocesses on the Pi, and the most
+    frequent turn ("gastei X no mercado") needs none of playwright/filesystem/
+    context7 to answer. The chat agent can still re-add anything via its own
+    ``.mcp.agent.json``.
 
     Tiers: (1) general research/runtime; (2) keyless financial-data servers,
     always on; (3) premium key-gated servers, added only when the key is set.
@@ -416,13 +429,8 @@ def _baseline_mcp_servers(workspace: Path | None = None) -> dict[str, Any]:
             "args": ["-y", _MCP_PINS["memory"]],
             "env": {"MEMORY_FILE_PATH": str(workspace / "memory" / "graph.json")},
         },
-        # Timezone/date math (COPOM/FOMC windows, usage-limit "resets at").
-        "time": {"command": "uvx", "args": [_MCP_PINS["time"]]},
-        # Version-control the tools the agent builds in ./tools/.
-        "git": {
-            "command": "uvx",
-            "args": [_MCP_PINS["git"], "--repository", str(workspace)],
-        },
+        # (date/timezone math and git both go through Bash — two fewer uvx
+        # subprocesses per run than the earlier dedicated servers.)
         # --- Tier 2: keyless financial-data servers (always on) ----------------
         # Crypto market data: prices, market cap, volume, coin metadata. Public
         # remote endpoint (streamable HTTP), no API key required.
@@ -444,6 +452,9 @@ def _baseline_mcp_servers(workspace: Path | None = None) -> dict[str, Any]:
     for name, key_attr, config in _KEY_GATED_MCP_SERVERS:
         if getattr(settings, key_attr, ""):
             servers[name] = config
+    if profile == "chat":
+        keep = _CHAT_MCP_SERVERS | {name for name, _, _ in _KEY_GATED_MCP_SERVERS}
+        servers = {k: v for k, v in servers.items() if k in keep}
     return servers
 
 
@@ -502,13 +513,13 @@ def _load_agent_mcp_servers(workspace: Path) -> dict[str, Any]:
     return servers if isinstance(servers, dict) else {}
 
 
-def _effective_mcp_config(workspace: Path) -> dict[str, Any]:
+def _effective_mcp_config(workspace: Path, profile: str = "committee") -> dict[str, Any]:
     """Baseline ∪ agent-added servers (the agent wins on key conflicts).
 
     This is what lets the agent provision ANY MCP it wants and have it stick:
     it edits ``.mcp.agent.json`` and the server loads on the next cycle.
     """
-    servers = _baseline_mcp_servers(workspace)
+    servers = _baseline_mcp_servers(workspace, profile=profile)
     servers.update(_load_agent_mcp_servers(workspace))
     return {"mcpServers": servers}
 

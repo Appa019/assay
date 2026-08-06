@@ -17,6 +17,7 @@ from app.routers import (
     reports,
     tax,
 )
+from app.services import chat_service
 
 logger = structlog.get_logger()
 
@@ -24,6 +25,10 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    try:
+        chat_service.reconcile_orphan_turns()
+    except Exception:  # noqa: BLE001 — cleanup must never block startup
+        logger.warning("chat_orphan_reconcile_failed", exc_info=True)
     logger.info("app_started", db=settings.sqlite_path)
     yield
     logger.info("app_stopped")
