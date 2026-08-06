@@ -55,10 +55,11 @@ Base: `http://127.0.0.1:8000` (o navegador nunca fala direto — o Next reescrev
 
 | Método | Rota | O que faz |
 |---|---|---|
-| `POST` | `` | Registra gasto/ganho. Body: `kind` (`expense`\|`income`), `amount_brl>0`, `category` (min., default `outros`), `description?`, `occurred_on?` (default hoje), `source` (`chat`\|`bot`\|`api`). **Idêntico em 120s → devolve o existente** |
-| `POST` | `/classify` | Texto livre → **rascunho** `CashflowCreate`. **Não grava.** 422 se não achou valor |
-| `GET` | `?month=YYYY-MM&kind=&limit=100` | Lançamentos. `month` malformado → 422 |
-| `GET` | `/summary?month=YYYY-MM` | `income_brl`, `expense_brl`, `net_brl`, `entries`, `by_category[]` |
+| `POST` | `` | Registra gasto/ganho. Body: `kind` (`expense`\|`income`), `amount_brl>0`, `category` (min., default `outros`), `description?`, `occurred_on?` (default hoje), `source` (`chat`\|`bot`\|`api`), `wallet?` (`conta`\|`vr`\|`va`, default `conta`; apelidos como "Vale Refeição" são dobrados). **Idêntico em 120s → devolve o existente** |
+| `POST` | `/classify` | Texto livre → **rascunho** `CashflowCreate` (com `wallet`). **Não grava.** 422 se não achou valor |
+| `GET` | `?month=YYYY-MM&kind=&wallet=&limit=100` | Lançamentos. `month` malformado → 422 |
+| `GET` | `/summary?month=YYYY-MM` | `income_brl`, `expense_brl`, `net_brl`, `entries`, `by_category[]`, `by_wallet[]` |
+| `GET` | `/wallets` | Saldo **acumulado** por carteira (entrou − saiu desde sempre) — responde "quanto ainda tenho de VR?" |
 | `GET` | `/history?months=6` | Totais por mês, **mais antigo primeiro** (a tendência) |
 | `DELETE` | `/{id}` | Apaga um lançamento |
 

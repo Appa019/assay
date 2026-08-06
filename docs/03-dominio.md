@@ -91,10 +91,24 @@ Separado do `Trade` de propósito: trade é operação de carteira, isto é vida
 (mercado, aluguel, salário). `kind` = `expense`|`income`; `category`
 normalizada para minúsculas; `source` = `chat`|`bot`|`api`.
 
-**Deduplicação:** um lançamento idêntico em todos os campos dentro de 120s é
-tratado como repetição do mesmo POST e devolve a entrada existente
-(`cashflow_service._recent_duplicate`). Motivo: o consultor às vezes posta,
-não lê a resposta, e posta de novo — o que dobrava o gasto silenciosamente.
+**Carteiras (`wallet`, 2026-08-06):** todo lançamento diz de qual pote o
+dinheiro saiu/entrou — `conta` (banco/pix/cartão, padrão), `vr`
+(vale-refeição) ou `va` (vale-alimentação). Vocabulário FECHADO, ao contrário
+das categorias: `normalize_wallet` dobra apelidos ("Vale Refeição" → `vr`) e
+degrada desconhecidos para `conta` (o comportamento pré-carteiras), nunca
+inventa um quarto saldo. VR/VA são benefício que só compra comida — o
+consultor é instruído a NUNCA somá-los como sobra investível; o resumo mensal
+expõe `by_wallet[]` e `GET /api/cashflow/wallets` dá o saldo ACUMULADO de
+benefício (crédito rola entre meses). No banco a coluna armazena o VALOR
+minúsculo (`values_callable` no `SAEnum`) — diferente de `kind`/`source`, que
+o SQLModel guarda pelo NOME — porque linhas antigas ganham o default `'conta'`
+do `ALTER TABLE` e o ORM precisa ler esse texto cru de volta.
+
+**Deduplicação:** um lançamento idêntico em todos os campos (carteira
+inclusive) dentro de 120s é tratado como repetição do mesmo POST e devolve a
+entrada existente (`cashflow_service._recent_duplicate`). Motivo: o consultor
+às vezes posta, não lê a resposta, e posta de novo — o que dobrava o gasto
+silenciosamente.
 
 ### `ChatMessage` — transcrição compartilhada
 

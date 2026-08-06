@@ -263,3 +263,20 @@ de descartá-la; avisa "na fila" a partir de 1 mensagem à frente.
 | A36 | `ChatMessage.cost_usd`/`duration_s` existiam desde a criação da tabela e NUNCA eram preenchidos — custo do chat invisível (só grep no log) | `converse()` grava do `StepResult` em `_settle` |
 | A37 | Turno web interrompido por restart deixava a bolha "Pensando…" RUNNING para sempre na transcrição | `reconcile_orphan_turns()` no startup marca FAILED (só com lock morto) |
 | A38 | Triagem rodava DENTRO do lock do chat — os ~6s dela alargavam a janela de `ChatBusyError` para todo mundo | triagem antes do lock em `run_chat_turn` |
+
+### D28 · Carteiras no ledger pessoal (conta · vr · va) — vocabulário FECHADO
+O cliente recebe salário + VR + VA. Todo `CashflowEntry` ganhou `wallet`
+(`conta` padrão, `vr`, `va`) para "gastei 35 no VR" não se misturar com
+dinheiro de banco. Três decisões deliberadas: **(1)** vocabulário fechado, ao
+contrário das categorias — `normalize_wallet` dobra apelidos e degrada
+desconhecido para `conta` (o comportamento pré-carteiras), porque carteira
+inventada = quarto saldo fantasma; **(2)** a coluna armazena o VALOR minúsculo
+(`SAEnum(values_callable=...)`), diferente de `kind`/`source` que o SQLModel
+guarda pelo NOME — o banco do Pi ganha a coluna por `ALTER TABLE ... DEFAULT
+'conta'` e o ORM precisa ler esse texto cru de volta (LookupError se fosse por
+nome; provado em simulação antes do deploy); **(3)** benefício NÃO é dinheiro
+investível — ordens do consultor mandam calcular a sobra investível só na
+carteira `conta`, e `GET /api/cashflow/wallets` responde "quanto ainda tenho
+de VR?" (saldo acumulado, porque crédito de benefício rola entre meses).
+Totais do mês continuam somando tudo (o extrato não mente); o recorte vem em
+`by_wallet[]`.

@@ -201,10 +201,13 @@ sem Playwright.
   suportado; mensagens de serviço ficam em silêncio.
 - **Ledger de finanças pessoais (`CashflowEntry`, 2026-07-28)**: gastos e
   ganhos do dia a dia, separado do ledger `Trade`. API `/api/cashflow` (POST /
-  GET com `month=`+`kind=` / DELETE / `GET /summary?month=YYYY-MM` com totais e
-  por categoria). Bot: `/gasto <valor> [descrição #categoria]`, `/ganho ...`,
-  `/financas [AAAA-MM]`; categorias normalizadas p/ minúsculas; fontes:
-  chat | bot | api.
+  GET com `month=`+`kind=`+`wallet=` / DELETE / `GET /summary?month=YYYY-MM`
+  com totais, por categoria e por carteira / `GET /wallets` saldo acumulado de
+  benefício). Bot: `/gasto <valor> [descrição #categoria] [vr|va]`,
+  `/ganho ...`, `/financas [AAAA-MM]`; categorias normalizadas p/ minúsculas;
+  fontes: chat | bot | api. **Carteiras (D28)**: `wallet` = conta | vr | va
+  (vocabulário FECHADO, `normalize_wallet` dobra apelidos, desconhecido →
+  conta). VR/VA = benefício, só comida — NUNCA contam como sobra investível.
 
 ### Chat no site + roteador de modelo (2026-07-28)
 O consultor deixou de ser exclusivo do Telegram. **É UMA conversa só**, com duas
