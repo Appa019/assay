@@ -2,7 +2,8 @@
 # Install systemd USER units for the whole system (preferred over cron):
 #   services : backend (uvicorn) + telegram bot — Restart=always
 #   timers   : maturidade · revisão semanal · resume (15min) · preços (6h)
-#              · snapshot diário · backup diário — all Persistent=true, so a
+#              · snapshot diário · insights diários · digest semanal
+#              · backup diário — all Persistent=true, so a
 #              machine that was OFF at the scheduled time catches up on boot
 #              (plain cron silently skips missed windows).
 # Idempotent. Remove with --uninstall. Requires a systemd user session.
@@ -20,7 +21,7 @@ FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 if [[ "${1:-}" == "--uninstall" ]]; then
   systemctl --user disable --now "${PREFIX}-backend.service" "${PREFIX}-bot.service" \
     "${PREFIX}-frontend.service" 2>/dev/null || true
-  for t in cadence weekly resume prices snapshot alerts monthly backup; do
+  for t in cadence weekly resume prices snapshot alerts monthly insights digest backup; do
     systemctl --user disable --now "${PREFIX}-${t}.timer" 2>/dev/null || true
   done
   rm -f "${UNIT_DIR}/${PREFIX}"-*.service "${UNIT_DIR}/${PREFIX}"-*.timer
@@ -103,12 +104,15 @@ oneshot_pair prices   "marcação a mercado"           "${PY} ${PROJECT_ROOT}/sc
 oneshot_pair snapshot "snapshot diário da carteira"  "${PY} ${PROJECT_ROOT}/scripts/daily_snapshot.py" "*-*-* 18:45"
 oneshot_pair alerts   "alertas de alvo/stop"         "${PY} ${PROJECT_ROOT}/scripts/check_alerts.py"   "*-*-* 11,15,19:05"
 oneshot_pair monthly  "relatório mensal"             "${PY} ${PROJECT_ROOT}/scripts/monthly_report.py" "*-*-01,02 10:00"
+# 09:07 by design: insights must never ping during the night (quiet hours).
+oneshot_pair insights "insights do ledger pessoal"   "${PY} ${PROJECT_ROOT}/scripts/daily_insights.py" "*-*-* 09:07"
+oneshot_pair digest   "digest financeiro semanal"    "${PY} ${PROJECT_ROOT}/scripts/weekly_digest.py"  "Sun *-*-* 20:07"
 oneshot_pair backup   "backup do SQLite"             "/usr/bin/env bash ${PROJECT_ROOT}/scripts/backup_db.sh" "*-*-* 03:00"
 
 systemctl --user daemon-reload
 systemctl --user enable --now "${PREFIX}-backend.service" "${PREFIX}-bot.service" \
   "${PREFIX}-frontend.service"
-for t in cadence weekly resume prices snapshot alerts monthly backup; do
+for t in cadence weekly resume prices snapshot alerts monthly insights digest backup; do
   systemctl --user enable --now "${PREFIX}-${t}.timer"
 done
 

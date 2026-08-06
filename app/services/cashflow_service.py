@@ -252,3 +252,77 @@ def month_history(session: Session, months: int = 6) -> list[MonthTotals]:
             )
         )
     return out
+
+
+def category_week_totals(
+    session: Session,
+    *,
+    weeks: int = 12,
+    end: date | None = None,
+) -> dict[str, list[float]]:
+    """Expense totals per category per 7-day bucket, oldest bucket first.
+
+    The window covers ``weeks`` consecutive 7-day buckets ending on ``end``
+    (inclusive; defaults to today). Only categories with at least one expense
+    inside the window appear; empty buckets hold 0.0. This feeds the
+    deterministic anomaly detector in ``insight_service`` — the bucket count
+    doubles as "how many weeks of history does this category actually have".
+    """
+    weeks = max(1, min(weeks, 52))
+    end = end or date.today()
+    start = end - timedelta(days=weeks * 7 - 1)
+    rows = session.exec(
+        select(CashflowEntry.category, CashflowEntry.occurred_on, CashflowEntry.amount_brl)
+        .where(CashflowEntry.kind == CashflowKind.EXPENSE)
+        .where(CashflowEntry.occurred_on >= start, CashflowEntry.occurred_on <= end)
+    ).all()
+    totals: dict[str, list[float]] = {}
+    for category, occurred_on, amount in rows:
+        buckets = totals.setdefault(category, [0.0] * weeks)
+        buckets[(occurred_on - start).days // 7] += float(amount)
+    return {category: [round(v, 2) for v in buckets] for category, buckets in totals.items()}
+
+
+def average_monthly_income(
+    session: Session,
+    *,
+    months: int = 6,
+    before: date | None = None,
+) -> float:
+    """Mean monthly income over the last ``months`` full calendar months.
+
+    Only months strictly before the month of ``before`` (default today) count —
+    the running month is incomplete by definition. Months with no ledger entry
+    at all are skipped (the ledger simply did not exist yet), while a tracked
+    month that happens to have zero income still weighs in as 0. Returns 0.0
+    when no prior tracked month exists.
+    """
+    months = max(1, min(months, 36))
+    before = before or date.today()
+    first_of_ref = before.replace(day=1)
+    window_end = first_of_ref - timedelta(days=1)
+    start_year, start_mon = divmod(before.year * 12 + (before.month - 1) - months, 12)
+    window_start = date(start_year, start_mon + 1, 1)
+
+    month_expr = func.strftime("%Y-%m", CashflowEntry.occurred_on)
+    rows = session.exec(
+        select(
+            month_expr,
+            CashflowEntry.kind,
+            func.coalesce(func.sum(CashflowEntry.amount_brl), 0),
+        )
+        .where(CashflowEntry.occurred_on >= window_start)
+        .where(CashflowEntry.occurred_on <= window_end)
+        .group_by(month_expr, CashflowEntry.kind)
+    ).all()
+
+    # Grouped rows only exist for months that HAVE entries, so every key here
+    # is a tracked month — income-less ones stay at 0.0 and still count.
+    incomes: dict[str, float] = {}
+    for label, kind, total in rows:
+        incomes.setdefault(str(label), 0.0)
+        if kind == CashflowKind.INCOME:
+            incomes[str(label)] += float(total)
+    if not incomes:
+        return 0.0
+    return round(sum(incomes.values()) / len(incomes), 2)
