@@ -22,6 +22,7 @@ from app.models.cashflow import CashflowKind
 from app.schemas.cashflow import CashflowCreate
 from app.services import analysis_runner
 from app.services.analysis_runner import AnalysisError
+from app.services.cashflow_service import CANONICAL_CATEGORIES
 
 logger = structlog.get_logger()
 
@@ -39,11 +40,9 @@ _WEEKDAYS = (
     "domingo",
 )
 
-_KNOWN_CATEGORIES = (
-    "mercado, transporte, alimentação, casa, saúde, lazer, educação, "
-    "assinaturas, vestuário, pets, viagem, impostos, salário, freelance, "
-    "dividendos, reembolso, presente, outros"
-)
+# Rendered from the ledger's canonical vocabulary — the consultant's orders use
+# the same source, so both doors speak identical category names (no accents).
+_KNOWN_CATEGORIES = ", ".join(CANONICAL_CATEGORIES)
 
 
 class ClassificationError(RuntimeError):
@@ -65,9 +64,9 @@ Regras:
 - `kind`: "expense" para gastos/saídas, "income" para ganhos/entradas.
 - `amount_brl`: número decimal com ponto. "42,90" vira 42.90. "1.250" vira 1250.00.
   Se a frase não tiver valor nenhum, use 0.
-- `category`: UMA palavra em minúsculas, sem acento no plural desnecessário.
+- `category`: UMA palavra em minúsculas e SEM acento.
   Prefira uma destas quando fizer sentido: {_KNOWN_CATEGORIES}.
-  Se nada servir, invente uma curta e óbvia.
+  Se nada servir, invente uma curta e óbvia (também sem acento).
 - `description`: a frase limpa e curta (máx. 80 caracteres), sem o valor.
   Ex.: "compra da semana", "uber pro centro". Se não houver detalhe, use "".
 - `occurred_on`: a data do lançamento em AAAA-MM-DD. Resolva expressões

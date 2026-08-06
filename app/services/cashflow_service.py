@@ -2,14 +2,18 @@
 
 Written primarily by the Telegram consultant (Claude registers what the user
 tells it over chat) and by the quick /gasto and /ganho bot commands. Category
-names are normalized to lowercase so "Mercado" and "mercado" aggregate together.
+names are normalized here — case, accents and known aliases — so the same
+real-world category can never split into two buckets depending on which door
+(consultant, classifier, bot, form) wrote it.
 """
 
+import unicodedata
 from calendar import monthrange
 from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 import structlog
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.models.cashflow import CashflowEntry, CashflowKind
@@ -21,6 +25,66 @@ from app.schemas.cashflow import (
 )
 
 logger = structlog.get_logger()
+
+# The ONE category vocabulary. The consultant's standing orders and the
+# classifier prompt both render THIS list — never their own copy — and
+# ``normalize_category`` folds whatever still arrives onto it. Two prompts
+# once carried divergent lists ("saúde"/"assinaturas" vs "saude"/"assinatura")
+# and the monthly summary fragmented the same category into two lines.
+CANONICAL_CATEGORIES: tuple[str, ...] = (
+    "mercado",
+    "restaurante",
+    "transporte",
+    "moradia",
+    "saude",
+    "lazer",
+    "assinatura",
+    "educacao",
+    "vestuario",
+    "pets",
+    "viagem",
+    "impostos",
+    "presente",
+    "salario",
+    "freela",
+    "dividendos",
+    "reembolso",
+    "outros",
+)
+
+# Legacy/synonym spellings (post accent-fold) → canonical bucket.
+_CATEGORY_ALIASES: dict[str, str] = {
+    "casa": "moradia",
+    "aluguel": "moradia",
+    "assinaturas": "assinatura",
+    "freelance": "freela",
+    "alimentacao": "mercado",
+    "supermercado": "mercado",
+    "farmacia": "saude",
+    "imposto": "impostos",
+    "presentes": "presente",
+    "viagens": "viagem",
+    "pet": "pets",
+    "restaurantes": "restaurante",
+}
+
+
+def _fold_accents(text: str) -> str:
+    return "".join(
+        ch for ch in unicodedata.normalize("NFKD", text) if not unicodedata.combining(ch)
+    )
+
+
+def normalize_category(raw: str | None) -> str:
+    """Fold case/accents and known aliases onto the canonical vocabulary.
+
+    Free-form categories remain allowed (the user may invent one) — the
+    guarantee is only that the SAME category always lands as the SAME string.
+    """
+    value = _fold_accents((raw or "").strip().lower()).strip()[:64]
+    if not value:
+        return "outros"
+    return _CATEGORY_ALIASES.get(value, value)
 
 
 class CashflowNotFoundError(LookupError):
@@ -64,7 +128,7 @@ def add_entry(session: Session, data: CashflowCreate) -> CashflowEntry:
     entry = CashflowEntry(
         kind=data.kind,
         amount_brl=data.amount_brl,
-        category=(data.category or "outros").strip().lower() or "outros",
+        category=normalize_category(data.category),
         description=(data.description or "").strip() or None,
         occurred_on=data.occurred_on or date.today(),
         source=data.source,
@@ -146,24 +210,45 @@ def month_history(session: Session, months: int = 6) -> list[MonthTotals]:
 
     One call instead of one per month: the consultant needs the trend to say
     anything useful about whether spending is drifting, and asking it to stitch
-    six requests together is both slow and easy to get wrong.
+    six requests together is both slow and easy to get wrong. A single GROUP BY
+    replaces the former query-per-month loop; months without entries still
+    appear, zeroed, so the trend line has no holes.
     """
     months = max(1, min(months, 36))
     today = date.today()
+    first_year, first_mon = divmod(today.year * 12 + (today.month - 1) - (months - 1), 12)
+    start = date(first_year, first_mon + 1, 1)
+
+    month_expr = func.strftime("%Y-%m", CashflowEntry.occurred_on)
+    rows = session.exec(
+        select(
+            month_expr,
+            CashflowEntry.kind,
+            func.coalesce(func.sum(CashflowEntry.amount_brl), 0),
+            func.count(),
+        )
+        .where(CashflowEntry.occurred_on >= start)
+        .group_by(month_expr, CashflowEntry.kind)
+    ).all()
+
+    totals: dict[str, dict[str, float]] = {}
+    for label, kind, total, count in rows:
+        bucket = totals.setdefault(str(label), {"income": 0.0, "expense": 0.0, "entries": 0.0})
+        bucket["income" if kind == CashflowKind.INCOME else "expense"] = float(total)
+        bucket["entries"] += int(count)
+
     out: list[MonthTotals] = []
     for offset in range(months - 1, -1, -1):
         year, mon = divmod(today.year * 12 + (today.month - 1) - offset, 12)
         label = f"{year:04d}-{mon + 1:02d}"
-        entries = list_entries(session, month=label, limit=10_000)
-        income = sum(float(e.amount_brl) for e in entries if e.kind == CashflowKind.INCOME)
-        expense = sum(float(e.amount_brl) for e in entries if e.kind == CashflowKind.EXPENSE)
+        bucket = totals.get(label, {"income": 0.0, "expense": 0.0, "entries": 0.0})
         out.append(
             MonthTotals(
                 month=label,
-                income_brl=round(income, 2),
-                expense_brl=round(expense, 2),
-                net_brl=round(income - expense, 2),
-                entries=len(entries),
+                income_brl=round(bucket["income"], 2),
+                expense_brl=round(bucket["expense"], 2),
+                net_brl=round(bucket["income"] - bucket["expense"], 2),
+                entries=int(bucket["entries"]),
             )
         )
     return out

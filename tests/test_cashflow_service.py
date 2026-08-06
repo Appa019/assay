@@ -37,6 +37,35 @@ def test_add_entry_blank_category_falls_back_to_outros(session: Session) -> None
     assert entry.category == "outros"
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("Saúde", "saude"),  # accent fold — the classifier used to emit these
+        ("Salário", "salario"),
+        ("educação", "educacao"),
+        ("assinaturas", "assinatura"),  # alias: plural variant
+        ("casa", "moradia"),  # alias: the classifier's old name for it
+        ("freelance", "freela"),
+        ("alimentação", "mercado"),
+        ("categoria nova", "categoria nova"),  # free-form stays allowed
+    ],
+)
+def test_normalize_category_folds_accents_and_aliases(raw: str, expected: str) -> None:
+    """Regression: the consultant and the classifier carried DIVERGENT category
+    vocabularies ("saúde" vs "saude"), splitting the monthly summary in two."""
+    assert cashflow_service.normalize_category(raw) == expected
+
+
+def test_same_category_from_both_doors_lands_in_one_bucket(session: Session) -> None:
+    cashflow_service.add_entry(session, _entry(category="saúde", amount="100.00"))
+    cashflow_service.add_entry(session, _entry(category="saude", amount="35.50"))
+    summary = cashflow_service.month_summary(session)
+    saude = [c for c in summary.by_category if c.category == "saude"]
+    assert len(saude) == 1
+    assert saude[0].count == 2
+    assert saude[0].total_brl == 135.5
+
+
 def test_list_entries_filters_by_month_and_kind(session: Session) -> None:
     cashflow_service.add_entry(session, _entry(occurred_on=date(2026, 7, 10)))
     cashflow_service.add_entry(
