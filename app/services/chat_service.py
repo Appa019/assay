@@ -35,6 +35,7 @@ from app.models.chat import ChatChannel, ChatMessage, ChatRole, ChatTurnStatus
 from app.services import analysis_runner, model_router
 from app.services.analysis_runner import (
     AnalysisError,
+    AuthError,
     LimitError,
     RetryableError,
     SessionNotFoundError,
@@ -800,6 +801,14 @@ def run_chat_turn(text: str) -> tuple[str, model_router.Route, StepResult]:
             raise ChatUnavailableError(
                 f"⏳ Atingi meu limite de uso do Claude{when}. "
                 "Me manda a mensagem de novo mais tarde — a memória fica guardada."
+            ) from exc
+        except AuthError as exc:
+            # Not transient and not fixable by resending: without this branch
+            # the OAuth-expired failure told the user to "just send it again".
+            raise ChatUnavailableError(
+                "🔐 Minha autenticação com o Claude expirou no servidor e não "
+                "renovou sozinha. Reenviar não resolve: renove o login do "
+                f"`claude` no Pi para eu voltar. Detalhe: {exc}"
             ) from exc
         except RetryableError as exc:
             raise ChatUnavailableError(

@@ -6,6 +6,7 @@ import pytest
 from app.config import settings
 from app.services import analysis_runner, chat_service
 from app.services.analysis_runner import (
+    AuthError,
     LimitError,
     RetryableError,
     SessionNotFoundError,
@@ -341,3 +342,18 @@ def test_is_busy_ignores_a_lock_left_by_a_dead_process(chat_dirs: Path) -> None:
     assert analysis_runner._try_acquire_lock_file(lock)
     assert chat_service.is_busy() is True
     analysis_runner._release_lock_file(lock)
+
+
+def test_auth_failure_tells_the_truth(chat_dirs: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An expired CLI login is NOT transient: the reply must say the login
+    needs renewing instead of asking the user to resend the message."""
+
+    def fake_step(prompt: str, *, resume_session_id, **kwargs) -> StepResult:
+        raise AuthError("Failed to authenticate: OAuth session expired")
+
+    monkeypatch.setattr(analysis_runner, "_run_claude_step", fake_step)
+    with pytest.raises(chat_service.ChatUnavailableError) as excinfo:
+        chat_service.run_chat_turn("oi")
+    message = str(excinfo.value)
+    assert "autenticação" in message
+    assert "manda a mensagem de novo" not in message

@@ -270,6 +270,11 @@ class SessionNotFoundError(AnalysisError):
     """The Claude session to ``--resume`` no longer exists; restart fresh."""
 
 
+class AuthError(AnalysisError):
+    """The CLI cannot authenticate (login expired or revoked). Retrying can
+    never fix it — someone must renew the ``claude`` login on this machine."""
+
+
 _MCP_FILENAME = ".mcp.json"  # effective config Claude loads (regenerated each run)
 _AGENT_MCP_FILENAME = ".mcp.agent.json"  # agent-owned; merged in and NEVER overwritten
 
@@ -793,6 +798,17 @@ _HARD_PATTERNS = (
     "context_length",
     "maximum context",
     "too long",
+)
+
+# Login problems get their own bucket: they look transient to the generic
+# classifier ("Failed to authenticate" matched nothing and fell through to
+# RetryableError), but retrying is pointless until a human renews the login.
+_AUTH_PATTERNS = (
+    "failed to authenticate",
+    "oauth session expired",
+    "oauth token",
+    "please run /login",
+    "not logged in",
     "invalid api key",
     "authentication",
 )
@@ -929,6 +945,8 @@ def _run_claude_step(
         detail = (stderr.strip() or str(data.get("result", "")) or "sem detalhe")[:500]
         if _is(_SESSION_GONE_PATTERNS):
             raise SessionNotFoundError(f"Sessão de resume não encontrada: {detail}")
+        if _is(_AUTH_PATTERNS):
+            raise AuthError(f"Login do Claude expirado nesta máquina: {detail}")
         if _is(_HARD_PATTERNS):
             raise AnalysisError(f"Erro não-recuperável do Claude: {detail}")
         if _is(_LIMIT_PATTERNS):

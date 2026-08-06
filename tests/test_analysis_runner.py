@@ -440,3 +440,13 @@ def test_pending_resumable_covers_pre_step_failures_but_not_manual(
     assert interrupted_mid_chain.id in ids
     assert manual.id not in ids
     assert gave_up.id not in ids
+
+
+def test_auth_failure_is_classified_as_auth_not_transient() -> None:
+    """ "Failed to authenticate" used to fall through to RetryableError and the
+    chat told the user to resend — pointless until someone renews the login."""
+    assert any(
+        p in "failed to authenticate: oauth session expired".lower() for p in ar._AUTH_PATTERNS
+    )
+    assert issubclass(ar.AuthError, ar.AnalysisError)
+    assert not issubclass(ar.AuthError, ar.RetryableError)
