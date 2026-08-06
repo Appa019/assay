@@ -70,8 +70,11 @@ _TRIVIAL_RE = re.compile(
 # "gastei 42 no mercado" is the single most frequent message in the product and
 # never needs more than the small model. A logging verb plus a number is a
 # specific enough shape to skip triage entirely, which is worth ~6s every time.
+# Present tense too ("ganho 5000 de salário e 800 de VR") — that's the client
+# declaring recurring income/expense, which the consultant files to memory.
 _LOGGING_VERB_RE = re.compile(
     r"\b(gastei|paguei|comprei|torrei|recebi|ganhei|caiu|entrou|"
+    r"gasto|ganho|pago|recebo|"
     r"anota|anote|lan[çc]a|registra|registre)\b",
     re.IGNORECASE,
 )
@@ -88,6 +91,7 @@ _HAS_AMOUNT_RE = re.compile(
 # to real B3 suffixes (3/4/5/6/11) so "sala12" doesn't count as a ticker.
 _MARKET_RE = re.compile(
     r"\b(a[çc][ãa]o|a[çc][õo]es|ativo|carteira|aporte|investi|investir|"
+    r"invisto|invista|aplico|aplicar|aplique|"
     r"bitcoin|btc|eth|cripto|crypto|cdb|cdi|selic|ipca|tesouro|dividendo|"
     r"rebalance|tese|valuation|[a-z]{4}(?:3|4|5|6|11))\b",
     re.IGNORECASE,

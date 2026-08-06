@@ -69,3 +69,28 @@ def test_triage_failure_falls_back_to_balanced(monkeypatch: pytest.MonkeyPatch) 
     route = model_router.route("me explica juros compostos no cartão")
     assert route.tier is model_router.Tier.BALANCED
     assert "falhou" in route.reason
+
+
+def test_recurring_income_declaration_hits_the_ledger_shortcut() -> None:
+    """ "ganho X de salário e Y de VR" is the client declaring income — the
+    consultant files it to memory; it never needs a big model or triage."""
+    route = model_router.route("ganho 5000 de salário e 800 de vr")
+    assert route.tier is model_router.Tier.FAST
+    assert route.reason == "lançamento no ledger"
+
+
+def test_benefit_spend_hits_the_ledger_shortcut() -> None:
+    """ "vr"/"va" must not read as market words and push logging into triage."""
+    route = model_router.route("gastei 35 no vr hoje")
+    assert route.tier is model_router.Tier.FAST
+    assert route.reason == "lançamento no ledger"
+
+
+def test_income_declaration_with_investment_question_still_pays_triage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ "ganho 5000, onde invisto?" carries a logging verb + amount, but it is
+    an investment question — first-person market verbs must block the shortcut."""
+    monkeypatch.setattr(model_router, "_triage", lambda _text, _context="": model_router.Tier.DEEP)
+    route = model_router.route("ganho 5000 por mês, onde invisto?")
+    assert route.tier is model_router.Tier.DEEP
