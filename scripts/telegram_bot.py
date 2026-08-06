@@ -14,8 +14,8 @@ Commands:
     /aporte <valor>                 cria o aporte e roda o comitê inteiro
     /comprei <ticker> <classe> <qtd> <preço>   registra uma compra
     /vender <ticker>                vende (ações/crypto após 30 dias; CDB quando quiser)
-    /gasto <valor> [descrição #categoria]      registra um gasto no ledger
-    /ganho <valor> [descrição #categoria]      registra um ganho no ledger
+    /gasto <valor> [descrição #categoria] [vr|va]   registra um gasto no ledger
+    /ganho <valor> [descrição #categoria] [vr|va]   registra um ganho no ledger
     /financas [YYYY-MM]             resumo do mês (gastos × ganhos × saldo)
     /carteira                       lista posições + elegibilidade de venda
     /status                         alocação atual vs. alvo + cadência
@@ -91,12 +91,12 @@ _HELP = (
     "🤖 *Agente de Investimentos*\n\n"
     "💬 *Me mande qualquer mensagem sem /* e eu respondo como seu consultor "
     "financeiro em tempo real: dúvidas de tickers, cripto, CDB, carteira, IR — "
-    'e registro gastos e ganhos que você me contar ("gastei 80 no mercado"). '
-    "Eu lembro das conversas (memória fixa).\n"
+    'e registro gastos e ganhos que você me contar ("gastei 80 no mercado", '
+    '"paguei 35 no VR", "caiu o VA"). Eu lembro das conversas (memória fixa).\n'
     "📎 Pode mandar *foto* (cupom, nota, print) ou *arquivo* (PDF, CSV, "
     "planilha, até 20 MB): eu leio, analiso e registro o que for gasto/ganho.\n\n"
-    "/gasto <valor> [descrição #categoria] — registro rápido de um gasto.\n"
-    "/ganho <valor> [descrição #categoria] — registro rápido de um ganho.\n"
+    "/gasto <valor> [descrição #categoria] [vr|va] — registro rápido de um gasto.\n"
+    "/ganho <valor> [descrição #categoria] [vr|va] — registro rápido de um ganho.\n"
     "/financas [AAAA-MM] — resumo do mês: gastos × ganhos × saldo por categoria.\n"
     "/resetchat — começo uma conversa nova (a memória fixa permanece).\n\n"
     "/aporte <valor> — crio o aporte e rodo o comitê inteiro (Opus · max). "
@@ -628,26 +628,35 @@ def _cmd_executei(args: list[str]) -> str:
     )
 
 
-def _parse_cashflow(args: list[str]) -> tuple[Decimal, str, str | None]:
-    """``<valor> [descrição ... #categoria]`` → (amount, category, description)."""
+def _parse_cashflow(args: list[str]) -> tuple[Decimal, str, str | None, str]:
+    """``<valor> [descrição ... #categoria] [vr|va]`` →
+    (amount, category, description, wallet).
+
+    A bare "vr"/"va" token anywhere marks the benefit card that paid (or was
+    credited); everything else stays description. Default wallet is "conta".
+    """
     amount = _parse_amount(args[0])
     if amount <= 0:
         raise InvalidOperation("valor deve ser positivo")
     category = "outros"
+    wallet = "conta"
     words: list[str] = []
     for token in args[1:]:
+        low = token.lower()
         if token.startswith("#") and len(token) > 1:
             category = token[1:].lower()
+        elif low in {"vr", "va"}:
+            wallet = low
         else:
             words.append(token)
-    return amount, category, " ".join(words) or None
+    return amount, category, " ".join(words) or None, wallet
 
 
 def _register_cashflow(kind: CashflowKind, args: list[str], usage: str) -> str:
     if not args:
         return usage
     try:
-        amount, category, description = _parse_cashflow(args)
+        amount, category, description, wallet = _parse_cashflow(args)
     except (InvalidOperation, ValueError):
         return f"Valor inválido: {args[0]}\n{usage}"
     with Session(engine) as s:
@@ -659,13 +668,16 @@ def _register_cashflow(kind: CashflowKind, args: list[str], usage: str) -> str:
                 category=category,
                 description=description,
                 source=CashflowSource.BOT,
+                wallet=wallet,
             ),
         )
         summ = cashflow_service.month_summary(s)
     label = "Gasto" if kind == CashflowKind.EXPENSE else "Ganho"
     desc = f" — {entry.description}" if entry.description else ""
+    wallet_note = f" no {entry.wallet.value.upper()}" if entry.wallet.value != "conta" else ""
     return (
-        f"✅ {label}: {_fmt_brl(float(entry.amount_brl))} ({entry.category}){desc}.\n"
+        f"✅ {label}{wallet_note}: {_fmt_brl(float(entry.amount_brl))} "
+        f"({entry.category}){desc}.\n"
         f"Mês: gastos {_fmt_brl(summ.expense_brl)} · ganhos {_fmt_brl(summ.income_brl)} "
         f"· saldo {_fmt_brl(summ.net_brl)}."
     )
@@ -673,13 +685,13 @@ def _register_cashflow(kind: CashflowKind, args: list[str], usage: str) -> str:
 
 def _cmd_gasto(args: list[str]) -> str:
     return _register_cashflow(
-        CashflowKind.EXPENSE, args, "Uso: /gasto <valor> [descrição #categoria]"
+        CashflowKind.EXPENSE, args, "Uso: /gasto <valor> [descrição #categoria] [vr|va]"
     )
 
 
 def _cmd_ganho(args: list[str]) -> str:
     return _register_cashflow(
-        CashflowKind.INCOME, args, "Uso: /ganho <valor> [descrição #categoria]"
+        CashflowKind.INCOME, args, "Uso: /ganho <valor> [descrição #categoria] [vr|va]"
     )
 
 
@@ -703,6 +715,23 @@ def _cmd_financas(args: list[str]) -> str:
         f"Saldo: {_fmt_brl(summ.net_brl)}",
         "",
     ]
+    benefit_months = [w for w in summ.by_wallet if w.wallet.value != "conta"]
+    if benefit_months:
+        for w in benefit_months:
+            lines.append(
+                f"{w.wallet.value.upper()} no mês: entrou {_fmt_brl(w.income_brl)} "
+                f"· saiu {_fmt_brl(w.expense_brl)}"
+            )
+        with Session(engine) as s:
+            balances = cashflow_service.wallet_balances(s)
+        saldo_bits = [
+            f"{b.wallet.value.upper()} {_fmt_brl(b.balance_brl)}"
+            for b in balances
+            if b.wallet.value != "conta"
+        ]
+        if saldo_bits:
+            lines.append(f"Saldo acumulado nos benefícios: {' · '.join(saldo_bits)}")
+        lines.append("")
     expenses = [c for c in summ.by_category if c.kind == CashflowKind.EXPENSE][:6]
     if expenses:
         lines.append("Maiores gastos por categoria:")
