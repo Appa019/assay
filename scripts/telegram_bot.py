@@ -26,8 +26,6 @@ Commands:
 
 import asyncio
 import atexit
-import json
-import os
 import queue
 import re
 import sys
@@ -673,7 +671,7 @@ def _cmd_relatorios() -> str:
         return "Nenhum relatório ainda. Use /revisao para gerar o primeiro."
     lines = ["📄 *Últimos relatórios:*", ""]
     for r in reports:
-        lines.append(f"• {r.created_at.date().isoformat()} — {r.kind} — {r.title}")
+        lines.append(f"• {_local_date(r.created_at).isoformat()} — {r.kind} — {r.title}")
     lines.append("\n(os relatórios também ficam salvos e entram como consulta nos aportes)")
     return "\n".join(lines)
 
@@ -732,18 +730,15 @@ def _acquire_single_instance() -> bool:
 
     Two pollers fighting over getUpdates produce endless Telegram 409s and
     randomly-split replies (observed: thousands of 409s in the logs).
+
+    Uses the shared process-identity lock (atomic O_EXCL create + pid AND
+    /proc starttime): a pid recycled after a reboot can't hold the bot in a
+    Restart=always failure loop, and two racing starters can't both win —
+    the exact invariant already fixed twice (runner A7, chat A25).
     """
-    if _PID_PATH.exists():
-        try:
-            other = int(json.loads(_PID_PATH.read_text(encoding="utf-8"))["pid"])
-            os.kill(other, 0)  # raises if the process is gone
-            return other == os.getpid()
-        except (ValueError, KeyError, json.JSONDecodeError, ProcessLookupError):
-            pass  # stale — reclaim below
-        except PermissionError:
-            return False
     _PID_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _PID_PATH.write_text(json.dumps({"pid": os.getpid()}), encoding="utf-8")
+    if not analysis_runner._try_acquire_lock_file(_PID_PATH):
+        return False
     atexit.register(_PID_PATH.unlink, missing_ok=True)
     return True
 

@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -34,7 +34,7 @@ class ReportRead(BaseModel):
 @router.get("", response_model=list[ReportListItem])
 async def list_reports(
     kind: ReportKind | None = None,
-    limit: int = 50,
+    limit: int = Query(default=50, ge=1, le=500),
     session: Session = Depends(get_session),
 ) -> list[ReportListItem]:
     stmt = select(Report).order_by(Report.created_at.desc()).limit(limit)

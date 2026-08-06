@@ -39,11 +39,15 @@ async def create_entry(
 
 
 @router.post("/classify", response_model=CashflowCreate)
-async def classify_entry(payload: CashflowClassify) -> CashflowCreate:
+def classify_entry(payload: CashflowClassify) -> CashflowCreate:
     """Parse free text into a DRAFT entry. Writes nothing.
 
     Returning a draft rather than saving keeps a misread sentence out of the
     ledger: the client shows what the model understood and the user confirms.
+
+    Deliberately sync (no ``async``): the classifier blocks on a subprocess for
+    up to 90s, and a sync route runs on the threadpool — an async one would
+    freeze the whole event loop (chat polling included) for the duration.
     """
     try:
         return classifier_service.classify(payload.text)

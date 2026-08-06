@@ -13,7 +13,7 @@ from app.models.contribution import (
     ContributionStatus,
     PromptKey,
 )
-from app.models.order import Order
+from app.models.order import Order, OrderStatus
 from app.schemas.contribution import (
     ContributionCreate,
     ContributionFinalize,
@@ -218,6 +218,25 @@ async def delete_contribution(
     contribution = session.get(Contribution, contribution_id)
     if contribution is None:
         raise HTTPException(status_code=404, detail="Contribution not found")
+    if analysis_runner.is_run_active(contribution_id):
+        raise HTTPException(
+            status_code=409,
+            detail="Análise em andamento para este aporte — aguarde terminar antes de apagar.",
+        )
+    executed_order = session.exec(
+        select(Order)
+        .where(Order.contribution_id == contribution_id)
+        .where(Order.status == OrderStatus.EXECUTED)
+        .limit(1)
+    ).first()
+    if executed_order is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Este aporte tem ordem EXECUTADA — apagá-lo removeria o vínculo "
+                "recomendação → posição do track record."
+            ),
+        )
     # Children first, with an explicit flush: the models define no ORM
     # relationships, so SQLAlchemy won't order these deletes on its own — and
     # with PRAGMA foreign_keys=ON an unordered flush violates the FK.

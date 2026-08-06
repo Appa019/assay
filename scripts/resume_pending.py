@@ -105,7 +105,15 @@ def main() -> int:
     init_db()
 
     if args.watch is None:
-        run_once()
+        # Infrastructure failures (DB, imports) must page, not die silently:
+        # this is the cron that revives interrupted paid analyses — if IT
+        # breaks, resumes stop happening and nobody would know.
+        try:
+            run_once()
+        except Exception as exc:  # noqa: BLE001 — last-resort alert, like every other cron
+            logger.error("resume_pending_failed", error=str(exc))
+            telegram_service.notify(f"✖ resume_pending falhou: {exc}")
+            return 1
         return 0
 
     interval = max(60, args.watch)
@@ -115,6 +123,7 @@ def main() -> int:
             run_once()
         except Exception as exc:  # keep the watcher alive across unexpected errors
             logger.error("resume_watch_error", error=str(exc))
+            telegram_service.notify(f"✖ resume_pending (watch) falhou neste passe: {exc}")
         try:
             time.sleep(interval)
         except KeyboardInterrupt:

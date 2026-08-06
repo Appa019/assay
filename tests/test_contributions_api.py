@@ -7,7 +7,35 @@ from app.core.database import get_session
 from app.main import app
 from app.models.asset import AssetClass
 from app.models.contribution import Contribution, ContributionPrompt, ContributionStatus
-from app.models.order import Order
+from app.models.order import Order, OrderStatus
+
+
+def test_delete_contribution_with_executed_order_is_blocked(session: Session) -> None:
+    """An EXECUTED order is the recommendation → position link of the track
+    record; deleting its contribution must 409, not silently orphan it."""
+    contribution = Contribution(amount_brl=Decimal("100"), status=ContributionStatus.COMPLETED)
+    session.add(contribution)
+    session.commit()
+    session.refresh(contribution)
+    session.add(
+        Order(
+            contribution_id=contribution.id,
+            ticker="PETR4",
+            asset_class=AssetClass.STOCKS,
+            amount_brl=Decimal("100"),
+            status=OrderStatus.EXECUTED,
+        )
+    )
+    session.commit()
+
+    app.dependency_overrides[get_session] = lambda: session
+    try:
+        client = TestClient(app)
+        response = client.delete(f"/api/contributions/{contribution.id}")
+        assert response.status_code == 409
+        assert session.get(Contribution, contribution.id) is not None
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_delete_contribution_with_children_and_fk_on(session: Session) -> None:
