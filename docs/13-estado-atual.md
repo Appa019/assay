@@ -1,6 +1,6 @@
 # 13 · Estado atual
 
-> **Fotografia de 2026-08-05.** Este é o documento que envelhece — atualize-o
+> **Fotografia de 2026-08-06.** Este é o documento que envelhece — atualize-o
 > quando mudar algo estrutural. Os outros 12 descrevem como o sistema funciona;
 > este descreve como ele está **agora**.
 
@@ -9,106 +9,76 @@
 | Item | Valor |
 |---|---|
 | Branch | `feat/state-of-art-overhaul` (a de trabalho; `main` é a principal) |
-| Último commit | `2389cc7 perf(deploy): run next directly instead of through pnpm` |
 | Versão backend | `0.4.0` (`app/main.py`, `pyproject.toml`) |
 | Versão frontend | `0.3.0` (`frontend/package.json`) — desalinhada, cosmético |
-| Testes | **68 passando** |
-| Tamanho | ~10.100 linhas de Python · ~8.500 de TS/CSS |
+| Testes | **113 passando** (eram 68 antes do overhaul de 2026-08-06) |
+| Tamanho | ~10.700 linhas de Python · ~8.400 de TS/CSS |
 
-## Trabalho não commitado (rebrand "Mesa" → "Assay")
+## O que aconteceu em 2026-08-06 (overhaul pós-revisão extensiva)
 
-Em andamento, coerente, pronto para commit:
+Uma revisão extensiva (5 revisores + verificação manual + smoke de runtime)
+levantou 3 críticos, 12 warnings e 10 propostas de motor. Tudo o que era
+acionável foi corrigido na mesma data — detalhes em `12-decisoes.md`
+(D18–D22, A26–A34). Resumo do que mudou:
 
-```
- M CLAUDE.md                        wordmark + hostname Tailscale novo + nota do ícone
- M frontend/src/app/layout.tsx      title "Assay", themeColor #f6f7f9
- M frontend/src/components/sidebar.tsx        wordmark
- M .../investimentos/page.tsx       masthead "Assay · investimentos"
- M frontend/public/manifest.webmanifest       nome + 4 ícones
- M frontend/src/app/icon.svg, apple-icon.png, favicon.ico
- M frontend/public/icon.svg
- M requirements.txt                 + pillow (build-time, só para o gerador de ícone)
-?? scripts/build_icon.py            gerador do ícone (fonte única)
-?? frontend/public/icon-{192,512,maskable-512}.png
-?? docs/                            esta documentação
- M .claude/settings.json            caminho de memória do hook Stop corrigido
- M .claude/agents/code-reviewer.md  idem
- M .claude/skills/review/SKILL.md   idem
- M app/services/chat_service.py     FIX: is_busy() valida liveness do lock
- M tests/test_chat_service.py       teste de regressão do lock órfão
-```
-
-**Caminhos de memória corrigidos (2026-08-05):** três arquivos de `.claude/`
-apontavam para diretórios de projeto que não existem mais — o hook `Stop` para
-`-home-<usuario>-investimentos-manual` e os outros dois para
-`-home-<usuario>-codigos-python-investimentos-manual`. O correto é
-`-home-<usuario>-01-investimentos-financas-app`. Enquanto estavam errados, o
-code reviewer automático falhava no passo de memória em toda execução.
-
-**Bug corrigido (2026-08-05): lock de chat órfão travava o site.**
-`chat_service.is_busy()` testava só a existência do arquivo de lock. Um kill duro
-no meio de um turno — **um deploy reiniciando o backend basta** — deixa o lock
-para trás, e a partir daí `POST /api/chat`, `/upload` e `/reset` devolviam 409
-indefinidamente, com a UI presa em "pensando". O Telegram continuava normal,
-porque o runner recupera lock morto ao adquirir. Agora `is_busy()` usa
-`_lock_is_active` (pid + starttime), como `is_run_active`. Detalhe em
-`12-decisoes.md` (A25).
-
-O hostname Tailscale mudou de `tail1d0148` para **`<tailnet>`** — a URL atual é
-`https://<host-do-pi>.<tailnet>.ts.net`.
+- **Ledger**: `execute_order` atômico (commit único); venda aceita **preço real
+  e quantidade parcial** (`SellPayload`); ordens do consultor corrigidas.
+- **Concorrência**: pidfile do bot no lock com identidade de processo;
+  `/classify` fora do event loop; `delete_contribution` protegido (409 com
+  ordem executada ou run ativo); aporte que morre pré-1ª-etapa entra no
+  auto-resume; `resume_pending` alerta falha de infra.
+- **Timezone**: `days_held` do IR, `_ibov_closes`, preâmbulo/notify do runner e
+  displays do bot/monthly agora convertem UTC→local antes de extrair data.
+- **Cashflow**: vocabulário canônico único de categorias
+  (`CANONICAL_CATEGORIES`) + fold de acentos/aliases no service;
+  `month_history` em 1 GROUP BY.
+- **Benchmark**: CDI tolera linha malformada; BTC via `market_chart/range`
+  (UTC); todas as séries rebased no 1º dia comum (`base_date` no payload).
+- **Motor de IA**: validador determinístico pós-run com 1 turno corretivo +
+  alerta de folha; ordens pendentes injetadas no contexto do aporte; rotação do
+  chat semeada com a transcrição; DDs com 2× timeout; **MCPs pinados**
+  (versão/sha — supply chain); templates sem contradições (N≥6,
+  Options_Overlays fora) + nota anti-fossilização de tickers; tiers do roteador
+  reportados no relatório mensal.
+- **Frontend**: race do `useCashflow` eliminada; `ReportKind` ganhou
+  `"monthly"` (label/ícone "Mensal"); payload tipado no cadastro de ativo;
+  `formatAmount` substitui o `.replace("R$")` frágil; gráfico morto removido.
+- **Tooling**: `python -m uvicorn` em start.sh/Makefile/systemd (rename-proof —
+  a renomeação do projeto tinha quebrado os shebangs do venv no desktop);
+  gitignore cobre router/classifier workspaces; resíduos `frontend/.vercel` e
+  `frontend/supabase` apagados; permissões supabase/vercel removidas de
+  `.claude/settings.json`.
 
 ## Divergências conhecidas na documentação antiga
 
-Encontradas ao escrever estes docs. **A verdade é o código.**
-
 | Onde | Diz | Realidade |
 |---|---|---|
-| `CLAUDE.md` | "**TRÊS abas**, só" | são **quatro** (`lib/nav.ts`): Visão geral · Consultor · Extrato · Investimentos |
-| `CLAUDE.md` | "`/financas` ainda existe como rota" | **não existe mais**. Foi substituída por `/extrato` (commit `f6a6e8d`) |
-| `CLAUDE.md` | "Fraunces só em títulos, Manrope no resto" | são **Bricolage Grotesque** + **Plus Jakarta Sans** (commit `5e0ab81`). `DESIGN.md` está certo |
-| `README.md` (raiz) | não menciona consultor, cashflow nem extrato | é anterior a toda a camada de finanças pessoais. Serve como apresentação do repo, não como referência |
-| `acesso-remoto-pi.md` §7 | "Tailscale ainda não configurado — decisão futura" | **está configurado e é o meio de acesso oficial**. O resto do arquivo (SSH, firewall, túnel) continua válido |
+| `README.md` (raiz) | não menciona consultor, cashflow nem extrato | é anterior à camada de finanças pessoais. Serve como capa do repo, não referência |
+| `acesso-remoto-pi.md` §7 | "Tailscale ainda não configurado" | está configurado e é o acesso oficial (`https://<host-do-pi>.<tailnet>.ts.net`) |
 | `.claude/skills/deploy/SKILL.md` | deploy para Vercel | o alvo é o **Pi**. Skill obsoleta |
-| `frontend/src/lib/api.ts` | `ReportKind = "weekly" \| "maturity"` | o backend também emite `"monthly"` |
 
 ## Dívidas e pontos frágeis (nenhum urgente)
 
 | # | Item | Impacto |
 |---|---|---|
-| 1 | `ativos/page.tsx` tem **1423 linhas** | é o maior arquivo do front; candidato natural a quebrar em componentes |
-| 2 | `analysis_runner.py` tem **1494 linhas** e mistura motor, locks, workspace, MCPs e o fluxo de aporte | funciona e está bem testado, mas seria mais legível separado em `runner_core` / `workspace` / `mcp_config` / `locks` |
-| 3 | `.gitignore` não lista `storage/router_workspace/` nem `storage/classifier_workspace/` | inofensivo hoje (git não versiona diretório vazio), mas qualquer arquivo que caia lá seria rastreado |
-| 4 | `frontend/.vercel/` e `frontend/supabase/` | resíduos de arquiteturas abandonadas. Podem ser apagados |
-| 5 | Sem teste de frontend | a validação é `lint` + `type-check` + `build`. Nenhum teste de componente |
-| 6 | `PromptKey.RESEARCH` | legado de aportes anteriores a 2026-05-24; mantido só para não quebrar registros antigos |
-| 7 | `README.md` desatualizado | ver tabela acima |
+| 1 | `ativos/page.tsx` tem ~1430 linhas | maior arquivo do front; quebrar em componentes quando voltar a ser tocado |
+| 2 | `analysis_runner.py` ~1700 linhas (motor + locks + workspace + MCPs + validador) | funciona e está testado; separável em módulos numa refatoração futura |
+| 3 | Sem teste de frontend | validação é lint + type-check + build |
+| 4 | `PromptKey.RESEARCH` | legado de aportes pré-2026-05-24 |
+| 5 | `README.md` desatualizado | ver tabela acima |
+| 6 | Bancos SEM dados de carteira (desktop e Pi zerados de lotes/trades) | o sistema roda "vazio"; posições reais precisam ser registradas (ou o histórico de maio/julho do desktop migrado deliberadamente) |
 
 ## Linha do tempo (o que aconteceu, em ordem)
 
 | Quando | Marco |
 |---|---|
-| 2026-05 | Telegram + scheduler reintroduzidos a pedido do usuário. Ciclos: aporte ad-hoc, revisão semanal, maturidade por lote |
+| 2026-05 | Telegram + scheduler reintroduzidos. Ciclos: aporte ad-hoc, revisão semanal, maturidade por lote |
 | 2026-05-24 | Pesquisa splitada em 3 reuniões (seleção → DD ações → DD cripto) |
-| 2026-07 (início) | Camada de dados: ledger `Trade`, snapshots diários, WAL, marcação a mercado, trava enforçada no service |
-| 2026-07 (meio) | Produto: ordens estruturadas, benchmark TWR, alertas de nível, IR, relatório mensal |
-| 2026-07-23 | Última verificação registrada do acesso ao Pi |
-| 2026-07-27 | Testes + CI + Makefile |
-| 2026-07-28 | **Grande virada:** ledger de finanças pessoais, consultor no chat, chat no site, roteador de modelo, classificador, mobile-first, Pi vira produção única |
-| 2026-07-29 | Rebrand Mesa → **Assay** + marca gerada por script |
-| 2026-08-02 | Última escrita no banco de produção do desktop |
-| 2026-08-05 | Esta documentação |
-
-## O que eu faria a seguir (sugestões, não compromissos)
-
-1. Commitar o rebrand Assay (está completo e coerente).
-2. Corrigir as divergências do `CLAUDE.md` — feito parcialmente: veja o
-   aviso no topo do arquivo apontando para `docs/`.
-3. Reescrever o `README.md` para refletir o produto de duas metades, ou reduzi-lo
-   a uma capa curta que aponte para `docs/`.
-4. Apagar `frontend/.vercel/` e `frontend/supabase/`.
-5. Remover ou reescrever `.claude/skills/deploy` (ainda deploya para Vercel).
-6. Se `ativos/page.tsx` voltar a ser tocado, quebrar em componentes na mesma
-   passada.
+| 2026-07 | Camada de dados (ledger Trade, snapshots, WAL) → produto (ordens, benchmark, alertas, IR, mensal) |
+| 2026-07-28 | **Grande virada:** finanças pessoais, consultor no chat/site, roteador de modelo, mobile-first, Pi vira produção única |
+| 2026-07-29 | Rebrand Mesa → **Assay** |
+| 2026-08-05 | Documentação `docs/` (13 arquivos) + fix do lock do chat (A25) |
+| 2026-08-06 | **Revisão extensiva + overhaul state-of-art** (D18–D22, A26–A34) + deploy no Pi |
 
 ---
 

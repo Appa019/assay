@@ -167,3 +167,46 @@ Está nas ordens permanentes do comitê **e** do consultor, e precisa continuar 
 
 Complemento: número que move decisão (preço, unlock, TVL, guidance) exige
 segunda fonte independente.
+
+---
+
+## Decisões e armadilhas de 2026-08-06 (overhaul pós-revisão extensiva)
+
+### D18 · Validador determinístico pós-run com UM turno corretivo
+Os templates sempre exigiram Σ ordens ≈ aporte (±R$ 5), mas nenhuma máquina
+conferia. `analysis_runner._validate_and_correct_final` roda
+`order_service.summarize_block` sobre o fechamento; bloco ausente ou desvio
+> 2% → UM re-prompt na MESMA sessão pedindo reemissão; a correção só é adotada
+se parsear pelo menos tão bem. Pós-ingest, desvio/linha descartada vira alerta
+no Telegram. Best-effort: falha do validador nunca derruba um run terminado.
+
+### D19 · Ordens pendentes entram no contexto do aporte
+`_pending_orders_context` lista a folha ainda não executada antes da Reunião
+nº 1 — sem isso o comitê re-recomendava nomes já recomendados e dimensionava
+ignorando capital já comprometido.
+
+### D20 · Rotação de sessão do chat semeada com a transcrição
+Sessão nova (rotação ou sessão sumida) recebe os últimos ~10 turnos DONE de
+`chat_message` (`_transcript_tail`), além do MEMORY.md — continuidade real, não
+declarada. Best-effort; exclui a cópia recém-gravada da mensagem atual.
+
+### D21 · MCPs de terceiros PINADOS (supply chain)
+Rodam sob `--dangerously-skip-permissions` + `--add-dir $HOME`: um `@latest`
+comprometido vira execução arbitrária no Pi entre dois runs. `_MCP_PINS` fixa
+versão exata npm/PyPI e commit sha do repositório git. Bump é ato deliberado.
+
+### D22 · Timeout por etapa proporcional
+As DDs por nome (Reuniões 3/4) rodam com 2× `AGENT_STEP_TIMEOUT` via
+`step_timeouts` do `run_chain` — matavam runs legítimos longos.
+
+| # | Armadilha | O que a corrige hoje |
+|---|---|---|
+| A26 | `execute_order` commitava DUAS vezes (via `create_asset`) — crash na janela deixava Asset criado com Order PENDING e o retry **duplicava a posição** | `build_asset_with_trade` (sem commit) + transação única; teste conta os commits |
+| A27 | As ordens do consultor ensinavam `POST /sell` com `{price, quantity}` que a API **ignorava** — P&L saía da marcação e venda parcial viraria venda TOTAL | `SellPayload` no endpoint (preço real + venda parcial); ordens do consultor corrigidas |
+| A28 | **(3ª reincidência de A7/A25)** pidfile do bot só com `{"pid"}` e `write_text` — PID reciclado pós-reboot podia prender o bot em loop de Restart | `_acquire_single_instance` usa `_try_acquire_lock_file`/`_lock_is_active` |
+| A29 | Rota `async def` chamando o classificador síncrono congelava o event loop inteiro por até 90s | `/api/cashflow/classify` é rota **sync** → threadpool |
+| A30 | Consultor e classificador com vocabulários de categoria DIVERGENTES (`saúde` × `saude`) fragmentavam o extrato | `CANONICAL_CATEGORIES` único + `normalize_category` (fold de acento + aliases) no service |
+| A31 | Renomear o diretório quebrou os shebangs do venv (`.venv/bin/uvicorn` → exit 127) e deixou um uvicorn zumbi do path antigo na :8000 | `python -m uvicorn` em start.sh/Makefile/systemd (imune a rename) |
+| A32 | BTC do benchmark ancorado em "days ago de AGORA" + `fromtimestamp` local → série sem começo e rebase em dias diferentes por linha | `market_chart/range` com timestamps UTC + rebase de TODAS as séries no 1º dia comum |
+| A33 | Aporte automático que morria ANTES da 1ª etapa (colisão com o lock global) ficava READY órfão para sempre | `pending_resumable_ids` inclui `READY + run_attempts > 0` |
+| A34 | `resume_pending` era o único cron sem alerta de falha — retomadas paravam em silêncio | notify no single-pass e no watch loop |

@@ -11,7 +11,10 @@ logado.
 
 **Roda no Pi**, unit `investimentos-bot.service`. ⚠️ **Nunca rode em duas
 máquinas** — os dois fazem long polling e o cliente recebe resposta em dobro.
-Proteção local: pidfile em `storage/telegram_bot.pid` (single-instance).
+Proteção local: pidfile em `storage/telegram_bot.pid` (single-instance) — desde
+2026-08-06 usa o lock compartilhado do `analysis_runner` (criação atômica
+`O_EXCL` + identidade pid/starttime), então um PID reciclado pós-reboot nunca
+prende o bot num loop de `Restart=always` (A28).
 
 ## Texto sem `/` = conversa com o consultor
 

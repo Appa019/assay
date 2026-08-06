@@ -61,6 +61,11 @@ Construídos em `_baseline_mcp_servers()` e mesclados em `_effective_mcp_config(
 **só** esse conjunto carrega — Gmail/Calendar/Drive do usuário ficam de fora de
 propósito (o agente é autônomo e não deve agir neles).
 
+**Todos os pacotes de terceiros são PINADOS** (`_MCP_PINS`: versão exata
+npm/PyPI, commit sha do git — D21). Eles rodam com permissão total na máquina;
+um `@latest` comprometido seria execução arbitrária no Pi. Para atualizar um
+servidor, mude o pin deliberadamente e olhe o diff do pacote.
+
 **Tier 1 — runtime e raciocínio (8, sempre):** `sequential-thinking`,
 `filesystem` ($HOME), `fetch`, `context7`, `playwright`, `memory`, `time`, `git`.
 
@@ -195,14 +200,20 @@ em `_kill_process_tree`.
 
 ## Contexto injetado no aporte
 
-Antes da Reunião nº 1, três blocos são prefixados ao primeiro prompt:
+Antes da Reunião nº 1, quatro blocos são prefixados ao primeiro prompt:
 
-1. **Preâmbulo** (`_build_preamble`) — valor do aporte, data, mandato, trava por
-   lote, ordem de ler/atualizar `MEMORY.md`, onde salvar os JSONs.
+1. **Preâmbulo** (`_build_preamble`) — valor do aporte, data LOCAL, mandato,
+   trava por lote, ordem de ler/atualizar `MEMORY.md`, onde salvar os JSONs.
 2. **Consulta à última revisão semanal** (`_latest_weekly_context`) — até 6000
    chars, cortado em fronteira de parágrafo.
 3. **Track record** (`_track_record_context`) — últimas 12 vendas com P&L e hit
    rate. Sem isso o comitê é um oráculo sem memória de ter errado.
+4. **Ordens pendentes** (`_pending_orders_context`, 2026-08-06) — a folha
+   anterior ainda não executada, para o comitê não re-recomendar um nome já em
+   aberto nem ignorar capital já comprometido.
+
+As Reuniões nº 3 e nº 4 (DD por nome) rodam com **2× o timeout** das demais
+(`step_timeouts` do `run_chain`).
 
 ## Fechamento e bloco de ordens
 
@@ -220,12 +231,23 @@ Depois de `---`, um bloco ```json {"orders": [...]}``` legível por máquina.
   banco para ingestão
 - `ingest_contribution_orders` — idempotente (pula se o aporte já tem ordens),
   best-effort (linha malformada é logada e descartada, nunca falha o run)
+- `summarize_block` — checagem determinística do bloco (linhas válidas, soma,
+  desvio vs. aporte)
+
+**Validador pós-run (D18, 2026-08-06)**: após a última etapa,
+`_validate_and_correct_final` confere o bloco com `summarize_block`; bloco
+ausente ou desvio > 2% dispara UM turno corretivo na MESMA sessão ("reemita o
+fechamento com a soma batendo"); a correção só substitui a original se parsear
+pelo menos tão bem. Após o ingest, linha descartada ou desvio residual vira
+alerta no Telegram ("Checagem da folha de ordens: X/Y linhas…").
 
 ## Chat do consultor
 
 `chat_service.py`. Uma sessão encadeada persistente por `session.json`,
 rotacionada a cada `CHAT_MAX_TURNS` (40) turnos — o `MEMORY.md` carrega o
-contexto durável através da rotação.
+contexto durável através da rotação e, desde 2026-08-06 (D20), a sessão nova é
+**semeada com os últimos ~10 turnos da transcrição** (`_transcript_tail`, lidos
+de `chat_message`), então o assunto em andamento sobrevive à rotação de fato.
 
 - Turno fresh recebe instrução de **ler `./MEMORY.md` antes de responder**.
 - Limite de uso → `ChatUnavailableError` com mensagem amigável e estimativa de
