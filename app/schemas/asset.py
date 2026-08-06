@@ -67,6 +67,14 @@ class PortfolioSummary(BaseModel):
     assets: list[AssetRead]
 
 
+class SellPayload(BaseModel):
+    """Real execution data for a sale. Both optional: omitted price falls back
+    to the marked price, omitted quantity sells the whole lot."""
+
+    price: Decimal | None = Field(default=None, gt=0)
+    quantity: Decimal | None = Field(default=None, gt=0)
+
+
 class SaleResult(BaseModel):
     ticker: str
     quantity: float

@@ -38,7 +38,13 @@ def get_asset(session: Session, asset_id: UUID) -> Asset:
     return asset
 
 
-def create_asset(session: Session, payload: AssetCreate) -> Asset:
+def build_asset_with_trade(session: Session, payload: AssetCreate) -> Asset:
+    """Stage a new lot + its BUY trade on the session WITHOUT committing.
+
+    Callers that compose this with other writes (e.g. order execution) commit
+    once at the end, so a crash can never leave the lot persisted while the
+    composing operation is still pending.
+    """
     asset = Asset(
         ticker=payload.ticker,
         name=payload.name,
@@ -62,6 +68,11 @@ def create_asset(session: Session, payload: AssetCreate) -> Asset:
             lot_entry_date=asset.entry_date,
         )
     )
+    return asset
+
+
+def create_asset(session: Session, payload: AssetCreate) -> Asset:
+    asset = build_asset_with_trade(session, payload)
     session.commit()
     session.refresh(asset)
     logger.info("asset_created", ticker=asset.ticker, asset_class=str(asset.asset_class))
@@ -97,12 +108,21 @@ def sell_lock_days_left(asset: Asset, *, today: date | None = None) -> int:
     return max(0, settings.min_holding_days - held)
 
 
-def sell_asset(session: Session, asset_id: UUID) -> SaleResult:
-    """Sell a whole lot, enforcing the per-lot holding lock at the source.
+def sell_asset(
+    session: Session,
+    asset_id: UUID,
+    *,
+    price: Decimal | None = None,
+    quantity: Decimal | None = None,
+) -> SaleResult:
+    """Sell a lot (whole or partial), enforcing the per-lot holding lock here.
 
     The lock lives HERE (not in each caller) so the API, the bot and any
-    future surface all obey the same rule. Records a sell Trade with realized
-    P&L before removing the position — the ledger is the permanent history.
+    future surface all obey the same rule. ``price`` is the REAL execution
+    price when the caller knows it; without it the mark-to-market price is
+    used. ``quantity`` sells part of the lot (the remainder keeps its
+    entry_date and avg_price); omitted, the whole lot goes. Records a sell
+    Trade with realized P&L — the ledger is the permanent history.
     """
     asset = get_asset(session, asset_id)
     days_left = sell_lock_days_left(asset)
@@ -113,9 +133,17 @@ def sell_asset(session: Session, asset_id: UUID) -> SaleResult:
             "por lote para ações e crypto)."
         )
 
-    price = asset.current_price if asset.current_price is not None else asset.avg_price
-    sale_value = asset.quantity * price
-    cost_basis = asset.quantity * asset.avg_price
+    if price is None:
+        price = asset.current_price if asset.current_price is not None else asset.avg_price
+    sell_qty = asset.quantity if quantity is None else quantity
+    if sell_qty <= 0 or sell_qty > asset.quantity:
+        raise ValueError(
+            f"Quantidade inválida: {sell_qty} (o lote {asset.ticker} tem {asset.quantity})."
+        )
+    partial = sell_qty < asset.quantity
+
+    sale_value = sell_qty * price
+    cost_basis = sell_qty * asset.avg_price
     realized_brl = (sale_value - cost_basis).quantize(Decimal("0.01"))
     realized_pct = (
         float((price - asset.avg_price) / asset.avg_price * 100) if asset.avg_price > 0 else None
@@ -128,7 +156,7 @@ def sell_asset(session: Session, asset_id: UUID) -> SaleResult:
             name=asset.name,
             asset_class=asset.asset_class,
             side=TradeSide.SELL,
-            quantity=asset.quantity,
+            quantity=sell_qty,
             price=price,
             total_brl=sale_value.quantize(Decimal("0.01")),
             realized_pnl_brl=realized_brl,
@@ -137,22 +165,34 @@ def sell_asset(session: Session, asset_id: UUID) -> SaleResult:
         )
     )
 
+    remainder_note = ""
+    if partial:
+        asset.quantity = asset.quantity - sell_qty
+        asset.updated_at = datetime.now(UTC)
+        session.add(asset)
+        remainder_note = f" — restam {asset.quantity} no lote"
+    else:
+        session.delete(asset)
+
     result = SaleResult(
         ticker=asset.ticker,
-        quantity=asset.quantity,
+        quantity=sell_qty,
         price=price,
         sale_value=sale_value,
         asset_class=asset.asset_class,
         message=(
             f"{asset.ticker} vendido por R$ {sale_value:,.2f} "
-            f"(P&L realizado R$ {realized_brl:,.2f})"
+            f"(P&L realizado R$ {realized_brl:,.2f}){remainder_note}"
         ),
     )
 
-    session.delete(asset)
     session.commit()
     logger.info(
-        "asset_sold", ticker=asset.ticker, value=str(sale_value), realized=str(realized_brl)
+        "asset_sold",
+        ticker=result.ticker,
+        value=str(sale_value),
+        realized=str(realized_brl),
+        partial=partial,
     )
     return result
 

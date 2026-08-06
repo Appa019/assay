@@ -11,6 +11,7 @@ from app.schemas.asset import (
     PortfolioSummary,
     RefreshResult,
     SaleResult,
+    SellPayload,
     SnapshotRead,
     TradeRead,
 )
@@ -50,13 +51,25 @@ async def update_asset(
 
 
 @router.post("/assets/{asset_id}/sell", response_model=SaleResult)
-async def sell_asset(asset_id: UUID, session: Session = Depends(get_session)) -> SaleResult:
+async def sell_asset(
+    asset_id: UUID,
+    payload: SellPayload | None = None,
+    session: Session = Depends(get_session),
+) -> SaleResult:
+    """Sell a lot. Body optional: price = real execution price, quantity = partial sale."""
     try:
-        return portfolio_service.sell_asset(session, asset_id)
+        return portfolio_service.sell_asset(
+            session,
+            asset_id,
+            price=payload.price if payload else None,
+            quantity=payload.quantity if payload else None,
+        )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except portfolio_service.SellLockedError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.delete("/assets/{asset_id}", response_model=AssetRead)

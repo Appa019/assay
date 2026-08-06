@@ -80,6 +80,37 @@ def test_execute_order_creates_asset_with_committee_context(session: Session) ->
         order_service.execute_order(session, petr.id, quantity=Decimal("1"), price=Decimal("1"))
 
 
+def test_execute_order_commits_exactly_once(
+    session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: create_asset used to commit internally before the Order
+    flipped to EXECUTED — a crash in that window persisted the Asset with the
+    Order still PENDING, and the retry doubled the position. The whole
+    execution must be ONE transaction."""
+    contribution = _completed_contribution(session)
+    orders = order_service.ingest_contribution_orders(session, contribution)
+    petr = next(o for o in orders if o.ticker == "PETR4")
+
+    real_commit = session.commit
+    commits: list[int] = []
+
+    def counting_commit() -> None:
+        commits.append(1)
+        if len(commits) > 1:
+            raise AssertionError("execute_order must commit exactly once")
+        real_commit()
+
+    monkeypatch.setattr(session, "commit", counting_commit)
+    executed = order_service.execute_order(
+        session, petr.id, quantity=Decimal("10"), price=Decimal("40")
+    )
+    assert commits == [1]
+    assert executed.status == OrderStatus.EXECUTED
+    asset = session.exec(select(Asset).where(Asset.ticker == "PETR4")).one()
+    assert asset.thesis == "Petróleo barato"
+    assert executed.executed_asset_id == asset.id
+
+
 _MODEL_DIALECT_SUMMARY = """\
 ```json
 {"orders": [
@@ -140,6 +171,21 @@ def test_strip_machine_block_hides_json_but_parsing_still_works() -> None:
     assert not visible.rstrip().endswith("---")
     # Original text still parses for ingestion.
     assert order_service.parse_orders_block(closing)[0]["ticker"] == "PETR4"
+
+
+def test_summarize_block_counts_rows_and_deviation() -> None:
+    """The post-run validator's math: ingestable rows, BRL sum, drift."""
+    check = order_service.summarize_block(_SUMMARY, expected_total=Decimal("5000"))
+    assert check["rows"] == 4
+    assert check["valid"] == 3  # the empty-ticker row doesn't count
+    assert check["total_brl"] == 5000.0
+    assert check["deviation_pct"] == 0.0
+
+    drifted = order_service.summarize_block(_SUMMARY, expected_total=Decimal("6000"))
+    assert drifted["deviation_pct"] == pytest.approx(1000 / 6000)
+
+    empty = order_service.summarize_block("sem bloco nenhum", expected_total=Decimal("100"))
+    assert empty == {"rows": 0, "valid": 0, "total_brl": 0.0, "deviation_pct": 1.0}
 
 
 def test_pending_order_lookup_and_skip(session: Session) -> None:

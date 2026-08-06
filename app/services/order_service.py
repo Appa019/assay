@@ -108,6 +108,36 @@ def _to_decimal(value: Any) -> Decimal | None:
         return None
 
 
+def summarize_block(text: str, *, expected_total: Decimal | None = None) -> dict[str, Any]:
+    """Deterministic health-check of the closing orders block.
+
+    The templates DEMAND that the sheet sums to the contribution (±R$ 5) — but
+    until now no machine ever verified it. Returns row counts, how many rows
+    are actually ingestable, their BRL sum, and the relative deviation vs the
+    expected total (None when no expectation). Powers the post-run validator
+    and the Telegram mismatch alert.
+    """
+    rows = parse_orders_block(text or "")
+    valid = 0
+    total = Decimal("0")
+    for row in rows:
+        ticker = str(_first(row, "ticker", "symbol", "ativo") or "").strip()
+        asset_class = _normalize_class(_first(row, "classe", "class", "asset_class"))
+        amount = _to_decimal(_first(row, "valor_brl", "amount_brl", "total_brl", "valor"))
+        if ticker and asset_class is not None and amount is not None and amount > 0:
+            valid += 1
+            total += amount
+    deviation: float | None = None
+    if expected_total is not None and expected_total > 0:
+        deviation = float(abs(total - Decimal(expected_total)) / Decimal(expected_total))
+    return {
+        "rows": len(rows),
+        "valid": valid,
+        "total_brl": float(total),
+        "deviation_pct": deviation,
+    }
+
+
 def ingest_contribution_orders(session: Session, contribution: Contribution) -> list[Order]:
     """Create Order rows from a completed contribution's final summary.
 
@@ -182,7 +212,10 @@ def execute_order(
     if order.status != OrderStatus.PENDING:
         raise ValueError(f"Ordem {order.ticker} já está {order.status}.")
 
-    asset = portfolio_service.create_asset(
+    # Single transaction: asset + BUY trade + order flip commit together, so a
+    # crash can never leave the lot persisted with the order still PENDING
+    # (which would double the position on the retry).
+    asset = portfolio_service.build_asset_with_trade(
         session,
         AssetCreate(
             ticker=order.ticker,
@@ -195,7 +228,6 @@ def execute_order(
     asset.thesis = order.thesis
     asset.target_price = order.target_price
     asset.stop_price = order.stop_price
-    session.add(asset)
 
     order.status = OrderStatus.EXECUTED
     order.executed_quantity = quantity

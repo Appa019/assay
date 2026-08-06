@@ -44,6 +44,45 @@ def test_sell_unlocked_lot_records_realized_pnl(session: Session, stock_unlocked
     assert sell.lot_entry_date == stock_unlocked.entry_date
 
 
+def test_partial_sell_keeps_the_rest_of_the_lot(session: Session, stock_unlocked: Asset) -> None:
+    """Selling part of a lot books P&L on the sold slice only; the remainder
+    keeps its entry_date and avg_price (same 30d clock, same cost basis)."""
+    original_entry = stock_unlocked.entry_date
+    result = portfolio_service.sell_asset(
+        session, stock_unlocked.id, price=Decimal("70.00"), quantity=Decimal("20")
+    )
+    assert result.quantity == Decimal("20")
+    assert result.sale_value == Decimal("1400.00")  # 20 × 70
+
+    remaining = session.get(Asset, stock_unlocked.id)
+    assert remaining is not None
+    assert remaining.quantity == Decimal("30")
+    assert remaining.avg_price == Decimal("60.00")
+    assert remaining.entry_date == original_entry
+
+    sell = session.exec(select(Trade).where(Trade.side == TradeSide.SELL)).one()
+    assert sell.quantity == Decimal("20")
+    assert sell.price == Decimal("70.00")
+    assert sell.realized_pnl_brl == Decimal("200.00")  # 20 × (70 − 60)
+
+
+def test_sell_uses_real_execution_price_over_marked(
+    session: Session, stock_unlocked: Asset
+) -> None:
+    """Regression: the endpoint used to silently ignore the caller's price and
+    book P&L at the stale marked price."""
+    result = portfolio_service.sell_asset(session, stock_unlocked.id, price=Decimal("64.50"))
+    assert result.price == Decimal("64.50")
+    sell = session.exec(select(Trade).where(Trade.side == TradeSide.SELL)).one()
+    assert sell.realized_pnl_brl == Decimal("225.00")  # 50 × (64.50 − 60)
+
+
+def test_sell_rejects_quantity_above_lot(session: Session, stock_unlocked: Asset) -> None:
+    with pytest.raises(ValueError):
+        portfolio_service.sell_asset(session, stock_unlocked.id, quantity=Decimal("999"))
+    assert session.get(Asset, stock_unlocked.id) is not None
+
+
 def test_cdb_sells_anytime(session: Session, cdb: Asset) -> None:
     result = portfolio_service.sell_asset(session, cdb.id)
     assert result.ticker == "CDB-ITAU"
