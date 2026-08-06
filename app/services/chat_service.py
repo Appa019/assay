@@ -40,6 +40,7 @@ from app.services.analysis_runner import (
     SessionNotFoundError,
     StepResult,
 )
+from app.services.cashflow_service import CANONICAL_CATEGORIES
 
 logger = structlog.get_logger()
 
@@ -162,9 +163,13 @@ com uma ordem de saque justificada:
    N dias para destravar um lote, ou para cair no mês seguinte e zerar o IR),
    diga.
 6. **Você NÃO vende.** Quem executa na corretora é o cliente. Depois que ele
-   confirmar que vendeu, registre com
+   confirmar que vendeu, registre com o preço REAL da execução — pergunte se
+   ele não disser. `quantity` é opcional: informe para venda PARCIAL do lote;
+   omita para vender o lote inteiro.
    `curl -s -X POST {backend_url}/api/portfolio/assets/<id>/sell \
      -H 'Content-Type: application/json' -d '{{"price": 38.20, "quantity": 100}}'`
+   Sem o preço real, chame antes `POST {backend_url}/api/portfolio/refresh` e
+   AVISE que registrou pela marcação a mercado, não pelo preço de execução.
    Nunca registre uma venda que o cliente não confirmou ter feito.
 
 ## Sua memória fixa (você a gerencia) — LEIA ANTES DE RESPONDER
@@ -215,9 +220,8 @@ Use Bash + curl. Endpoints principais:
          "description": "compras da semana", "occurred_on": "2026-07-28", \\
          "source": "chat"}}'`
   · kind: "expense" (gastou) | "income" (ganhou/recebeu)
-  · category (minúsculas): mercado, restaurante, transporte, moradia, saude,
-    lazer, assinatura, educacao, vestuario, salario, freela, dividendos,
-    reembolso, outros — escolha a mais próxima; crie nova só se necessário.
+  · category (minúsculas, SEM acento): {categories} — escolha a mais próxima;
+    crie nova só se necessário (também sem acento).
   · occurred_on: a data que o cliente disse (padrão: hoje). source: "chat".
   · **Chame o POST UMA VEZ e só uma.** Se não tiver certeza se gravou, CONFIRA
     com `GET .../api/cashflow?month=...` — nunca repita o POST. Um lançamento em
@@ -369,6 +373,7 @@ def _ensure_chat_workspace() -> Path:
         _CONSULTANT_ORDERS.format(
             min_holding_days=settings.min_holding_days,
             backend_url=settings.backend_url.rstrip("/"),
+            categories=", ".join(CANONICAL_CATEGORIES),
         ),
         encoding="utf-8",
     )
@@ -420,7 +425,37 @@ def reset_session() -> None:
 # --- turn runner ---------------------------------------------------------------
 
 
-def _turn_prompt(text: str, *, fresh: bool, rotated: bool) -> str:
+_TRANSCRIPT_SEED_MESSAGES = 10
+_TRANSCRIPT_SEED_MAX_CHARS = 2400
+
+
+def _transcript_tail(current_text: str) -> str:
+    """Recent turns from the SHARED transcript, for reseeding a fresh session.
+
+    Rotation used to hand the new session only MEMORY.md — whatever was being
+    discussed simply vanished. The full conversation lives in ``chat_message``;
+    feeding the tail back makes the continuity real instead of claimed.
+    Best-effort: any failure returns an empty string, never breaks the turn.
+    """
+    try:
+        msgs = history(limit=_TRANSCRIPT_SEED_MESSAGES + 4)
+    except Exception:  # noqa: BLE001 — seeding is an extra, not a dependency
+        return ""
+    # Drop the just-recorded copy of the message being answered right now.
+    if msgs and msgs[-1].role == ChatRole.USER and msgs[-1].content.strip() == current_text.strip():
+        msgs = msgs[:-1]
+    msgs = [m for m in msgs if m.status == ChatTurnStatus.DONE and m.content]
+    msgs = msgs[-_TRANSCRIPT_SEED_MESSAGES:]
+    if not msgs:
+        return ""
+    lines = []
+    for m in msgs:
+        who = "Cliente" if m.role == ChatRole.USER else "Consultor"
+        lines.append(f"{who}: {m.content.strip()[:300]}")
+    return "\n".join(lines)[-_TRANSCRIPT_SEED_MAX_CHARS:]
+
+
+def _turn_prompt(text: str, *, fresh: bool, rotated: bool, transcript: str = "") -> str:
     now = datetime.now().astimezone()
     stamp = now.strftime("%Y-%m-%d %H:%M (%A)")
     if not fresh:
@@ -431,10 +466,17 @@ def _turn_prompt(text: str, *, fresh: bool, rotated: bool) -> str:
         if rotated
         else ""
     )
+    transcript_block = (
+        f"Últimos turnos da conversa (transcrição, do mais antigo ao mais "
+        f"recente):\n{transcript}\n\n"
+        if transcript
+        else ""
+    )
     return (
         f"[Nova sessão de chat — {stamp}] {rotation_note}"
         "Antes de responder, leia ./MEMORY.md (sua memória fixa sobre o "
         "cliente). Não anuncie que leu; apenas responda.\n\n"
+        f"{transcript_block}"
         f"Mensagem do cliente: {text}"
     )
 
@@ -487,7 +529,12 @@ def run_chat_turn(text: str) -> tuple[str, model_router.Route]:
             session_id, turns = None, 0
 
         fresh = session_id is None
-        prompt = _turn_prompt(text, fresh=fresh, rotated=rotated)
+        prompt = _turn_prompt(
+            text,
+            fresh=fresh,
+            rotated=rotated,
+            transcript=_transcript_tail(text) if fresh else "",
+        )
         # Same chained session either way — only the model answering it changes.
         picked = model_router.route(text)
         try:
@@ -502,7 +549,7 @@ def run_chat_turn(text: str) -> tuple[str, model_router.Route]:
             logger.warning("chat_session_gone_restarting")
             reset_session()
             result = _run_turn_once(
-                _turn_prompt(text, fresh=True, rotated=True),
+                _turn_prompt(text, fresh=True, rotated=True, transcript=_transcript_tail(text)),
                 session_id=None,
                 workspace=workspace,
                 model=picked.model,

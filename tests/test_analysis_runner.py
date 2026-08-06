@@ -1,10 +1,13 @@
 import json
 import os
 from datetime import datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from sqlmodel import Session
 
+from app.models.contribution import Contribution, ContributionStatus
 from app.services import analysis_runner as ar
 
 # --- _seconds_until_reset ------------------------------------------------------
@@ -220,3 +223,220 @@ def test_agent_env_denylist(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "TELEGRAM_BOT_TOKEN" not in env
     assert "AWS_SECRET_ACCESS_KEY" not in env
     assert env["SOME_HARMLESS_VAR"] == "ok"
+
+
+# --- pending orders context + final-block validator ----------------------------
+
+
+def test_pending_orders_context_lists_only_open_orders(session: Session) -> None:
+    from app.models.asset import AssetClass
+    from app.models.order import Order, OrderStatus
+
+    contribution = Contribution(amount_brl=Decimal("5000"))
+    session.add(contribution)
+    session.commit()
+    session.refresh(contribution)
+    session.add(
+        Order(
+            contribution_id=contribution.id,
+            ticker="PETR4",
+            asset_class=AssetClass.STOCKS,
+            amount_brl=Decimal("1500"),
+        )
+    )
+    session.add(
+        Order(
+            contribution_id=contribution.id,
+            ticker="BTC",
+            asset_class=AssetClass.CRYPTO,
+            amount_brl=Decimal("2000"),
+            status=OrderStatus.EXECUTED,
+        )
+    )
+    session.commit()
+
+    block = ar._pending_orders_context(session)
+    assert "PETR4" in block and "1,500.00" in block
+    assert "BTC" not in block  # executed — no longer open
+    assert "NÃO re-recomende" in block
+
+
+def test_pending_orders_context_empty_without_orders(session: Session) -> None:
+    assert ar._pending_orders_context(session) == ""
+
+
+_GOOD_CLOSE = (
+    "📋 ONDE INVESTIR\n\n---\n"
+    '```json\n{"orders": [{"ticker": "PETR4", "classe": "acoes_b3", "valor_brl": 1000}]}\n```\n'
+)
+_DRIFTED_CLOSE = (
+    "📋 ONDE INVESTIR\n\n---\n"
+    '```json\n{"orders": [{"ticker": "PETR4", "classe": "acoes_b3", "valor_brl": 700}]}\n```\n'
+)
+
+
+def test_final_validator_passes_a_matching_block_untouched(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    contribution = Contribution(amount_brl=Decimal("1000"))
+    summary = ar.RunSummary(run_id="r1", session_id="sess", final_summary=_GOOD_CLOSE)
+    monkeypatch.setattr(
+        ar, "_run_step_resilient", lambda *a, **k: pytest.fail("must not run a fixup")
+    )
+    out = ar._validate_and_correct_final(
+        summary, contribution, model="m", effort="e", timeout=60, on_event=None
+    )
+    assert out.final_summary == _GOOD_CLOSE
+
+
+def test_final_validator_adopts_an_improved_fixup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A drifted sheet triggers ONE in-session corrective turn; the corrected
+    closing replaces the original when it parses at least as well."""
+    contribution = Contribution(amount_brl=Decimal("1000"))
+    summary = ar.RunSummary(run_id="r1", session_id="sess", final_summary=_DRIFTED_CLOSE)
+    calls: list[str] = []
+
+    def fake_fixup(prompt: str, **kwargs) -> ar.StepResult:
+        calls.append(prompt)
+        return ar.StepResult(
+            label="", result=_GOOD_CLOSE, cost_usd=0.1, duration_s=2.0, session_id="sess"
+        )
+
+    monkeypatch.setattr(ar, "_run_step_resilient", fake_fixup)
+    out = ar._validate_and_correct_final(
+        summary, contribution, model="m", effort="e", timeout=60, on_event=None
+    )
+    assert len(calls) == 1
+    assert "VALIDAÇÃO AUTOMÁTICA" in calls[0]
+    assert out.final_summary == _GOOD_CLOSE
+    assert out.steps[-1].label == "Correção do fechamento"
+
+
+def test_final_validator_keeps_original_when_fixup_is_worse(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    contribution = Contribution(amount_brl=Decimal("1000"))
+    summary = ar.RunSummary(run_id="r1", session_id="sess", final_summary=_DRIFTED_CLOSE)
+    monkeypatch.setattr(
+        ar,
+        "_run_step_resilient",
+        lambda *a, **k: ar.StepResult(
+            label="", result="resposta sem bloco nenhum", cost_usd=0.1, duration_s=2.0
+        ),
+    )
+    out = ar._validate_and_correct_final(
+        summary, contribution, model="m", effort="e", timeout=60, on_event=None
+    )
+    assert out.final_summary == _DRIFTED_CLOSE  # never adopt a worse closing
+
+
+# --- fresh restart wipes stale responses (A9 regression, contribution flow) ----
+
+
+def test_run_analysis_wipes_stale_responses_when_the_session_is_gone(
+    session: Session, isolated_runner_dirs: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Resuming onto a dead Claude session must restart FRESH and wipe every
+    response persisted by the dead session — otherwise the retry counts the
+    old prefix as done and skips steps the new session never saw (A9)."""
+    from app.models.contribution import ContributionPrompt
+
+    contribution = Contribution(
+        amount_brl=Decimal("1000"),
+        status=ContributionStatus.READY,
+        claude_session_id="dead-sess",
+    )
+    session.add(contribution)
+    session.commit()
+    session.refresh(contribution)
+    for i in (1, 2):
+        session.add(
+            ContributionPrompt(
+                contribution_id=contribution.id,
+                prompt_order=i,
+                prompt_key="macro",
+                title=f"Reunião {i}",
+                description="d",
+                content=f"prompt {i}",
+                response="resposta da sessão morta",
+            )
+        )
+    session.commit()
+
+    close = (
+        "📋 ONDE INVESTIR\n\n---\n"
+        '```json\n{"orders": [{"ticker": "PETR4", "classe": "acoes_b3", "valor_brl": 1000}]}\n```'
+    )
+    calls: list[str | None] = []
+
+    def fake_step(
+        prompt: str, *, resume_session_id: str | None, **_kwargs: object
+    ) -> ar.StepResult:
+        calls.append(resume_session_id)
+        if resume_session_id == "dead-sess":
+            raise ar.SessionNotFoundError("no conversation found")
+        result = close if len(calls) == 4 else f"resp{len(calls)}"
+        return ar.StepResult(
+            label="", result=result, cost_usd=0.0, duration_s=1.0, session_id="new-sess"
+        )
+
+    monkeypatch.setattr(ar, "_run_claude_step", fake_step)
+    ar.run_analysis(session, contribution.id, notify=False)
+
+    session.refresh(contribution)
+    prompts = sorted(contribution_prompts(session, contribution.id), key=lambda p: p.prompt_order)
+    assert calls[0] == "dead-sess"  # tried the saved session first
+    assert calls[1] is None  # then restarted fresh
+    assert [p.response for p in prompts] == ["resp2", "resp3"]  # stale wiped, redone
+    assert contribution.status == ContributionStatus.COMPLETED
+    assert contribution.final_summary == close
+    assert contribution.claude_session_id == "new-sess"
+
+
+def contribution_prompts(session: Session, contribution_id) -> list:
+    from sqlmodel import select
+
+    from app.models.contribution import ContributionPrompt
+
+    return list(
+        session.exec(
+            select(ContributionPrompt).where(ContributionPrompt.contribution_id == contribution_id)
+        ).all()
+    )
+
+
+# --- pending_resumable_ids -----------------------------------------------------
+
+
+def test_pending_resumable_covers_pre_step_failures_but_not_manual(
+    session: Session, isolated_runner_dirs: Path
+) -> None:
+    """An automatic run that died BEFORE its first step (global-lock collision)
+    leaves READY + run_attempts>0 + no session id — it must be resumable.
+    A manual READY contribution (attempts=0) must never auto-run."""
+    failed_pre_step = Contribution(
+        amount_brl=Decimal("5000"),
+        status=ContributionStatus.READY,
+        run_attempts=1,
+    )
+    manual = Contribution(amount_brl=Decimal("1000"), status=ContributionStatus.READY)
+    interrupted_mid_chain = Contribution(
+        amount_brl=Decimal("2000"),
+        status=ContributionStatus.READY,
+        claude_session_id="sess-123",
+        run_attempts=2,
+    )
+    gave_up = Contribution(
+        amount_brl=Decimal("3000"),
+        status=ContributionStatus.READY,
+        run_attempts=99,  # past max_run_attempts — stop paying for it
+    )
+    for c in (failed_pre_step, manual, interrupted_mid_chain, gave_up):
+        session.add(c)
+    session.commit()
+
+    ids = ar.pending_resumable_ids(session)
+    assert failed_pre_step.id in ids
+    assert interrupted_mid_chain.id in ids
+    assert manual.id not in ids
+    assert gave_up.id not in ids

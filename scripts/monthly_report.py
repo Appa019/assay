@@ -24,6 +24,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 from sqlmodel import Session, select  # noqa: E402
 
 from app.core.database import engine, init_db  # noqa: E402
+from app.models.chat import ChatMessage, ChatRole  # noqa: E402
 from app.models.contribution import ContributionPrompt  # noqa: E402
 from app.models.portfolio_snapshot import PortfolioSnapshot  # noqa: E402
 from app.models.report import Report, ReportKind  # noqa: E402
@@ -45,6 +46,11 @@ def _month_bounds(ref: date) -> tuple[date, date]:
 def _fmt(value: float) -> str:
     integer, decimals = f"{value:,.2f}".split(".")
     return f"R$ {integer.replace(',', '.')},{decimals}"
+
+
+def _local_day(dt: datetime) -> date:
+    """Local calendar date for a stored UTC-naive timestamp (A5 pattern)."""
+    return (dt if dt.tzinfo else dt.replace(tzinfo=UTC)).astimezone().date()
 
 
 def build_report(session: Session, start: date, end: date) -> str:
@@ -108,7 +114,7 @@ def build_report(session: Session, start: date, end: date) -> str:
                 else ""
             )
             lines.append(
-                f"- {t.executed_at.date().isoformat()} {t.side.upper()} {t.ticker}: "
+                f"- {_local_day(t.executed_at).isoformat()} {t.side.upper()} {t.ticker}: "
                 f"{float(t.quantity)} @ {_fmt(float(t.price))} = {_fmt(float(t.total_brl))}{pnl}"
             )
     else:
@@ -122,6 +128,31 @@ def build_report(session: Session, start: date, end: date) -> str:
             lines.append(f"- {label_cls}: vendas {_fmt(data.get('sales_brl', 0))} → {status}")
     else:
         lines.append("- Sem vendas tributáveis no mês.")
+
+    # Router feedback loop: without this there is zero visibility on whether
+    # the model router is tiering turns sensibly (or silently falling back).
+    chat_rows = list(
+        session.exec(
+            select(ChatMessage)
+            .where(ChatMessage.role == ChatRole.ASSISTANT)
+            .where(ChatMessage.created_at >= datetime(start.year, start.month, 1, tzinfo=UTC))
+            .where(
+                ChatMessage.created_at
+                < datetime(end.year, end.month, end.day, tzinfo=UTC) + timedelta(days=1)
+            )
+        ).all()
+    )
+    lines += ["", f"## Consultor no mês ({len(chat_rows)} respostas)"]
+    if chat_rows:
+        tiers: dict[str, int] = {}
+        for m in chat_rows:
+            key = m.tier or "sem tier (fallback/erro)"
+            tiers[key] = tiers.get(key, 0) + 1
+        lines.append(
+            "- Tiers do roteador: " + " · ".join(f"{k}: {v}" for k, v in sorted(tiers.items()))
+        )
+    else:
+        lines.append("- (nenhuma conversa)")
 
     lines += [
         "",

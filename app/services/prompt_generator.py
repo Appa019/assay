@@ -1,4 +1,4 @@
-"""Render the 3-prompt sequence for a contribution, based on captured context."""
+"""Render the 5-prompt meeting sequence for a contribution from captured context."""
 
 from datetime import date
 from pathlib import Path
@@ -186,7 +186,7 @@ class _NamespaceLike(dict):
 
 
 def render_all_prompts(context: dict[str, Any]) -> list[dict[str, Any]]:
-    """Render the 3 prompts in order. Returns rows ready for persistence."""
+    """Render the 5 prompts in order. Returns rows ready for persistence."""
     out: list[dict[str, Any]] = []
     for definition in _PROMPT_DEFINITIONS:
         template = _env.get_template(definition["template"])

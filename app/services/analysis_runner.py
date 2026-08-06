@@ -20,7 +20,7 @@ import subprocess
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -29,7 +29,13 @@ import structlog
 from sqlmodel import Session, select
 
 from app.config import settings
-from app.models.contribution import Contribution, ContributionPrompt, ContributionStatus
+from app.models.contribution import (
+    Contribution,
+    ContributionPrompt,
+    ContributionStatus,
+    PromptKey,
+)
+from app.models.order import Order, OrderStatus
 from app.models.report import Report, ReportKind
 from app.models.trade import Trade, TradeSide
 from app.services import telegram_service
@@ -247,6 +253,16 @@ não existir) com as teses, tickers/CG-ids e decisões deste ciclo, e a \
 watchlist do próximo. Depois entregue o fechamento como resposta."""
 
 
+def _local_date(dt: datetime) -> date:
+    """Local calendar date for a stored UTC-naive timestamp.
+
+    Every client-facing or prompt-facing date must be the LOCAL day: an aporte
+    created 22h in Brazil is already "tomorrow" in UTC, and the committee would
+    open the meeting dated a day ahead of the very prompts it received.
+    """
+    return (dt if dt.tzinfo else dt.replace(tzinfo=UTC)).astimezone().date()
+
+
 class AnalysisError(RuntimeError):
     """A Claude CLI step failed or returned an error result."""
 
@@ -258,6 +274,31 @@ class SessionNotFoundError(AnalysisError):
 _MCP_FILENAME = ".mcp.json"  # effective config Claude loads (regenerated each run)
 _AGENT_MCP_FILENAME = ".mcp.agent.json"  # agent-owned; merged in and NEVER overwritten
 
+
+# Every third-party MCP is PINNED (exact npm/PyPI version, git commit sha).
+# These servers run under --dangerously-skip-permissions with --add-dir $HOME:
+# an unpinned @latest would hand whoever publishes the next version arbitrary
+# code execution on this machine between two runs. Bump deliberately, after a
+# look at the diff. Pinned on 2026-08-06.
+_MCP_PINS = {
+    "sequential-thinking": "@modelcontextprotocol/server-sequential-thinking@2026.7.4",
+    "filesystem": "@modelcontextprotocol/server-filesystem@2026.7.10",
+    "context7": "@upstash/context7-mcp@3.2.5",
+    "playwright": "@playwright/mcp@0.0.79",
+    "memory": "@modelcontextprotocol/server-memory@2026.7.4",
+    "defillama": "@iqai/defillama-mcp@1.0.8",
+    "fetch": "mcp-server-fetch==2026.7.10",
+    "time": "mcp-server-time==2026.7.10",
+    "git": "mcp-server-git==2026.7.10",
+    "yahoo-finance": (
+        "git+https://github.com/Alex2Yang97/yahoo-finance-mcp"
+        "@241e52316729474cabfb3e338a74c0e6ad4b25e0"
+    ),
+    "coinglass": "mcp-coinglass@0.1.0",
+    "messari": "@messari/sdk-ts-mcp@0.4.0",
+    "firecrawl": "firecrawl-mcp@3.23.3",
+    "tavily": "tavily-mcp@0.2.22",
+}
 
 # Optional premium data MCPs, keyed by the settings attr that gates them. Each
 # is only added to the effective config when that key is set, so an autonomous
@@ -281,7 +322,7 @@ _KEY_GATED_MCP_SERVERS: tuple[tuple[str, str, dict[str, Any]], ...] = (
         "coinglass_api_key",
         {
             "command": "npx",
-            "args": ["-y", "mcp-coinglass"],
+            "args": ["-y", _MCP_PINS["coinglass"]],
             "env": {"COINGLASS_API_KEY": "${COINGLASS_API_KEY:-}"},
         },
     ),
@@ -291,7 +332,7 @@ _KEY_GATED_MCP_SERVERS: tuple[tuple[str, str, dict[str, Any]], ...] = (
         "messari_api_key",
         {
             "command": "npx",
-            "args": ["-y", "@messari/sdk-ts-mcp"],
+            "args": ["-y", _MCP_PINS["messari"]],
             "env": {"MESSARI_SDK_API_KEY": "${MESSARI_SDK_API_KEY:-}"},
         },
     ),
@@ -301,7 +342,7 @@ _KEY_GATED_MCP_SERVERS: tuple[tuple[str, str, dict[str, Any]], ...] = (
         "firecrawl_api_key",
         {
             "command": "npx",
-            "args": ["-y", "firecrawl-mcp"],
+            "args": ["-y", _MCP_PINS["firecrawl"]],
             "env": {"FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY:-}"},
         },
     ),
@@ -311,7 +352,7 @@ _KEY_GATED_MCP_SERVERS: tuple[tuple[str, str, dict[str, Any]], ...] = (
         "tavily_api_key",
         {
             "command": "npx",
-            "args": ["-y", "tavily-mcp"],
+            "args": ["-y", _MCP_PINS["tavily"]],
             "env": {"TAVILY_API_KEY": "${TAVILY_API_KEY:-}"},
         },
     ),
@@ -326,7 +367,7 @@ def _playwright_mcp_args() -> list[str]:
     'chrome' is not found at /opt/google/chrome/chrome". Point it at the distro
     Chromium there; x86 desktops with Chrome installed keep the default.
     """
-    args = ["@playwright/mcp@latest"]
+    args = [_MCP_PINS["playwright"]]
     if Path("/opt/google/chrome/chrome").exists():
         return args
     chromium = shutil.which("chromium") or shutil.which("chromium-browser")
@@ -356,45 +397,45 @@ def _baseline_mcp_servers(workspace: Path | None = None) -> dict[str, Any]:
         # Deep, structured reasoning for institutional-grade analysis.
         "sequential-thinking": {
             "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+            "args": ["-y", _MCP_PINS["sequential-thinking"]],
         },
         # Navigate the whole machine + create/read files anywhere under $HOME.
         "filesystem": {
             "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-filesystem", home],
+            "args": ["-y", _MCP_PINS["filesystem"], home],
         },
         # Robust web page → markdown fetch (filings, data pages).
-        "fetch": {"command": "uvx", "args": ["mcp-server-fetch"]},
+        "fetch": {"command": "uvx", "args": [_MCP_PINS["fetch"]]},
         # Live library docs when the agent writes its own tools.
-        "context7": {"command": "npx", "args": ["-y", "@upstash/context7-mcp@latest"]},
+        "context7": {"command": "npx", "args": ["-y", _MCP_PINS["context7"]]},
         # Full browser for JS-heavy research sites (dashboards, on-chain, RI).
         "playwright": {"command": "npx", "args": _playwright_mcp_args()},
         # Structured knowledge graph, complementary to the file-based MEMORY.md.
         "memory": {
             "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-memory"],
+            "args": ["-y", _MCP_PINS["memory"]],
             "env": {"MEMORY_FILE_PATH": str(workspace / "memory" / "graph.json")},
         },
         # Timezone/date math (COPOM/FOMC windows, usage-limit "resets at").
-        "time": {"command": "uvx", "args": ["mcp-server-time"]},
+        "time": {"command": "uvx", "args": [_MCP_PINS["time"]]},
         # Version-control the tools the agent builds in ./tools/.
-        "git": {"command": "uvx", "args": ["mcp-server-git", "--repository", str(workspace)]},
+        "git": {
+            "command": "uvx",
+            "args": [_MCP_PINS["git"], "--repository", str(workspace)],
+        },
         # --- Tier 2: keyless financial-data servers (always on) ----------------
         # Crypto market data: prices, market cap, volume, coin metadata. Public
         # remote endpoint (streamable HTTP), no API key required.
         "coingecko": {"type": "http", "url": "https://mcp.api.coingecko.com/mcp"},
         # Equities incl. B3 (suffix .SA): quotes, fundamentals, statements,
-        # holders, options, news. No API key required.
+        # holders, options, news. No API key required. Pinned to a commit sha —
+        # a third-party repo at HEAD could change behavior between two runs.
         "yahoo-finance": {
             "command": "uvx",
-            "args": [
-                "--from",
-                "git+https://github.com/Alex2Yang97/yahoo-finance-mcp",
-                "yahoo-finance-mcp",
-            ],
+            "args": ["--from", _MCP_PINS["yahoo-finance"], "yahoo-finance-mcp"],
         },
         # DeFi TVL, yields/APY, protocol revenue & fees. Public DeFiLlama API.
-        "defillama": {"command": "npx", "args": ["-y", "@iqai/defillama-mcp"]},
+        "defillama": {"command": "npx", "args": ["-y", _MCP_PINS["defillama"]]},
         # Neural/semantic web research over high-quality sources (streamable
         # HTTP). Free tier works without a key (rate-limited); set TAVILY too.
         "exa": {"type": "http", "url": "https://mcp.exa.ai/mcp"},
@@ -577,9 +618,9 @@ def _track_record_context(session: Session, *, max_trades: int = 12) -> str:
         pnl_brl = f"R$ {float(t.realized_pnl_brl):+,.2f}" if t.realized_pnl_brl is not None else ""
         held = ""
         if t.lot_entry_date:
-            held = f", {max(0, (t.executed_at.date() - t.lot_entry_date).days)}d de posição"
+            held = f", {max(0, (_local_date(t.executed_at) - t.lot_entry_date).days)}d de posição"
         lines.append(
-            f"- {t.executed_at.date().isoformat()} VENDA {t.ticker} "
+            f"- {_local_date(t.executed_at).isoformat()} VENDA {t.ticker} "
             f"({t.asset_class}): {pnl_pct} {pnl_brl}{held}"
         )
         if (t.realized_pnl_pct or 0) > 0:
@@ -610,10 +651,42 @@ def _latest_weekly_context(session: Session, *, max_chars: int = 6000) -> str:
         body = body[: cut if cut > max_chars // 2 else max_chars].rstrip() + "\n[… truncado]"
     return (
         "[CONSULTA — última revisão semanal do comitê em "
-        f"{report.created_at.date().isoformat()}]\n"
+        f"{_local_date(report.created_at).isoformat()}]\n"
         f"{body}\n"
         "----------------------------------------------------------------------\n\n"
     )
+
+
+def _pending_orders_context(session: Session, *, max_orders: int = 20) -> str:
+    """Open (unexecuted) recommendations, shown to the committee before sizing.
+
+    Without this the committee had no idea what it already recommended and the
+    client hasn't executed yet — it could re-recommend the same name or size a
+    new contribution ignoring capital already committed on the open sheet.
+    """
+    rows = list(
+        session.exec(
+            select(Order)
+            .where(Order.status == OrderStatus.PENDING)
+            .order_by(Order.created_at)
+            .limit(max_orders)
+        ).all()
+    )
+    if not rows:
+        return ""
+    lines = ["[ORDENS PENDENTES — folha anterior AINDA NÃO executada pelo cliente]"]
+    for o in rows:
+        lines.append(
+            f"- {o.ticker} ({o.asset_class}) R$ {float(o.amount_brl):,.2f} — "
+            f"emitida em {_local_date(o.created_at).isoformat()}"
+        )
+    lines.append(
+        "Considere-as ao decidir este aporte: NÃO re-recomende um nome já na folha "
+        "(a menos que a tese tenha mudado — e diga isso explicitamente) e trate o "
+        "valor acima como capital possivelmente já comprometido.\n"
+        "----------------------------------------------------------------------\n"
+    )
+    return "\n".join(lines)
 
 
 def _claude_bin() -> str:
@@ -977,6 +1050,7 @@ def run_chain(
     model: str = DEFAULT_MODEL,
     effort: str = DEFAULT_EFFORT,
     step_timeout: int = DEFAULT_STEP_TIMEOUT,
+    step_timeouts: list[int] | None = None,
     min_holding_days: int | None = None,
     on_event: EventCallback | None = None,
     persist: Callable[[int, str, StepResult], None] | None = None,
@@ -999,7 +1073,9 @@ def run_chain(
     fails fast with ``AnalysisError`` instead of doubling the spend.
 
     ``step_offset``/``total_steps`` keep event numbering absolute on resumes
-    (the UI shows "etapa 4/6", not "1/3").
+    (the UI shows "etapa 4/6", not "1/3"). ``step_timeouts`` (aligned with
+    ``steps``) overrides the flat ceiling per step — the per-name due-diligence
+    meetings legitimately run far longer than the macro one.
     """
     min_holding_days = (
         min_holding_days if min_holding_days is not None else settings.min_holding_days
@@ -1017,13 +1093,18 @@ def run_chain(
     try:
         for index, (title, prompt) in enumerate(steps):
             abs_step = step_offset + index + 1
+            timeout = (
+                step_timeouts[index]
+                if step_timeouts is not None and index < len(step_timeouts)
+                else step_timeout
+            )
             _emit(on_event, "step_start", step=abs_step, total=total, title=title)
             result = _run_step_resilient(
                 prompt,
                 resume_session_id=summary.session_id or None,
                 model=model,
                 effort=effort,
-                timeout=step_timeout,
+                timeout=timeout,
                 cwd=workspace,
                 on_event=on_event,
                 step=abs_step,
@@ -1183,10 +1264,14 @@ def is_run_active(contribution_id: UUID) -> bool:
 def pending_resumable_ids(session: Session) -> list[UUID]:
     """Contributions whose automatic run started but never produced the report.
 
-    Two shapes qualify: a captured ``claude_session_id`` with no
-    ``final_summary`` (interrupted mid-chain), and an orphaned ``IN_PROGRESS``
-    with no live lock (the process died before the 1st step captured a session
-    — previously unreachable forever). Contributions that already burned
+    Three shapes qualify: a captured ``claude_session_id`` with no
+    ``final_summary`` (interrupted mid-chain); an orphaned ``IN_PROGRESS``
+    with no live lock (the process died before the 1st step captured a
+    session); and a ``READY`` with ``run_attempts > 0`` — an automatic run
+    that failed BEFORE its first step (e.g. it collided with the global run
+    lock while a weekly review was running) and would otherwise sit forever.
+    ``run_attempts > 0`` is what separates those from manual contributions,
+    which must never auto-run. Contributions that already burned
     ``max_run_attempts`` consecutive failures are skipped so a permanently
     broken analysis stops costing money. Oldest first.
     """
@@ -1196,6 +1281,9 @@ def pending_resumable_ids(session: Session) -> list[UUID]:
         .where(
             (Contribution.claude_session_id.is_not(None))
             | (Contribution.status == ContributionStatus.IN_PROGRESS)
+            | (
+                (Contribution.status == ContributionStatus.READY) & (Contribution.run_attempts > 0)  # noqa: PLR2004 — auto-run marker
+            )
         )
         .order_by(Contribution.created_at)
     ).all()
@@ -1207,6 +1295,87 @@ def pending_resumable_ids(session: Session) -> list[UUID]:
             continue  # genuinely running right now — leave it alone
         out.append(c.id)
     return out
+
+
+# Tolerated relative drift between the orders-sheet sum and the contribution
+# amount before the post-run validator kicks in (the prompt itself asks ±R$ 5).
+_ORDERS_SUM_TOLERANCE = 0.02
+
+
+def _validate_and_correct_final(
+    summary: RunSummary,
+    contribution: Contribution,
+    *,
+    model: str,
+    effort: str,
+    timeout: int,
+    on_event: EventCallback | None,
+) -> RunSummary:
+    """Deterministic post-run check of the closing block, with ONE fix-up turn.
+
+    The templates demand a machine block whose sum matches the aporte (±R$ 5),
+    but nothing ever verified it mechanically. When the block is missing or the
+    sum drifts beyond tolerance, the SAME chained session is asked once to
+    re-emit the closing; the correction is adopted only if it parses at least
+    as well as the original. Best-effort — any failure keeps the original.
+    """
+    from app.services import order_service
+
+    check = order_service.summarize_block(
+        summary.final_summary, expected_total=contribution.amount_brl
+    )
+    ok = check["valid"] > 0 and (
+        check["deviation_pct"] is None or check["deviation_pct"] <= _ORDERS_SUM_TOLERANCE
+    )
+    if ok or not summary.session_id:
+        return summary
+
+    logger.warning("final_block_invalid", **check)
+    _emit(on_event, "final_validation_retry", **check)
+    if check["valid"] == 0:
+        problem = "veio AUSENTE ou sem nenhuma linha válida"
+    else:
+        problem = (
+            f"soma R$ {check['total_brl']:,.2f}, desviando "
+            f"{check['deviation_pct'] * 100:.1f}% do aporte de "
+            f"R$ {float(contribution.amount_brl):,.2f}"
+        )
+    prompt = (
+        "[VALIDAÇÃO AUTOMÁTICA DO FECHAMENTO — correção obrigatória]\n"
+        f'O bloco ```json {{"orders": [...]}}``` do seu fechamento {problem}.\n'
+        "Reemita AGORA o FECHAMENTO EXECUTIVO COMPLETO no MESMO formato "
+        "(esqueleto humano + linha '---' + bloco ```json de orders com as "
+        "chaves exatas), com Σ valor_brl batendo o aporte (±R$ 5). NÃO refaça "
+        "pesquisa nem mude as decisões — apenas corrija e reemita inteiro."
+    )
+    try:
+        step = _run_step_resilient(
+            prompt,
+            resume_session_id=summary.session_id,
+            model=model,
+            effort=effort,
+            timeout=timeout,
+            cwd=WORKSPACE,
+            on_event=on_event,
+            step=len(summary.steps) + 1,
+            total=len(summary.steps) + 1,
+            title="Correção do fechamento",
+            transcript_tag=f"{summary.run_id}_fixup",
+            limit_backoff=[60],
+        )
+    except Exception as exc:  # noqa: BLE001 — the validator must never sink a finished run
+        logger.warning("final_fixup_failed", error=str(exc))
+        return summary
+
+    fixed = order_service.summarize_block(step.result, expected_total=contribution.amount_brl)
+    old_dev = check["deviation_pct"] if check["deviation_pct"] is not None else float("inf")
+    new_dev = fixed["deviation_pct"] if fixed["deviation_pct"] is not None else float("inf")
+    if fixed["valid"] > 0 and (check["valid"] == 0 or new_dev <= old_dev):
+        step.label = "Correção do fechamento"
+        summary.steps.append(step)
+        summary.final_summary = step.result
+        logger.info("final_fixup_adopted", **fixed)
+    return summary
 
 
 def run_analysis(
@@ -1286,19 +1455,27 @@ def _run_analysis_locked(
 
     preamble = _build_preamble(
         amount_brl=float(contribution.amount_brl),
-        when=contribution.created_at.date().isoformat(),
+        when=_local_date(contribution.created_at).isoformat(),
         min_holding_days=min_holding_days,
         contribution_id=str(contribution_id),
     )
-    # Consult blocks: latest weekly review + the committee's own track record.
+    # Consult blocks: latest weekly review, the committee's own track record,
+    # and whatever it already recommended that the client hasn't executed.
     review_ctx = _latest_weekly_context(session)
     track_ctx = _track_record_context(session)
+    orders_ctx = _pending_orders_context(session)
 
     all_steps: list[tuple[str, str]] = []
+    step_timeouts: list[int] = []
     for index, prompt in enumerate(prompts):
-        head = (preamble + review_ctx + track_ctx) if index == 0 else ""
+        head = (preamble + review_ctx + track_ctx + orders_ctx) if index == 0 else ""
         all_steps.append((prompt.title, head + prompt.content))
+        # The per-name due-diligence meetings (one full memo per ticker, often
+        # with subagents) legitimately run far longer than the macro rounds.
+        deep_dd = prompt.prompt_key in (PromptKey.EQUITY, PromptKey.CRYPTO)
+        step_timeouts.append(step_timeout * 2 if deep_dd else step_timeout)
     all_steps.append(("Fechamento executivo", _SYNTHESIS_PROMPT))
+    step_timeouts.append(step_timeout)
 
     # Resume point: prompts fill in order, so the completed ones are a prefix.
     done_prompts = 0
@@ -1393,6 +1570,7 @@ def _run_analysis_locked(
             model=model,
             effort=effort,
             step_timeout=step_timeout,
+            step_timeouts=step_timeouts[from_index:],
             min_holding_days=min_holding_days,
             on_event=on_event,
             persist=_persist,
@@ -1418,6 +1596,18 @@ def _run_analysis_locked(
             _clear_stale_responses()
             _emit(on_event, "run_resume_failed", contribution_id=str(contribution_id))
             summary = _execute(0, None)
+
+        # Deterministic check of the closing block (sum vs aporte) with one
+        # in-session corrective turn — no more arithmetic drift reaching the
+        # client unverified.
+        summary = _validate_and_correct_final(
+            summary,
+            contribution,
+            model=model,
+            effort=effort,
+            timeout=step_timeout,
+            on_event=on_event,
+        )
 
         contribution.final_summary = summary.final_summary
         contribution.status = ContributionStatus.COMPLETED
@@ -1471,13 +1661,29 @@ def _run_analysis_locked(
         from app.services import order_service
 
         order_service.ingest_contribution_orders(session, contribution)
+        # Sheet health alert: dropped rows or a sum that drifts from the aporte
+        # must reach the client, not just a log line nobody reads.
+        check = order_service.summarize_block(
+            contribution.final_summary or "", expected_total=contribution.amount_brl
+        )
+        skipped = check["rows"] - check["valid"]
+        drifted = (
+            check["deviation_pct"] is not None and check["deviation_pct"] > _ORDERS_SUM_TOLERANCE
+        )
+        if (skipped or drifted or check["valid"] == 0) and notify and telegram_service.is_enabled():
+            telegram_service.notify(
+                "⚠️ Checagem da folha de ordens: "
+                f"{check['valid']}/{check['rows']} linhas válidas, "
+                f"soma R$ {check['total_brl']:,.2f} vs aporte "
+                f"R$ {float(contribution.amount_brl):,.2f}. Revise em /ordens."
+            )
     except Exception as ingest_exc:  # noqa: BLE001 — orders are best-effort extras
         logger.warning("order_ingest_failed", error=str(ingest_exc))
 
     if notify and telegram_service.is_enabled():
         header = (
             f"📊 Recomendação do aporte de R$ {float(contribution.amount_brl):,.2f} "
-            f"({contribution.created_at.date().isoformat()})\n"
+            f"({_local_date(contribution.created_at).isoformat()})\n"
             "Executou uma ordem? Confirme com /executei <ticker> <qtd> <preço>.\n\n"
         )
         try:
