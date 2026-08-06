@@ -29,11 +29,31 @@ const ConsultorPage = () => {
   const [uploading, setUploading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Follow the conversation only while the user is already at (or near) the
+  // bottom. Scrolling up to reread must never be fought by the poll.
+  const stickRef = useRef(true);
+  const lastTurnKeyRef = useRef("");
+
+  useEffect(() => {
+    const onScroll = () => {
+      const distance =
+        document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
+      stickRef.current = distance < 120;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const load = useCallback(async () => {
     try {
       const state = await fetchChat();
-      setMessages(state.messages);
+      const fingerprint = state.messages.map((m) => `${m.id}:${m.status}`).join(",");
+      setMessages((current) => {
+        const currentPrint = (current ?? []).map((m) => `${m.id}:${m.status}`).join(",");
+        // Same rows, same statuses: keep the old array so nothing re-renders
+        // (and nothing scrolls) on the 2.5s polls of a long thinking turn.
+        return current !== null && currentPrint === fingerprint ? current : state.messages;
+      });
       setBusy(state.busy || state.messages.some((m) => m.status === "running"));
       setOffline(false);
     } catch {
@@ -54,7 +74,13 @@ const ConsultorPage = () => {
   }, [busy, load]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const last = messages?.[messages.length - 1];
+    const key = last ? `${last.id}:${last.status}` : "";
+    if (key === lastTurnKeyRef.current) return;
+    lastTurnKeyRef.current = key;
+    if (stickRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
   }, [messages]);
 
   const send = async () => {
@@ -72,6 +98,7 @@ const ConsultorPage = () => {
       setAttachment(null);
       try {
         const state = await uploadChatAttachment(file, text);
+        stickRef.current = true;
         setMessages(state.messages);
         setBusy(true);
       } catch (err) {
@@ -93,6 +120,7 @@ const ConsultorPage = () => {
     setDraft("");
     try {
       const state = await sendChatMessage(text);
+      stickRef.current = true;
       setMessages(state.messages);
       setBusy(true);
     } catch (err) {
