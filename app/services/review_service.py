@@ -82,7 +82,9 @@ def _macro_block(macro_ctx: dict[str, Any]) -> str:
 
 
 _MANDATE = (
-    "MANDATO: Renda Fixa = 100% CDB; Ações = só equities da B3 (sem FII/ETF/BDR); "
+    "MANDATO: Renda Fixa = só CDB Bradesco 100% CDI liquidez diária (instrumento "
+    "único e fixo — a decisão é quanto, nunca qual CDB); Ações = só equities da B3 "
+    "(sem FII/ETF/BDR); "
     "Crypto = agressivo (alto upside, risco controlado). Trava de venda POR LOTE de "
     f"{settings.min_holding_days} dias vale só para AÇÕES e CRYPTO; CDB tem liquidez "
     "diária (dry powder) e pode ser vendido a qualquer momento para aproveitar "

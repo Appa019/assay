@@ -70,9 +70,11 @@ completa 30 dias, um cron roda a análise de maturidade. Aporte é ad-hoc.
 - **Rotação de dry powder**: a revisão semanal pode recomendar VENDER CDB e
   COMPRAR uma ação/crypto se achar oportunidade relevante (a nova compra entra
   na trava de 30d).
-- **Mandato de alocação**: Renda Fixa = **100% CDB**; Ações = **só equities da
-  B3** (sem FII/ETF/BDR); Crypto = **agressivo** (alto upside, com risco). Está
-  nas ordens permanentes, no preâmbulo, na síntese e nos cabeçalhos dos templates.
+- **Mandato de alocação**: Renda Fixa = **só CDB Bradesco 100% CDI liquidez
+  diária** (instrumento ÚNICO e FIXO desde 2026-08-10 — o comitê decide QUANTO,
+  nunca QUAL CDB); Ações = **só equities da B3** (sem FII/ETF/BDR); Crypto =
+  **agressivo** (alto upside, com risco). Está nas ordens permanentes, no
+  preâmbulo, na síntese e nos cabeçalhos dos templates.
 - **Auto-resume (no processo)**: se uma etapa falha por limite de uso/taxa,
   `run_chain` espera (até a hora do reset, backoff até ~1h) e retoma a MESMA
   etapa via `--resume` automaticamente.
@@ -385,8 +387,9 @@ rsync -a --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
 > investimento (o quê comprar, quanto, quando). Plataforma e exchange
 > são decisão do usuário ao executar a folha de ordens.
 
-- **Escopo de ativos (mandato)**: três classes APENAS — Renda Fixa = 100%
-  CDB, Ações = só equities da B3, Crypto = agressivo. SEM FII/ETF/BDR,
+- **Escopo de ativos (mandato)**: três classes APENAS — Renda Fixa = só CDB
+  Bradesco 100% CDI liquidez diária (sem outros emissores, sem CDB de prazo),
+  Ações = só equities da B3, Crypto = agressivo. SEM FII/ETF/BDR,
   Tesouro, LCI/LCA, debêntures, fundos ou internacional direto.
 - **Broker B3 preferido**: a corretora do banco para ações e CDB.
 - **Crypto**: comitê é agnóstico (escolhe por liquidez/segurança). Usuário
@@ -422,7 +425,8 @@ rsync -a --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
 - NUNCA commitar `storage/claude_session.json` (credenciais) — está no
   .gitignore; é resíduo do Playwright antigo, não é usado pelo orquestrador
 - **NÃO mencione plataforma específica DENTRO dos prompts** — comitê é
-  agnóstico
+  agnóstico. ÚNICA exceção (D29): o **Bradesco** como emissor do CDB, porque
+  emissor faz parte do produto de renda fixa, não é escolha de corretora
 - Sempre rode `pnpm lint && pnpm type-check && pnpm build` antes de
   commits no frontend
 - Sempre rode validação Python antes de commits no backend
@@ -451,9 +455,10 @@ decisão tactical (BL+RP+HRP) → pre-mortem. Saída: `final_tactical_brl`
 
 ### Reunião nº 2 — Universo, Filtros e Seleção (+ CDB final)
 12 personas + 2 vetos. Universo → long lists → filtros (quant + forense preview)
-→ **SELEÇÃO** (5-8 ações + 3-5 cryptos, com sizing-alvo) → **CDB final** com
-credit analysis. Saída: `selecao_acoes_b3`, `selecao_crypto`, `shortlist_cdb`
-(valor_brl + credit do emissor), `sanidade_selecao`. NÃO escreve o memo final.
+→ **SELEÇÃO** (5-8 ações + 3-5 cryptos, com sizing-alvo) → **CDB final**
+(instrumento fixo: Bradesco 100% CDI liquidez diária; só valor + sanidade de
+crédito). Saída: `selecao_acoes_b3`, `selecao_crypto`, `shortlist_cdb`
+(1 item, valor_brl + credit do emissor), `sanidade_selecao`. NÃO escreve o memo final.
 
 ### Reunião nº 3 — Due Diligence de Ações B3
 Equity desk. Memo COMPLETO por ação de `selecao_acoes_b3`: thesis + valuation

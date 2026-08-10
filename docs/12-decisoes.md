@@ -281,3 +281,29 @@ carteira `conta`, e `GET /api/cashflow/wallets` responde "quanto ainda tenho
 de VR?" (saldo acumulado, porque crédito de benefício rola entre meses).
 Totais do mês continuam somando tudo (o extrato não mente); o recorte vem em
 `by_wallet[]`.
+
+### D29 · CDB é instrumento FIXO: Bradesco, 100% do CDI, liquidez diária
+Até 2026-08-10 o mandato dizia "Renda Fixa = 100% CDB, preferir ≥100% do CDI" e
+deixava emissor, prazo e taxa a critério do comitê. O resultado apareceu na
+folha do aporte real: dos 4 CDBs, dois eram de PRAZO (Daycoval 113%,
+BTG 112%), que travam o dinheiro por ~2 anos e matam o dry powder. O cliente
+fechou a regra: **um único instrumento, CDB do Bradesco a 100% do CDI com
+liquidez diária** — o banco onde ele já opera (Bradesco), resgate no
+mesmo dia, sem caçar taxa. A decisão do comitê passa a ser só **QUANTO**, nunca
+QUAL.
+
+Três consequências deliberadas nos prompts:
+**(1)** morreu a pesquisa de ofertas de CDB (WebSearch de "melhores taxas"), a
+long list de emissores e o eixo liquidez-vs-prazo — economiza turno de pesquisa
+e elimina a tentação de comprar carry travado;
+**(2)** o Bucket 2 "Carry (CDB de prazo)" foi fundido no Bucket 1 (liquidez/
+defesa), porque com um instrumento só não há dois baldes;
+**(3)** se a sanidade de crédito do Bradesco falhar, o comitê **não troca de
+emissor** — reduz o bolso e sinaliza ao cliente, porque a escolha do banco é
+dele, não do comitê. O FGC (R$ 250k/CPF) vira alerta de concentração, não
+critério de seleção.
+
+Vale para as 3 etapas que tocam RF (01 macro, 02 seleção, 05 decisão), para as
+ordens permanentes do agente (`analysis_runner`), para a revisão semanal
+(`review_service`) e para o consultor (`chat_service`) — a regra é a mesma em
+todas as bocas do produto.

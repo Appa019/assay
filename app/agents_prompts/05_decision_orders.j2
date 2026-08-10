@@ -2,7 +2,7 @@
 INVESTMENT COMMITTEE FINAL · REUNIÃO Nº 5 DE 5
 TIER: GS PORTFOLIO STRATEGY + MS GIC + AQR CIO DESK
 PADRÃO: WORLD-CLASS · NO COMPROMISE
-MANDATO: 3 CLASSES — RENDA FIXA = CDB · AÇÕES = SÓ B3 · CRYPTO (AGRESSIVO)
+MANDATO: RF = CDB BRADESCO 100% CDI LIQ. DIÁRIA · AÇÕES = SÓ B3 · CRYPTO (AGRESSIVO)
 TEMA: RISK · SENTIMENT · TAX · STRESS · OPTIONS · ORDENS
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -17,8 +17,9 @@ Etapa final. Já temos, na mesma sessão encadeada:
 - **Reunião nº 4 (DD Crypto)**: `shortlist_crypto` — memo completo por cripto
 
 > ## MANDATO (a TOTALIDADE do universo — a folha de ordens DEVE respeitá-lo)
-> Três classes APENAS: **(1) Renda Fixa = 100% CDB** (≥100% CDI, FGC R$ 250k/
-> instituição, dry powder de liquidez diária); **(2) Ações = só equities da B3**;
+> Três classes APENAS: **(1) Renda Fixa = CDB Bradesco 100% do CDI, liquidez
+> diária — instrumento ÚNICO e FIXO** (sem outros emissores, sem CDB de prazo;
+> dry powder; FGC R$ 250k/instituição); **(2) Ações = só equities da B3**;
 > **(3) Crypto = agressivo**. **NADA** de Tesouro, LCI/LCA, debêntures, CRI/CRA,
 > fundos, FII, ETF (GOLD11/BOVA11/IVVB11), BDR, ouro, DOL ou internacional. USD
 > só via stablecoin USDC (crypto). Trava de venda **por lote** (cada compra de
@@ -91,7 +92,7 @@ Inconsistências → **reconcilie**. NÃO sobrescreva as etapas anteriores — r
 | Options BR | opcoes.net.br, OpLab.com.br |
 | VIX term structure | vixcentral.com |
 | Crypto + CNN F&G | alternative.me/crypto, cnn.com/markets/fear-and-greed |
-| CDB ofertas + saúde do banco | WebSearch `"CDB % CDI hoje"`, `"<banco> Basileia Tier 1 NPL"`, fgc.org.br |
+| Saúde do Bradesco (emissor único do CDB) | WebSearch `"Bradesco Basileia Tier 1 NPL"`, fgc.org.br |
 | Coinglass | coinglass.com |
 
 `Bash` para calcular: VaR/CVaR via Monte Carlo, marginal/component VaR, CDaR,
@@ -155,11 +156,11 @@ Aplique à posição agregada pós-aporte:
 | **E. Crash global 2020-tipo** | Risco −25/35% generalizado, USD/BRL +15%; CDB líquido vira refúgio (dry powder) | Liquidity event |
 | **F. China hard landing** | Vale −20%, Petr −10%, Ibov −7%, commodities down, USD +3% | China demand collapse |
 | **G. Bull dovish (Goldilocks)** | Selic −150 bps surpresa, Ibov +12%, BTC +20%, alts +35%, USD/BRL −5% | Soft landing upside |
-| **H. Evento de crédito bancário** | Banco médio emissor do CDB sob estresse/intervenção | Testa FGC + concentração R$ 250k |
+| **H. Evento de crédito bancário** | Bradesco (emissor único do CDB) sob estresse severo | Testa FGC + concentração R$ 250k |
 
 **Entregue**:
 - Perda/ganho R$ + % patrimônio por cenário · **Worst case**: viola 25%?
-- **No cenário H**: confirme que nenhuma exposição a um emissor passa de R$ 250k (FGC cobre); se passar, é **perda real** → sinalize e corrija sizing do CDB.
+- **No cenário H**: confirme que a exposição total no Bradesco não passa de R$ 250k (FGC cobre); se passar, o excedente é **perda potencial real** → sinalize ao cliente (o emissor é fixo por regra dele; a mitigação é sizing, não troca de banco).
 - **Probability-weighted expected return 31d** · **Conditional probability of 5% loss** · **Time to recover** se worst case
 
 ## ROUND 3 — Sentiment Overlay (Sofia)
@@ -193,17 +194,22 @@ Para top 3-5 ações B3 com opções líquidas (se o dado for acessível):
 
 ## ROUND 5 — Renda Fixa = CDB (Henrique + Daniel) — confirmar a R2
 
-A fatia de CDB **já foi materializada na Reunião nº 2** (`shortlist_cdb`: emissor,
-%CDI, FGC, credit analysis). Aqui apenas **confirme e ajuste**, replicando em `cdb_final`:
-- Revalide **cobertura FGC** (≤ R$ 250k por instituição, somando exposições no mesmo banco) e o **risco de crédito** do emissor (Basileia Tier 1, ROE, NPL).
-- Se o risk overlay (Round 1) vetar um emissor, **troque** por outro da long list da R2.
-- Garanta um colchão de **liquidez diária** (~100-103% CDI) como dry powder para a revisão semanal poder rotacionar para ação/crypto.
-- Calcule o rendimento líquido **pós-IR** por papel.
+A fatia de CDB **já foi materializada na Reunião nº 2** e o instrumento é FIXO
+por regra do cliente: **CDB Bradesco 100% do CDI, liquidez diária**. Aqui apenas
+**confirme o valor**, replicando em `cdb_final`:
+- Revalide **cobertura FGC** (exposição total no Bradesco ≤ R$ 250k/CPF, somando
+  posições existentes) e a **sanidade de crédito** (Basileia Tier 1, ROE, NPL).
+- Se o risk overlay (Round 1) apontar problema grave no Bradesco, NÃO troque de
+  emissor: **reduza o bolso CDB** e sinalize ao cliente na folha.
+- O bolso inteiro É o dry powder (liquidez diária) — disponível para a revisão
+  semanal rotacionar para ação/crypto.
+- Calcule o rendimento líquido **pós-IR** do carry a 100% CDI.
 
 ## ROUND 6 — Tax Strategy Máxima (Cláudia + Edson) — 3 classes
 
 ### 6.1 CDB
-- IR regressivo 22.5%→15% (>720d). Alongar parte > 720d trava 15%. Calcule rendimento líquido pós-IR.
+- IR regressivo 22.5%→15% (>720d) pelo TEMPO DE PERMANÊNCIA (o CDB é liquidez
+  diária; deixar parado >720d também chega aos 15%). Calcule rendimento líquido pós-IR.
 
 ### 6.2 Ações B3
 | Isenção/Regra | R$ / efeito |
@@ -223,9 +229,8 @@ A fatia de CDB **já foi materializada na Reunião nº 2** (`shortlist_cdb`: emi
   NÃO recomende nem aloque. Se material, 1 linha de observação, sem valores.
 
 ### 6.5 Bucket Strategy (Edson)
-- **Bucket 1 (Liquidez/Defesa)**: CDB liquidez diária (dry powder, 6-12 meses de despesas)
-- **Bucket 2 (Carry)**: CDB de prazo (110-125% CDI)
-- **Bucket 3 (Growth 5y+)**: Ações B3 + Crypto
+- **Bucket 1 (Liquidez/Defesa/Carry)**: CDB Bradesco 100% CDI liquidez diária (dry powder, 6-12 meses de despesas)
+- **Bucket 2 (Growth 5y+)**: Ações B3 + Crypto
 - **Withdrawal/Sequence-of-returns**: aportes ad-hoc + dry powder mitigam (DCA)
 
 ## ROUND 7 — Pair Trades & Options Overlays (Felipe + Daniel) — camada INFORMATIVA (não gera ordem)
@@ -307,7 +312,7 @@ Cada persona 1 linha. Identifique: **fator de risco dominante** · **ajuste de d
 ### Regras de sizing
 - Σ `valor_brl` + `troco_brl` ≤ R$ {{ amount_brl }} (±R$ 5) · Σ `pct_aporte` = 100 (±0.5)
 - **Bolso ∈ {cdb, acoes_b3, crypto}** · Quantidade inteira p/ ações; crypto aceita frações; CDB = valor R$
-- **Troco** → CDB liquidez diária (dry powder) — cite
+- **Troco** → CDB Bradesco 100% CDI liquidez diária (dry powder) — cite
 
 ### Coluna **Tax** (valores válidos): `ir_reg_cdb` · `isento_acoes_20k` · `isento_div_b3` · `ir15_acoes` · `ir_cripto_15_22`
 ### Coluna **Conviction**: `HIGH (8-10)` overweight · `MEDIUM (5-7)` equal-weight · `LOW (3-4)` sondagem
@@ -322,7 +327,7 @@ Cada persona 1 linha. Identifique: **fator de risco dominante** · **ajuste de d
 - **Semana 4 (D+22–D+30)**: lotes de ação/crypto liberam da trava (≥30d); rebalanceamento se desvio > 10pp; tax-loss harvesting; PnL. Aporte novo só quando o cliente quiser (ad-hoc). CDB pode ser rotacionado a qualquer momento.
 
 ### Panic Review Triggers
-- COPOM ±100 bps surpresa · Fed ±50 bps · VIX > 30 (de < 20) · HY OAS > 600 bps · BTC ±25% em 7d · Ibov −10% em 7d · USD/BRL ±8% em 7d · **notícia de crédito no banco emissor do CDB**
+- COPOM ±100 bps surpresa · Fed ±50 bps · VIX > 30 (de < 20) · HY OAS > 600 bps · BTC ±25% em 7d · Ibov −10% em 7d · USD/BRL ±8% em 7d · **notícia de crédito no Bradesco (emissor único do CDB)**
 
 ### Alertas calibrados
 - Por ativo: alerta em **stop − 2%** (warning) e **target 31d + 2%** (review) · Macro: USD/BRL ±5%, Ibov ±5%, BTC ±15%, VIX > X
@@ -426,15 +431,15 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
      "breakeven_brl": 0, "max_gain_brl": 0, "max_loss_brl": 0}
   ],
   "cdb_final": [
-    {"emissor": "", "tipo": "grande|medio", "rating": "",
-     "pct_cdi": 0, "equivalente_pos_ir_pct": 0, "premio_credito_vs_grande_banco_bps": 0,
-     "liquidez": "diaria|prazo", "vencimento": "", "carencia": "",
-     "valor_brl": 0, "papel": "dry_powder|carry", "fgc_ok_ate_250k": true,
+    {"emissor": "Bradesco", "rating": "",
+     "pct_cdi": 100, "equivalente_pos_ir_pct": 0,
+     "liquidez": "diaria",
+     "valor_brl": 0, "papel": "dry_powder", "fgc_ok_ate_250k": true,
      "credito_emissor": {"basileia_tier1_pct": 0, "roe_pct": 0, "inadimplencia_npl_pct": 0},
      "razao": ""}
   ],
   "tax_strategy_maxima": {
-    "cdb_alongar_720d_trava_15pct": false, "cdb_rendimento_liquido_pos_ir_pct": 0,
+    "cdb_ir_regressivo_permanencia_nota": "", "cdb_rendimento_liquido_pos_ir_pct": 0,
     "acoes_isencao_20k_mes": true,
     "dividendos_tributacao_vigente_verificada": "",
     "crypto_isencao_35k_mes": true,
@@ -448,9 +453,8 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
   },
   "wealth_planning": {
     "bucket_strategy": {
-      "bucket_1_liquidez_cdb_diario_brl": 0,
-      "bucket_2_carry_cdb_prazo_brl": 0,
-      "bucket_3_growth_acoes_crypto_brl": 0
+      "bucket_1_liquidez_cdb_bradesco_diario_brl": 0,
+      "bucket_2_growth_acoes_crypto_brl": 0
     },
     "drawdown_rules": "", "sequence_of_returns_mitigation": ""
   },
@@ -520,7 +524,7 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
 > 4. ✓ Toda ordem de ação/crypto: stop_loss + target_31d/90d/12m numéricos; CDB usa "—" onde não se aplica
 > 5. ✓ `stress_test_8_cenarios.viola_tolerancia_25pct` avaliado; cenário H confirma FGC (≤ R$ 250k/instituição)
 > 6. ✓ `portfolio_risk_aggregate` completo (VaR + CVaR + EVT + CDaR + HHI) · `effective_n_positions` ≥ 6 (universo máx. ~14 nomes — 12 era impossível)
-> 7. ✓ `cdb_final` respeita FGC (nenhuma instituição > R$ 250k) e separa dry powder de carry
+> 7. ✓ `cdb_final` tem EXATAMENTE 1 item: Bradesco 100% CDI liquidez diária (sinalize FGC se exposição no Bradesco > R$ 250k)
 > 8. ✓ `pre_mortem_final.fator_risco_dominante` identificado · `resumo_executivo` legível sozinho
 > 9. ✓ `confianca_media_ponderada_0_10` calibrada (≠ 5) · Asymmetry média ponderada ≥ 1.5:1
 > 10. ✓ Component VaR: nenhuma > 25% portfolio · Behavioral 9 biases preenchidos

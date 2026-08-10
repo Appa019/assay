@@ -42,8 +42,8 @@ _PROMPT_DEFINITIONS = [
         "title": "Reunião nº 2 — Universo, Filtros e Seleção",
         "description": (
             "Define o universo investível, monta long lists, aplica filtros (quant + forense + "
-            "técnico) e SELECIONA a shortlist (5-8 ações B3 + 3-5 cryptos). Finaliza a fatia de CDB "
-            "com credit analysis do banco emissor (Basel III, FGC, %CDI pós-IR)."
+            "técnico) e SELECIONA a shortlist (5-8 ações B3 + 3-5 cryptos). Confirma a fatia de CDB "
+            "(instrumento fixo: Bradesco 100% CDI liquidez diária) com sanidade de crédito do emissor."
         ),
     },
     {

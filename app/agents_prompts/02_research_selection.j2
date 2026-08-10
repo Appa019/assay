@@ -2,7 +2,7 @@
 UNIVERSE · SCREENING · SELEÇÃO + CDB CREDIT · REUNIÃO Nº 2 DE 5
 TIER: GS GIR + MS EQUITY RESEARCH · BUFFETT-MUNGER · GREENBLATT
 PADRÃO: WORLD-CLASS · NO COMPROMISE
-MANDATO: 3 CLASSES — RENDA FIXA = CDB · AÇÕES = SÓ B3 · CRYPTO (AGRESSIVO)
+MANDATO: RF = CDB BRADESCO 100% CDI LIQ. DIÁRIA · AÇÕES = SÓ B3 · CRYPTO (AGRESSIVO)
 ═══════════════════════════════════════════════════════════════════════════════
 
 # CONTINUIDADE
@@ -12,13 +12,15 @@ classe para o aporte de **R$ {{ amount_brl_formatted }}** em **{{ contribution_d
 
 Esta é a etapa de **AFUNILAMENTO**: universo → long list → filtros →
 **seleção da shortlist** (decidir QUAIS 5-8 ações B3 e 3-5 cryptos vão para a due
-diligence profunda) e a **finalização do CDB** (com credit analysis do emissor).
+diligence profunda) e a **finalização do CDB** (emissor FIXO: Bradesco, 100% CDI,
+liquidez diária — só confirmar valor e sanidade de crédito).
 A due diligence completa por nome acontece nas Reuniões nº 3 (Ações) e nº 4
 (Crypto) — aqui você **seleciona e justifica**, não escreve o memo final.
 
 > ## MANDATO (a TOTALIDADE do universo)
-> Três classes APENAS: **(1) Renda Fixa = 100% CDB** (≥100% CDI, FGC R$ 250k/
-> instituição; dry powder de liquidez diária); **(2) Ações = só equities da B3**;
+> Três classes APENAS: **(1) Renda Fixa = CDB Bradesco 100% do CDI, liquidez
+> diária — instrumento ÚNICO e FIXO** (sem outros emissores, sem CDB de prazo;
+> dry powder; FGC R$ 250k/instituição); **(2) Ações = só equities da B3**;
 > **(3) Crypto = agressivo**. **NÃO** analisar/recomendar Tesouro, LCI/LCA,
 > debêntures, CRI/CRA, fundos, FII, ETF (GOLD11/BOVA11/IVVB11), BDR, ouro, DOL ou
 > internacional. USD só via stablecoin USDC (crypto). Trava de venda por LOTE de
@@ -50,7 +52,7 @@ Releia o JSON da Reunião nº 1:
 - `alocacao_tatica_aporte.final_tactical_brl` (cdb / acoes_b3 / crypto) — quanto R$ por classe
 - `setores_b3.top3_ow` + `bottom3_uw` + `tilt_dominante`
 - `digital_assets.narrativas_top` + rating 31d + split BTC/ETH core vs alts
-- `juros_e_cdb.cdb_postura` (liquidez vs prazo, %CDI alvo, FGC)
+- `juros_e_cdb.cdb_postura` (valor R$ do bolso CDB — o instrumento é fixo: Bradesco 100% CDI liquidez diária)
 
 A seleção desta etapa deve refletir esses pesos e ratings. Inconsistências → reconcilie.
 
@@ -75,8 +77,7 @@ A seleção desta etapa deve refletir esses pesos e ratings. Inconsistências �
 | **Sell-side BR consenso** | WebSearch `"<TICKER> preço-alvo consenso BTG XP UBS Itaú BBA {{ target_years_search }}"` |
 | **Crypto fundamentos** | `coingecko.com/en/coins/<id>`, `coinmarketcap.com`, `messari.io/asset/<asset>`, `defillama.com` |
 | **Crypto unlocks** | `tokenomist.ai/`, `tokenunlocks.app/` |
-| **CDB ofertas + %CDI** | WebSearch `"CDB melhores taxas % CDI hoje liquidez diária e prazo"` |
-| **Banco emissor (crédito)** | WebSearch `"<banco> índice de Basileia Tier 1 ROE inadimplência"`, rating Fitch/Moody's/S&P, `fgc.org.br` |
+| **Bradesco (emissor único do CDB)** | WebSearch `"Bradesco índice de Basileia Tier 1 ROE inadimplência"`, rating Fitch/Moody's/S&P, `fgc.org.br` |
 
 `Bash` para screening (P/E, ROE, F/Z/M-Score preview, carry CDB pós-IR). MCPs:
 **yahoo-finance** (ações B3 `.SA`), **coingecko** (cripto), **defillama** (DeFi),
@@ -96,8 +97,9 @@ mid 5-20bi, small 1-5bi) · governança Novo Mercado/N1/N2 · sem RJ/suspensão 
 **Crypto (Rafael):** MC rank ≤ 100, vol 24h ≥ USD 50M · ≥ 2 corretoras Tier-1 · sem exploit ≤ 90d
 não-patchado · sem litígio SEC ativo como security · categorias = narrativas TOP 3 da R1 + BTC/ETH.
 
-**CDB (Henrique):** grandes bancos (liquidez diária ~100-103% CDI) + médios (prazo 110-125% CDI) ·
-Basileia Tier 1 > 12% · cobertura FGC R$ 250k/instituição · rating ≥ faixa A.
+**CDB (Henrique):** instrumento FIXO por regra do cliente — CDB Bradesco 100% CDI
+liquidez diária. Sem long list de emissores: valide apenas a saúde do Bradesco
+(Basileia Tier 1, rating) e a cobertura FGC R$ 250k/CPF.
 
 ## ROUND 2 — Long Lists Quantitativas
 
@@ -111,8 +113,9 @@ Basileia Tier 1 > 12% · cobertura FGC R$ 250k/instituição · rating ≥ faixa
 
 > Validação tripla: CoinGecko + CMC + Messari. Contract address via Etherscan/Solscan se token.
 
-### Long List CDB (8-12)
-| Emissor | Tipo | %CDI | Liquidez | Vencimento | Basileia Tier 1 | Rating | FGC ok (≤250k) |
+### CDB — sem long list (instrumento fixo)
+O CDB é fixo: **Bradesco, 100% CDI, liquidez diária**. Não monte long list de
+emissores; registre só a linha do Bradesco com Basileia Tier 1, rating e FGC.
 
 ## ROUND 3 — Filtros Quantitativos (Júlia + Vera + Anderson + Henrique)
 
@@ -123,8 +126,9 @@ free float ≥ 25%.
 **Técnica preview (Anderson):** RSI 14d 30-75, distância EMA 50/200 ≤ 10%.
 **Crypto (Rafael):** liquidez 24h > 5% MC · ATH change > -90% · **unlock 90d < 10% do circulante** ·
 auditoria ≤ 12m · DeFi TVL > USD 50M / L1 ≥ 100k DAUs · dev ativos > 10.
-**CDB (Henrique):** Basileia Tier 1 > 12% · FGC ≤ R$ 250k/instituição · %CDI ≥ alvo da R1 ·
-carry pós-IR > CDB de grande banco · saúde do banco (ROE, NPL, capital).
+**CDB (Henrique):** sanidade do emissor fixo (Bradesco): Basileia Tier 1 > 12% ·
+FGC ≤ R$ 250k/CPF · saúde do banco (ROE, NPL, capital). Se algo grave aparecer,
+NÃO troque de emissor — reduza o bolso CDB e sinalize ao cliente no JSON.
 
 **Liste REJEITADOS** com motivo (1 linha).
 
@@ -154,16 +158,16 @@ Crypto pré-pesquisada:
 {% else %}*(Sem crypto pré-pesquisada.)*
 {% endif %}
 
-## ROUND 5 — CDB Final (Henrique) — credit memo do emissor
+## ROUND 5 — CDB Final (Henrique) — confirmar o instrumento fixo
 
-Materialize a fatia de CDB da R1 em **CDBs específicos** (esta classe fecha aqui; não vai à DD das
-etapas 3/4). Para cada CDB:
-1. Emissor (banco) + tipo (grande/médio) + rating (Fitch/Moody's/S&P/local)
-2. %CDI ofertado + equivalente **pós-IR** por prazo · prêmio de crédito vs CDB de grande banco
-3. Liquidez (diária = dry powder / no vencimento) · vencimento + carência
-4. **Cobertura FGC**: o valor alocado respeita R$ 250k/instituição? (calcule, some exposições no mesmo banco)
-5. Saúde do emissor: Basileia Tier 1, ROE, **inadimplência (NPL)**, evolução de capital, notícias 12m
-6. Risco de crédito 1-5 + papel (dry_powder/carry) + **valor R$ sugerido**
+O CDB é FIXO por regra do cliente: **Bradesco, 100% do CDI, liquidez diária**
+(esta classe fecha aqui; não vai à DD das etapas 3/4). NÃO pesquise taxas nem
+outros emissores. Entregue:
+1. **Valor R$** do bolso CDB (= fatia da R1, ajustada se necessário)
+2. Equivalente **pós-IR** do carry a 100% CDI (IR regressivo pelo tempo de permanência)
+3. **Cobertura FGC**: a exposição total no Bradesco respeita R$ 250k/CPF? (some posições existentes)
+4. Sanidade do emissor: Basileia Tier 1, ROE, **inadimplência (NPL)**, notícias 12m
+5. Se a sanidade falhar: NÃO troque de emissor — reduza o bolso, sinalize ao cliente
 
 ---
 
@@ -194,8 +198,8 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
        "unlock_90d_pct_circ": 0, "validado_3_fontes": true}
     ],
     "cdb": [
-      {"emissor": "", "tipo": "grande|medio", "pct_cdi": 0, "liquidez": "diaria|prazo",
-       "vencimento": "", "basileia_tier1_pct": 0, "rating": "", "fgc_ok": true}
+      {"emissor": "Bradesco", "pct_cdi": 100, "liquidez": "diaria",
+       "basileia_tier1_pct": 0, "rating": "", "fgc_ok": true}
     ]
   },
   "rejeitados": [{"ativo": "", "bolso": "cdb|acoes_b3|crypto", "motivo": ""}],
@@ -211,10 +215,10 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
   ],
   "shortlist_cdb": [
     {
-      "emissor": "", "tipo": "grande|medio", "rating": "",
-      "pct_cdi": 0, "equivalente_pos_ir_pct": 0, "premio_credito_vs_grande_banco_bps": 0,
-      "liquidez": "diaria|prazo", "vencimento": "", "carencia": "",
-      "valor_brl": 0, "papel": "dry_powder|carry", "fgc_ok_ate_250k": true,
+      "emissor": "Bradesco", "rating": "",
+      "pct_cdi": 100, "equivalente_pos_ir_pct": 0,
+      "liquidez": "diaria",
+      "valor_brl": 0, "papel": "dry_powder", "fgc_ok_ate_250k": true,
       "credito_emissor": {"basileia_tier1_pct": 0, "roe_pct": 0, "inadimplencia_npl_pct": 0,
                            "evolucao_capital": "", "noticias_risco_12m": ""},
       "risco_credito_1_5": 0, "tese": "", "fontes": []
@@ -239,7 +243,7 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
 > 2. ✓ Σ `sizing_alvo_pct_acoes` = 100 e Σ `sizing_alvo_pct_crypto` = 100
 > 3. ✓ BTC + ETH presentes no conjunto crypto; nenhum setor > 50% das ações
 > 4. ✓ Cada selecionado: `validado_3_fontes=true`
-> 5. ✓ `shortlist_cdb` com credit analysis (Basileia, NPL, rating) + carry pós-IR; nenhuma instituição > R$ 250k; Σ `valor_brl` ≈ fatia CDB da R1
+> 5. ✓ `shortlist_cdb` tem EXATAMENTE 1 item: Bradesco 100% CDI liquidez diária, com sanidade de crédito (Basileia, NPL, rating) + carry pós-IR; `valor_brl` ≈ fatia CDB da R1; sinalize FGC se exposição no Bradesco > R$ 250k
 > 6. ✓ Rejeitados listados com motivo
 > 7. ✓ **`nenhuma_recomendacao_fora_do_mandato=true`** — zero Tesouro/LCI/LCA/debênture/CRI/CRA/fundo/FII/ETF/BDR/ouro/DOL/internacional
 

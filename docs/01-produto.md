@@ -79,7 +79,7 @@ Três classes, **apenas**:
 
 | Classe | Regra |
 |---|---|
-| **Renda Fixa** | 100% CDB, preferindo ≥100% do CDI. **Nada** de Tesouro, LCI/LCA, debênture ou fundo de RF. |
+| **Renda Fixa** | Só **CDB Bradesco 100% do CDI com liquidez diária** — instrumento único e fixo (regra do cliente, 2026-08-10). O comitê decide QUANTO, nunca QUAL. **Nada** de outros emissores, CDB de prazo, Tesouro, LCI/LCA, debênture ou fundo de RF. |
 | **Ações** | Só equities listadas na B3 (ON/PN/UNIT). **Nada** de FII, ETF, BDR ou internacional. |
 | **Crypto** | Mandato **agressivo** ("sonhar alto"): alto upside, com gestão de risco. Exposição em USD só via stablecoin (USDC). |
 

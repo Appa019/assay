@@ -152,8 +152,10 @@ analista só. Rigor máximo institucional, sempre.
   (travado vs liberado); o CDB está sempre disponível.
 
 ## Mandato de alocação (PRIORIDADE MÁXIMA — três classes APENAS)
-- **Renda Fixa = 100% CDB** (preferir CDB ≥100% do CDI; prazo/liquidez conforme
-  objetivo). NÃO recomende Tesouro Direto, LCI/LCA, debêntures nem fundos de RF.
+- **Renda Fixa = CDB do BRADESCO a 100% do CDI com LIQUIDEZ DIÁRIA — instrumento
+  ÚNICO e FIXO por regra do cliente.** Nenhum outro emissor, nenhum CDB de prazo,
+  nenhuma taxa a caçar: a decisão é QUANTO alocar, nunca QUAL CDB. NÃO recomende
+  Tesouro Direto, LCI/LCA, debêntures nem fundos de RF.
 - **Ações = SOMENTE ações listadas na B3** (ON/PN/UNIT). NÃO recomende FIIs,
   ETFs, BDRs nem qualquer ativo internacional.
 - **Crypto = mandato AGRESSIVO ("sonhar alto")**: busque alto upside (majors,
@@ -236,9 +238,11 @@ REGRAS DURAS DO FORMATO:
 monitoramento, sem cenários, sem disclaimers, sem tabelas markdown. Se algo \
 não é "quanto e onde", NÃO entra.
 - Quantidades executáveis (ações B3 em lote inteiro de 1; cripto em fração).
-- NÃO mencione plataforma/corretora/exchange.
-- Mandato: Renda Fixa = 100% CDB; Ações = só equities da B3 (sem FII/ETF/\
-BDR); Crypto = agressivo.
+- NÃO mencione plataforma/corretora/exchange. ÚNICA exceção: o CDB, cujo \
+emissor faz parte do nome do produto — a linha de CDB é sempre \
+"CDB BRADESCO 100% CDI (liquidez diária)", uma só, sem stop e sem preço.
+- Mandato: Renda Fixa = só CDB Bradesco 100% CDI liquidez diária; Ações = só \
+equities da B3 (sem FII/ETF/BDR); Crypto = agressivo.
 
 DEPOIS do fechamento acima, adicione uma linha "---" e um bloco ```json com \
 {"orders": [{"ticker": str, "classe": "cdb"|"acoes_b3"|"crypto", \
@@ -593,7 +597,8 @@ def _build_preamble(
         "[CONTEXTO DO CICLO — leia antes de tudo]\n"
         f"- Aporte deste ciclo: R$ {amount_brl:,.2f}\n"
         f"- Data: {when}\n"
-        "- MANDATO: Renda Fixa = 100% CDB; Ações = só equities da B3 (sem "
+        "- MANDATO: Renda Fixa = só CDB Bradesco 100% CDI liquidez diária "
+        "(instrumento único e fixo); Ações = só equities da B3 (sem "
         "FII/ETF/BDR); Crypto = agressivo (alto upside, com risco controlado).\n"
         f"- Trava POR LOTE só de AÇÕES e CRYPTO: cada compra vende após "
         f"{min_holding_days} dias da sua data. CDB/Renda Fixa tem liquidez "

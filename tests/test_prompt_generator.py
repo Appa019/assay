@@ -48,6 +48,19 @@ def test_quarter_rollover_at_year_boundary() -> None:
     assert ctx["di_tenors"].startswith("DI jan/27")
 
 
+def test_fixed_income_mandate_is_a_single_fixed_instrument() -> None:
+    """D29: the committee decides HOW MUCH goes to CDB, never WHICH CDB."""
+    macro, selection, _equity, _crypto, decision = (
+        p["content"] for p in pg.render_all_prompts(_sample_context(date(2026, 7, 27)))
+    )
+    for content in (macro, selection, decision):
+        assert "Bradesco" in content
+        # No hunting for issuers, rates or term deposits.
+        assert "bancos médios" not in content
+        assert "melhores taxas" not in content
+        assert "110-125% CDI" not in content
+
+
 def test_render_context_validates_amount() -> None:
     with pytest.raises(ValueError):
         pg.build_render_context(
