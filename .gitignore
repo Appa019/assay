@@ -61,3 +61,5 @@ storage/chat_workspace/
 storage/webpush/
 storage/router_workspace/
 storage/classifier_workspace/
+storage/bot_state.json
+storage/insights_state.json
