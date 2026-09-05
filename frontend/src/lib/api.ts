@@ -280,6 +280,15 @@ export const fetchTrades = async (): Promise<Trade[] | null> => {
 
 export type OrderStatus = "pending" | "executed" | "skipped";
 
+/** One line of the broker ticket, already split by B3 order book. */
+export type TicketLine = {
+  ticker: string;
+  quantity: number;
+  price: number;
+  book: string;
+  total_brl: number;
+};
+
 export type Order = {
   id: string;
   contribution_id: string;
@@ -291,6 +300,10 @@ export type Order = {
   stop_price: number | null;
   thesis: string | null;
   status: OrderStatus;
+  suggested_quantity: number | null;
+  reference_price: number | null;
+  priced_at: string | null;
+  ticket: TicketLine[];
   executed_quantity: number | null;
   executed_price: number | null;
   executed_at: string | null;
@@ -329,6 +342,61 @@ export const skipOrder = async (id: string, reason?: string): Promise<Order> =>
       body: JSON.stringify({ reason: reason || undefined }),
     })
   );
+
+/* ── Avisos (inbox do app — substituiu o Telegram) ─────────────────── */
+
+export type NotificationKind =
+  | "orders"
+  | "review"
+  | "alert"
+  | "ledger"
+  | "system"
+  | "chat";
+
+export type NotificationLevel = "info" | "success" | "warning" | "error";
+
+export type AppNotification = {
+  id: string;
+  kind: NotificationKind;
+  level: NotificationLevel;
+  title: string;
+  body: string;
+  url: string | null;
+  read_at: string | null;
+  created_at: string;
+};
+
+export type NotificationList = {
+  items: AppNotification[];
+  unread: number;
+};
+
+/** Returns null on failure so the bell can stay quiet instead of erroring. */
+export const fetchNotifications = async (
+  limit = 50
+): Promise<NotificationList | null> => {
+  try {
+    return await json<NotificationList>(
+      await fetch(`${API_BASE}/api/notifications?limit=${limit}`)
+    );
+  } catch {
+    return null;
+  }
+};
+
+export const markNotificationRead = async (
+  id: string
+): Promise<AppNotification> =>
+  json<AppNotification>(
+    await fetch(`${API_BASE}/api/notifications/${id}/read`, { method: "POST" })
+  );
+
+export const markAllNotificationsRead = async (): Promise<number> => {
+  const data = await json<{ marked: number }>(
+    await fetch(`${API_BASE}/api/notifications/read-all`, { method: "POST" })
+  );
+  return data.marked;
+};
 
 /* ── Benchmark (TWR vs CDI · IBOV · BTC, rebased 100) ──────────────── */
 

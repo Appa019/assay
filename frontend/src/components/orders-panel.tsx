@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Check,
   ClipboardList,
+  Copy,
   SkipForward,
   Target,
   X,
@@ -14,6 +15,7 @@ import {
   skipOrder,
   type AssetClass,
   type Order,
+  type TicketLine,
 } from "@/lib/api";
 import { formatBRL, formatDateTime, formatNumber } from "@/lib/format";
 
@@ -205,6 +207,8 @@ const OrderCard = ({
             </span>
           </div>
 
+          {pending && <Ticket lines={order.ticket} />}
+
           {(order.target_price !== null || order.stop_price !== null) && (
             <p
               className="flex flex-wrap items-center gap-1.5 text-[11px] mt-1.5 tabular"
@@ -282,6 +286,86 @@ const OrderCard = ({
   );
 };
 
+/**
+ * The broker ticket. This is what the client retypes into Agora at the moment
+ * of buying, so it gets the loudest treatment on the card: ticker, quantity
+ * and price on one tabular line, one line per B3 order book.
+ */
+const Ticket = ({ lines }: { lines: TicketLine[] }) => {
+  const [copied, setCopied] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(null), 1800);
+    return () => clearTimeout(t);
+  }, [copied]);
+
+  if (lines.length === 0) return null;
+
+  const copy = async (line: TicketLine) => {
+    const text =
+      line.book === "aplicação"
+        ? `${line.ticker} ${line.price.toFixed(2)}`
+        : `${line.ticker} ${formatNumber(line.quantity)} ${line.price.toFixed(2)}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(line.ticker);
+    } catch {
+      // Clipboard is blocked outside a secure context; the numbers are on
+      // screen anyway, so a failed copy is not worth an error state.
+    }
+  };
+
+  return (
+    <div className="mt-3 space-y-1.5">
+      {lines.map((line) => (
+        <div
+          key={`${line.ticker}-${line.book}`}
+          className="flex items-center gap-3 flex-wrap rounded-md px-3 py-2.5"
+          style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
+        >
+          {line.book === "aplicação" ? (
+            <span
+              className="text-sm tabular font-semibold"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Aplicar {formatBRL(line.price)}
+            </span>
+          ) : (
+            <>
+              <span
+                className="text-base font-semibold tracking-tight"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {line.ticker}
+              </span>
+              <span className="text-sm tabular" style={{ color: "var(--text-primary)" }}>
+                <strong>{formatNumber(line.quantity)}</strong> un
+              </span>
+              <span className="text-sm tabular" style={{ color: "var(--text-primary)" }}>
+                {formatBRL(line.price)}
+              </span>
+              <span className="text-xs tabular" style={{ color: "var(--text-muted)" }}>
+                = {formatBRL(line.total_brl)} · {line.book}
+              </span>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => copy(line)}
+            aria-label={`Copiar ordem de ${line.ticker}`}
+            className="ml-auto flex items-center gap-1.5 min-h-11 px-2.5 rounded-md text-[11px] font-medium md:min-h-0 md:py-1.5"
+            style={{ color: copied === line.ticker ? "var(--success)" : "var(--text-muted)" }}
+          >
+            {copied === line.ticker ? <Check size={12} /> : <Copy size={12} />}
+            {copied === line.ticker ? "copiado" : "copiar"}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const StatusChip = ({ status }: { status: Order["status"] }) => {
   if (status === "pending") return null;
   const executed = status === "executed";
@@ -315,9 +399,17 @@ const ExecuteDialog = ({
 
   useEffect(() => {
     if (order) {
-      setQuantity("");
+      // Prefill with what we told them to buy: the common case is confirming
+      // the ticket as-is, and an empty form made them retype both numbers.
+      setQuantity(
+        order.suggested_quantity !== null ? String(order.suggested_quantity) : ""
+      );
       setPrice(
-        order.target_price !== null ? String(order.target_price) : ""
+        order.reference_price !== null
+          ? String(order.reference_price)
+          : order.target_price !== null
+            ? String(order.target_price)
+            : ""
       );
       setError(null);
       ref.current?.showModal();

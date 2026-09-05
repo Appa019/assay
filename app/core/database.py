@@ -63,6 +63,11 @@ _ADDED_COLUMNS: dict[str, dict[str, str]] = {
     "cashflow_entry": {
         "wallet": "TEXT NOT NULL DEFAULT 'conta'",
     },
+    "order": {
+        "suggested_quantity": "NUMERIC",
+        "reference_price": "NUMERIC",
+        "priced_at": "TIMESTAMP",
+    },
 }
 
 
@@ -70,12 +75,15 @@ def _ensure_sqlite_columns(target_engine: Any = None) -> None:
     target_engine = target_engine if target_engine is not None else engine
     with target_engine.begin() as conn:
         for table, columns in _ADDED_COLUMNS.items():
-            existing = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")}
+            # Quoted: "order" is a SQL keyword and an unquoted PRAGMA on it is
+            # a syntax error, which would take down init_db() at boot.
+            quoted = f'"{table}"'
+            existing = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({quoted})")}
             if not existing:  # table not created yet — create_all will handle it
                 continue
             for name, ddl in columns.items():
                 if name not in existing:
-                    conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+                    conn.exec_driver_sql(f"ALTER TABLE {quoted} ADD COLUMN {name} {ddl}")
 
 
 def init_db() -> None:

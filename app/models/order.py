@@ -41,6 +41,14 @@ class Order(SQLModel, table=True):
     stop_price: Decimal | None = Field(default=None, decimal_places=8, max_digits=24)
     thesis: str | None = Field(default=None, max_length=512)
 
+    # What to type into the broker ticket. The committee sizes in reais; these
+    # two turn that into the TICKER/QTY/PRICE the ticket asks for. Derived
+    # deterministically from the live quote (never from the model's memory) and
+    # re-derived by the mark-to-market job while the order is still pending.
+    suggested_quantity: Decimal | None = Field(default=None, decimal_places=8, max_digits=24)
+    reference_price: Decimal | None = Field(default=None, decimal_places=8, max_digits=24)
+    priced_at: datetime | None = Field(default=None)
+
     status: OrderStatus = Field(default=OrderStatus.PENDING, index=True)
     # Filled on execution: what actually happened at the broker/exchange.
     executed_quantity: Decimal | None = Field(default=None, decimal_places=8, max_digits=24)

@@ -58,6 +58,7 @@ from app.services import (  # noqa: E402
     chat_service,
     contribution_service,
     order_service,
+    order_sizing,
     portfolio_service,
     price_refresh_service,
     review_service,
@@ -140,6 +141,13 @@ _BOT_COMMANDS = [
 def _fmt_brl(value: float) -> str:
     integer, decimals = f"{value:,.2f}".split(".")
     return f"R$ {integer.replace(',', '.')},{decimals}"
+
+
+def _fmt_qty(quantity: Decimal) -> str:
+    """Whole units bare, crypto without the trailing-zero noise."""
+    if quantity == quantity.to_integral_value():
+        return str(int(quantity))
+    return format(quantity.normalize(), "f")
 
 
 def _parse_amount(raw: str) -> Decimal:
@@ -585,17 +593,44 @@ def _cmd_ordens() -> str:
     if not pending:
         return "Nenhuma ordem pendente. Rode /aporte para o comitê gerar uma folha nova."
     lines = ["📋 *Ordens pendentes:*", ""]
+    stale = False
     for o in pending:
+        lines.append(f"• *{o.ticker}* ({o.asset_class}) · {_fmt_brl(float(o.amount_brl))}")
+        # The ticket line is the whole point of /ordens: ticker, quantity and
+        # price exactly as the broker's boleta asks for them.
+        ticket = order_sizing.ticket_lines(
+            ticker=o.ticker,
+            asset_class=o.asset_class,
+            amount_brl=o.amount_brl,
+            quantity=o.suggested_quantity,
+            price=o.reference_price,
+        )
+        if ticket:
+            for line in ticket:
+                if line.book == "aplicação":
+                    lines.append(f"  🧾 aplicar {_fmt_brl(float(line.price))}")
+                else:
+                    lines.append(
+                        f"  🧾 `{line.ticker}` · *{_fmt_qty(line.quantity)}* un · "
+                        f"{_fmt_brl(float(line.price))}  = {_fmt_brl(float(line.total_brl))}"
+                        f"  _({line.book})_"
+                    )
+            if o.priced_at is not None:
+                stale = True
+        else:
+            lines.append("  🧾 _sem cotação — quantidade indisponível_")
         levels = []
         if o.target_price is not None:
             levels.append(f"alvo {_fmt_brl(float(o.target_price))}")
         if o.stop_price is not None:
             levels.append(f"stop {_fmt_brl(float(o.stop_price))}")
-        suffix = f" ({', '.join(levels)})" if levels else ""
-        lines.append(f"• {o.ticker} ({o.asset_class}) · {_fmt_brl(float(o.amount_brl))}{suffix}")
+        if levels:
+            lines.append(f"  🎯 {' · '.join(levels)}")
         if o.thesis:
             lines.append(f"  _{o.thesis[:120]}_")
-    lines.append("")
+        lines.append("")
+    if stale:
+        lines.append("_Preço de referência da última marcação a mercado — confira na boleta._")
     lines.append("Executou? Confirme com /executei <ticker> <qtd> <preço>.")
     return "\n".join(lines)
 
@@ -940,7 +975,7 @@ def _drain_backlog() -> int | None:
 
 
 def main() -> int:
-    if not settings.telegram_enabled:
+    if not settings.telegram_configured:
         print("Telegram não configurado. Rode scripts/telegram_setup.py primeiro.")
         return 2
     if not _acquire_single_instance():

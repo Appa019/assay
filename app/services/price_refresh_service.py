@@ -135,6 +135,24 @@ async def _cdb_price(asset: Asset, factor_cache: dict[date, float | None]) -> fl
     return float(asset.avg_price) * effective
 
 
+async def quote_tickers(pairs: list[tuple[str, AssetClass]]) -> dict[str, float]:
+    """Live BRL price per ticker, from the same sources as the mark-to-market.
+
+    Crypto goes out in a single batched CoinGecko call; stocks are one Yahoo
+    lookup each. Fixed income has no quote (a CDB is applied in reais), so it
+    is skipped. Tickers whose source fails are simply absent from the result.
+    """
+    crypto = sorted({t for t, c in pairs if c == AssetClass.CRYPTO})
+    stocks = sorted({t for t, c in pairs if c == AssetClass.STOCKS})
+
+    prices: dict[str, float] = await _crypto_prices_brl(crypto) if crypto else {}
+    for ticker in stocks:
+        price = await _stock_price(ticker)
+        if price is not None:
+            prices[ticker] = price
+    return prices
+
+
 async def refresh_prices(session: Session) -> dict[str, Any]:
     """Update ``current_price`` of every asset. Best-effort per asset.
 
@@ -167,5 +185,41 @@ async def refresh_prices(session: Session) -> dict[str, Any]:
         updated += 1
 
     session.commit()
-    logger.info("prices_refreshed", updated=updated, warnings=len(warnings))
-    return {"updated": updated, "warnings": warnings}
+
+    # Pending orders carry a ticket (qty + price) that goes stale exactly like
+    # a lot's price does. Repricing here means the ticket is never older than
+    # the last mark-to-market and reads stay a plain DB query.
+    repriced = await reprice_pending_orders(session)
+
+    logger.info("prices_refreshed", updated=updated, warnings=len(warnings), repriced=repriced)
+    return {"updated": updated, "warnings": warnings, "repriced": repriced}
+
+
+async def reprice_pending_orders(session: Session) -> int:
+    """Refresh ``suggested_quantity``/``reference_price`` on PENDING orders."""
+    from app.models.order import Order, OrderStatus
+    from app.services import order_sizing
+
+    pending = list(session.exec(select(Order).where(Order.status == OrderStatus.PENDING)).all())
+    if not pending:
+        return 0
+
+    quotes = await quote_tickers([(o.ticker, o.asset_class) for o in pending])
+    changed = 0
+    for order in pending:
+        price = quotes.get(order.ticker)
+        if price is None:
+            continue
+        price_dec = Decimal(str(round(price, 8)))
+        order.reference_price = price_dec
+        order.suggested_quantity = order_sizing.size_order(
+            amount_brl=order.amount_brl,
+            price=price_dec,
+            asset_class=order.asset_class,
+        )
+        order.priced_at = datetime.now(UTC)
+        session.add(order)
+        changed += 1
+    if changed:
+        session.commit()
+    return changed
