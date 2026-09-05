@@ -145,11 +145,11 @@ Vieram via API. Onde `null`/`⚠️`, pesquisem. **Não inventem. URL + data.**
 {% for a in assets %}| {{ a.ticker }} | {{ a.name or "—" }} | {{ a.asset_class }} | {{ "%.4f"|format(a.quantity) }} | R$ {{ "%.2f"|format(a.avg_price) }} | {% if a.current_price is not none %}R$ {{ "%.2f"|format(a.current_price) }}{% else %}—{% endif %} | R$ {{ "%.2f"|format(a.total_value) }} | {% if a.pnl_pct is not none %}{{ "%+.2f"|format(a.pnl_pct) }}%{% else %}—{% endif %} | {{ a.days_in_portfolio }} |
 {% endfor %}
 {% else %}
-> Carteira vazia. Este aporte inaugura a alocação. Construir cores gradualmente:
-> CDB Bradesco 100% CDI liquidez diária como caixa estratégico,
-> ações B3 top-quality (25-40%, escalonado), crypto BTC/ETH como core + alts
-> agressivas seletas. Sem timing perfeito — escalonamento mitiga sequence-of-
-> returns risk.
+> Carteira vazia. Este aporte inaugura a alocação. Construir cores gradualmente
+> em direção ao alvo do mandato (tabela acima — NÃO invente outro):
+> CDB Bradesco 100% CDI liquidez diária como caixa estratégico e maior bolso,
+> ações B3 top-quality escalonadas, crypto BTC/ETH como core + alts agressivas
+> seletas. Sem timing perfeito — escalonamento mitiga sequence-of-returns risk.
 {% endif %}
 
 ## Benchmarks de gestoras brasileiras (sanity check de performance)

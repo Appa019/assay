@@ -30,10 +30,13 @@ class Settings(BaseSettings):
     # machines rotated the same refresh token (A39). Blank on the desktop.
     claude_code_oauth_token: str = ""
 
-    # Portfolio targets (used to compute deviation, in fraction of 1.0)
-    target_fixed_income: float = 0.35
-    target_stocks: float = 0.40
-    target_crypto: float = 0.25
+    # Portfolio targets (used to compute deviation, in fraction of 1.0).
+    # 2026-09-05: the client took 10 points off stocks and 10 off crypto and put
+    # all 20 into fixed income. Dry powder is now the majority of the book, so
+    # the mandate reads clearly more defensive than the 35/40/25 it replaced.
+    target_fixed_income: float = 0.55
+    target_stocks: float = 0.30
+    target_crypto: float = 0.15
 
     # Investment agent (autonomous Claude runs). Contributions are ad-hoc (no
     # fixed cadence); min_holding_days is the per-lot sell lock for stocks/crypto.
