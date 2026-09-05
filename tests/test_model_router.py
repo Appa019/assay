@@ -1,96 +1,115 @@
+"""Two tiers: haiku books a spend, opus does everything else.
+
+The rule the client set is "na dúvida, opus". These tests exist to keep the
+fast path narrow — every case that is not provably a booking must land on the
+big model, even when it looks small.
+"""
+
 import pytest
 
 from app.config import settings
 from app.services import model_router
 
 
-@pytest.fixture(autouse=True)
-def _triage_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Shortcut tests must never reach the paid triage call."""
-    monkeypatch.setattr(
-        model_router,
-        "_triage",
-        lambda _text, _context="": pytest.fail("triage must not be called"),
-    )
+def _tier(text: str) -> model_router.Tier:
+    return model_router.route(text).tier
 
 
-def test_greeting_short_circuits_to_fast() -> None:
+# --- the fast path ----------------------------------------------------------
+
+
+def test_spend_booking_goes_to_haiku() -> None:
+    route = model_router.route("gastei 42 no mercado")
+    assert route.tier is model_router.Tier.FAST
+    assert route.reason == "lançamento no ledger"
+
+
+def test_written_amounts_hit_the_fast_path() -> None:
+    assert _tier("gastei mil reais no mercado") is model_router.Tier.FAST
+
+
+def test_benefit_spend_hits_the_fast_path() -> None:
+    """ "vr"/"va" name a wallet, not a market instrument."""
+    assert _tier("gastei 35 no vr hoje") is model_router.Tier.FAST
+
+
+def test_receipt_event_hits_the_fast_path() -> None:
+    assert _tier("recebi 120 de cashback") is model_router.Tier.FAST
+
+
+def test_explicit_filing_command_hits_the_fast_path() -> None:
+    assert _tier("anota 42 no mercado") is model_router.Tier.FAST
+
+
+def test_room_numbers_are_not_mistaken_for_tickers() -> None:
+    assert _tier("paguei 300 do aluguel da sala12") is model_router.Tier.FAST
+
+
+def test_greeting_goes_to_haiku() -> None:
     route = model_router.route("oi")
     assert route.tier is model_router.Tier.FAST
     assert route.reason == "saudação"
 
 
-def test_ledger_logging_short_circuits_to_fast() -> None:
-    """The product's most frequent message must never pay triage latency."""
-    route = model_router.route("gastei 42,90 no mercado ontem")
-    assert route.tier is model_router.Tier.FAST
-    assert route.reason == "lançamento no ledger"
+# --- everything else is opus ------------------------------------------------
 
 
-def test_written_amounts_hit_the_ledger_shortcut() -> None:
-    """Amounts written out in words are still the product's cheapest turn."""
-    route = model_router.route("gastei mil reais no mercado")
-    assert route.tier is model_router.Tier.FAST
-    assert route.reason == "lançamento no ledger"
+def test_recurring_benefit_declaration_goes_to_opus() -> None:
+    """ "meu VR é 800" is a FACT about the client, not a transaction: it goes
+    to MEMORY.md, and deciding that needs the big model."""
+    assert _tier("meu vr é 800 por mês") is model_router.Tier.DEEP
 
 
-def test_room_numbers_are_not_mistaken_for_tickers() -> None:
-    """The B3 ticker guard is anchored to real suffixes — "sala12" is not one,
-    so this stays on the free shortcut instead of paying triage."""
-    route = model_router.route("paguei 300 do aluguel da sala12")
-    assert route.tier is model_router.Tier.FAST
-    assert route.reason == "lançamento no ledger"
+def test_recurring_income_declaration_goes_to_opus() -> None:
+    """Present tense "ganho" declares income. Only past-tense events book."""
+    assert _tier("ganho 5000 de salário e 800 de vr") is model_router.Tier.DEEP
 
 
-def test_portfolio_purchase_is_not_mistaken_for_ledger_logging(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """ "comprei 100 PETR4" is an investment statement — the market guard must
-    push it through triage instead of the cheap ledger shortcut."""
-    monkeypatch.setattr(model_router, "_triage", lambda _text, _context="": model_router.Tier.DEEP)
-    route = model_router.route("comprei 100 PETR4 hoje")
-    assert route.tier is model_router.Tier.DEEP
+def test_installment_advice_goes_to_opus() -> None:
+    """The client's own example: a purchase to plan, with a question about how
+    far to stretch it. Amount plus a verb, but unmistakably a doubt."""
+    assert (
+        _tier(
+            "preciso comprar algo de 3000 urgente, posso parcelar em 10x, "
+            "no máximo quanto vc recomenda eu parcelar?"
+        )
+        is model_router.Tier.DEEP
+    )
 
 
-def test_router_disabled_pins_everything_to_deep(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_booking_with_a_question_attached_goes_to_opus() -> None:
+    """ "na dúvida, opus": a question rides along, so the whole turn escalates."""
+    assert _tier("gastei 300 no mercado, quanto me sobrou esse mês?") is model_router.Tier.DEEP
+
+
+def test_portfolio_purchase_goes_to_opus() -> None:
+    """ "comprei 100 PETR4" is an investment statement, not a grocery run."""
+    assert _tier("comprei 100 PETR4 hoje") is model_router.Tier.DEEP
+
+
+def test_long_message_never_takes_the_fast_path() -> None:
+    """A booking is one short sentence; length means extra intent."""
+    long_text = "gastei 42 no mercado " + "e também precisava te contar uma coisa " * 4
+    assert _tier(long_text) is model_router.Tier.DEEP
+
+
+def test_open_question_goes_to_opus() -> None:
+    assert _tier("me explica juros compostos no cartão") is model_router.Tier.DEEP
+
+
+def test_router_disabled_pins_everything_to_opus(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "chat_router_enabled", False)
     route = model_router.route("oi")
     assert route.tier is model_router.Tier.DEEP
     assert route.reason == "roteador desligado"
 
 
-def test_triage_failure_falls_back_to_balanced(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Routing must never be the reason a chat fails (D8)."""
-
-    def broken(_text: str, _context: str = "") -> model_router.Tier:
-        raise RuntimeError("triagem quebrou")
-
-    monkeypatch.setattr(model_router, "_triage", broken)
-    route = model_router.route("me explica juros compostos no cartão")
-    assert route.tier is model_router.Tier.BALANCED
-    assert "falhou" in route.reason
+def test_routing_never_costs_a_model_call() -> None:
+    """The whole point of the rewrite: no triage process is ever spawned, so a
+    deep turn is never slower than pinning opus was."""
+    assert not hasattr(model_router, "_triage")
 
 
-def test_recurring_income_declaration_hits_the_ledger_shortcut() -> None:
-    """ "ganho X de salário e Y de VR" is the client declaring income — the
-    consultant files it to memory; it never needs a big model or triage."""
-    route = model_router.route("ganho 5000 de salário e 800 de vr")
-    assert route.tier is model_router.Tier.FAST
-    assert route.reason == "lançamento no ledger"
-
-
-def test_benefit_spend_hits_the_ledger_shortcut() -> None:
-    """ "vr"/"va" must not read as market words and push logging into triage."""
-    route = model_router.route("gastei 35 no vr hoje")
-    assert route.tier is model_router.Tier.FAST
-    assert route.reason == "lançamento no ledger"
-
-
-def test_income_declaration_with_investment_question_still_pays_triage(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """ "ganho 5000, onde invisto?" carries a logging verb + amount, but it is
-    an investment question — first-person market verbs must block the shortcut."""
-    monkeypatch.setattr(model_router, "_triage", lambda _text, _context="": model_router.Tier.DEEP)
-    route = model_router.route("ganho 5000 por mês, onde invisto?")
-    assert route.tier is model_router.Tier.DEEP
+def test_tiers_map_to_the_configured_models() -> None:
+    assert model_router.route("gastei 42 no mercado").model == settings.chat_fast_model
+    assert model_router.route("devo comprar PETR4?").model == settings.chat_deep_model

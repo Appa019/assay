@@ -1,38 +1,32 @@
-"""Pick the right model for each chat turn.
+"""Pick the model for each chat turn. Two tiers, decided without asking a model.
 
-The consultant used to answer everything on opus at high effort. That is the
-correct call for "devo trocar CDB por PETR4 agora?" and absurd for "oi" or
-"anota 42 no mercado" — same cost, same minutes of latency, no extra value.
+The consultant answers on opus. The single exception is booking a spend or a
+receipt — "gastei 42 no mercado" — which is the most frequent message in the
+product, needs no reasoning, and runs on haiku in roughly half the time.
 
-A tiny haiku triage classifies the message into three tiers. It adds roughly a
-second to a turn that otherwise runs from ten seconds to minutes, and it is far
-more robust than keyword rules, which break the moment the user phrases
-something the way people actually talk. Anything that goes wrong in triage
-falls through to BALANCED: routing must never be the reason a chat fails.
+Everything else is opus, deliberately. A question, a doubt, a fact about the
+client to remember, a purchase to plan: **when in doubt, opus.**
+
+There used to be a haiku triage step deciding between three tiers. On the Pi
+each triage is a fresh CLI process — measured at 5.6s, not the ~1s the design
+assumed — so it made every investment question SLOWER than pinning opus. The
+rules below cost nothing and are strict: the fast path has to be proven, not
+guessed.
 """
 
 import re
-from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
 
 import structlog
 
 from app.config import settings
-from app.services import analysis_runner
 
 logger = structlog.get_logger()
-
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-# Bare directory: no .mcp.json means no MCP servers boot, which is most of why
-# this stays fast.
-_WORKSPACE = _PROJECT_ROOT / "storage" / "router_workspace"
 
 
 class Tier(StrEnum):
     FAST = "fast"
-    BALANCED = "balanced"
     DEEP = "deep"
 
 
@@ -44,22 +38,24 @@ class Route:
     reason: str
 
 
-def _tier_settings(tier: Tier) -> tuple[str, str]:
-    if tier is Tier.FAST:
-        return settings.chat_fast_model, settings.chat_fast_effort
-    if tier is Tier.DEEP:
-        return settings.chat_deep_model, settings.chat_deep_effort
-    return settings.chat_balanced_model, settings.chat_balanced_effort
-
-
 def _route_for(tier: Tier, reason: str) -> Route:
-    model, effort = _tier_settings(tier)
-    return Route(tier=tier, model=model, effort=effort, reason=reason)
+    if tier is Tier.FAST:
+        return Route(
+            tier=tier,
+            model=settings.chat_fast_model,
+            effort=settings.chat_fast_effort,
+            reason=reason,
+        )
+    return Route(
+        tier=tier,
+        model=settings.chat_deep_model,
+        effort=settings.chat_deep_effort,
+        reason=reason,
+    )
 
 
-# Greetings, thanks and one-word acks never need a big model, and short-
-# circuiting them removes the triage latency from exactly the turns where a
-# second is most noticeable.
+# Greetings, thanks and one-word acks. Unambiguous, and the only other place
+# where a big model buys nothing at all.
 _TRIVIAL_RE = re.compile(
     r"^(oi+|ola|olá|eae|opa|bom dia|boa tarde|boa noite|tudo bem\??|"
     r"obrigad[oa]|valeu|vlw|ok|okay|blz|beleza|certo|entendi|show|"
@@ -67,28 +63,41 @@ _TRIVIAL_RE = re.compile(
     re.IGNORECASE,
 )
 
-# "gastei 42 no mercado" is the single most frequent message in the product and
-# never needs more than the small model. A logging verb plus a number is a
-# specific enough shape to skip triage entirely, which is worth ~6s every time.
-# Present tense too ("ganho 5000 de salário e 800 de VR") — that's the client
-# declaring recurring income/expense, which the consultant files to memory.
-_LOGGING_VERB_RE = re.compile(
-    r"\b(gastei|paguei|comprei|torrei|recebi|ganhei|caiu|entrou|"
-    r"gasto|ganho|pago|recebo|"
-    r"anota|anote|lan[çc]a|registra|registre)\b",
+# PAST-TENSE events only, plus the explicit filing commands. Present-tense
+# forms are deliberately absent: "ganho 5000 de salário", "meu VR é 800" and
+# "recebo 800 de benefício" declare a RECURRING fact about the client. That is
+# something the consultant has to reason about and write to MEMORY.md, not a
+# line to book — so it falls through to opus like everything else.
+_LEDGER_EVENT_RE = re.compile(
+    r"\b(gastei|gastamos|paguei|pagamos|comprei|compramos|torrei|"
+    r"recebi|recebemos|ganhei|ganhamos|caiu|entrou|"
+    r"anota|anote|lan[çc]a|lance|registra|registre|adiciona|adicione)\b",
     re.IGNORECASE,
 )
-# Digits, or the amounts people actually type ("gastei mil reais no mercado" is
-# the most frequent message written out in full — it must hit the shortcut too).
+
+# Digits, or the amounts people actually type out ("gastei mil reais no
+# mercado" must hit the fast path too).
 _HAS_AMOUNT_RE = re.compile(
     r"\d|\b(mil|cem|duzentos|trezentos|quatrocentos|quinhentos|seiscentos|"
     r"setecentos|oitocentos|novecentos|vinte|trinta|quarenta|cinquenta|"
     r"sessenta|setenta|oitenta|noventa)\b",
     re.IGNORECASE,
 )
-# ...unless the sentence is actually about the portfolio, where "comprei" means
-# an asset and the answer needs live market data. The ticker shape is anchored
-# to real B3 suffixes (3/4/5/6/11) so "sala12" doesn't count as a ticker.
+
+# Anything that ASKS instead of stating. "gastei 300 no mercado, quanto me
+# sobrou?" books a line AND wants advice — that is a doubt, so it is opus.
+_ASKS_RE = re.compile(
+    r"\?|\b(quanto|quanta|quantos|quantas|qual|quais|como|onde|quando|"
+    r"por que|porqu[êe]|pq|"
+    r"devo|deveria|posso|poderia|consigo|vale a pena|compensa|"
+    r"recomenda|recomendas|recomendaria|sugere|sugest[ãa]o|acha|achas|"
+    r"melhor|pior|ajuda|explica|explique|dica|opini[ãa]o|"
+    r"parcel\w*|financi\w*|juros|d[íi]vida|empr[ée]stimo)\b",
+    re.IGNORECASE,
+)
+
+# Market words mean the answer needs live data and real reasoning. The ticker
+# shape is anchored to real B3 suffixes (3/4/5/6/11) so "sala12" is not one.
 _MARKET_RE = re.compile(
     r"\b(a[çc][ãa]o|a[çc][õo]es|ativo|carteira|aporte|investi|investir|"
     r"invisto|invista|aplico|aplicar|aplique|"
@@ -97,63 +106,12 @@ _MARKET_RE = re.compile(
     re.IGNORECASE,
 )
 
-_TRIAGE_PROMPT = """Classifique a dificuldade desta mensagem para um consultor financeiro.
-{context}
-Mensagem: "{text}"
-
-Responda com UMA palavra, nada mais:
-
-- `fast` — conversa curta, registrar um gasto/ganho, consultar um número que já
-  existe (saldo, quanto gastei, qual meu patrimônio), pergunta factual simples.
-- `balanced` — dúvida que pede explicação ou contexto, comparação simples,
-  organizar finanças, entender um conceito, planejar o mês, **pedir opinião
-  sobre os próprios gastos** ou sobre como o mês está indo.
-- `deep` — decisão de investimento, análise de ativo ou carteira, tese de
-  compra/venda, cenário macro, risco, tributação complexa, qualquer coisa que
-  exija pesquisa na web ou dados de mercado ao vivo.
-
-Se a mensagem for uma continuação curta ("e vale a pena?", "faz sentido?"),
-classifique pelo ASSUNTO em curso no contexto, não pelo tamanho da mensagem.
-
-Uma palavra:"""
+# A booking is one short sentence. Anything longer is carrying extra intent.
+_LEDGER_MAX_CHARS = 120
 
 
-def _context_block(context: str) -> str:
-    if not context:
-        return ""
-    return (
-        "\nContexto — últimas mensagens da conversa (só para você entender do "
-        f"que se trata):\n{context[:1200]}\n"
-    )
-
-
-def _triage(text: str, context: str = "") -> Tier:
-    _WORKSPACE.mkdir(parents=True, exist_ok=True)
-    result = analysis_runner._run_claude_step(
-        _TRIAGE_PROMPT.format(text=text[:1500], context=_context_block(context)),
-        resume_session_id=None,
-        model=settings.chat_router_model,
-        effort=settings.chat_router_effort,
-        timeout=settings.chat_router_timeout,
-        cwd=_WORKSPACE,
-        transcript_tag=None,
-    )
-    answer = (result.result or "").strip().lower()
-    for tier in (Tier.DEEP, Tier.BALANCED, Tier.FAST):
-        if tier.value in answer:
-            return tier
-    raise ValueError(f"triagem devolveu algo inesperado: {answer[:60]!r}")
-
-
-def route(text: str, context_provider: Callable[[], str] | None = None) -> Route:
-    """Choose a model for this message. Never raises.
-
-    ``context_provider`` lazily supplies a short transcript tail for the triage
-    prompt — a terse follow-up ("e vale a pena?") in the middle of a deep
-    investment discussion looks trivial on its own and would be misrouted to a
-    small model answering a continuation opus built. Only consulted when triage
-    actually runs (the regex shortcuts never need it), and best-effort.
-    """
+def route(text: str) -> Route:
+    """Choose a model for this message. Never raises."""
     text = text.strip()
 
     if not settings.chat_router_enabled:
@@ -163,25 +121,13 @@ def route(text: str, context_provider: Callable[[], str] | None = None) -> Route
         return _route_for(Tier.FAST, "saudação")
 
     if (
-        len(text) <= 120
-        and _LOGGING_VERB_RE.search(text)
+        len(text) <= _LEDGER_MAX_CHARS
+        and _LEDGER_EVENT_RE.search(text)
         and _HAS_AMOUNT_RE.search(text)
+        and not _ASKS_RE.search(text)
         and not _MARKET_RE.search(text)
     ):
+        logger.info("model_router_pick", tier=Tier.FAST.value, chars=len(text))
         return _route_for(Tier.FAST, "lançamento no ledger")
 
-    context = ""
-    if context_provider is not None:
-        try:
-            context = context_provider() or ""
-        except Exception:  # noqa: BLE001 — context is a hint, never a gate
-            context = ""
-
-    try:
-        tier = _triage(text, context)
-    except Exception as exc:  # noqa: BLE001 — triage is an optimisation, not a gate
-        logger.warning("model_router_fallback", error=str(exc))
-        return _route_for(Tier.BALANCED, "triagem falhou, usando o padrão")
-
-    logger.info("model_router_pick", tier=tier.value, chars=len(text))
-    return _route_for(tier, "triagem")
+    return _route_for(Tier.DEEP, "padrão")

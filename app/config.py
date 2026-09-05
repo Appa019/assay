@@ -63,19 +63,18 @@ class Settings(BaseSettings):
     classifier_effort: str = "low"
     classifier_timeout: int = 90
 
-    # Model router: a haiku triage picks the tier for each chat turn, so "oi"
-    # stops costing an opus run. Set CHAT_ROUTER_ENABLED=false to pin every turn
-    # to the deep tier (the pre-router behaviour).
+    # Model router: two tiers, decided by rules (no triage model call). Booking
+    # a spend runs on the fast tier; everything else is deep. When in doubt,
+    # deep. CHAT_ROUTER_ENABLED=false pins every turn to the deep tier.
     chat_router_enabled: bool = True
+    chat_fast_model: str = "haiku"
+    chat_fast_effort: str = "low"
+    chat_deep_model: str = "opus"
+    chat_deep_effort: str = "high"
+    # Small model for auxiliary steps (the chat's rotation summary).
     chat_router_model: str = "haiku"
     chat_router_effort: str = "low"
     chat_router_timeout: int = 60
-    chat_fast_model: str = "haiku"
-    chat_fast_effort: str = "low"
-    chat_balanced_model: str = "sonnet"
-    chat_balanced_effort: str = "medium"
-    chat_deep_model: str = "opus"
-    chat_deep_effort: str = "high"
 
     # CDB accrual assumption: % of CDI the paper pays (mandate: CDB >= 100%).
     # Used to mark fixed-income lots to market from the BCB daily CDI series.
@@ -84,9 +83,11 @@ class Settings(BaseSettings):
     # TTL (seconds) for the cached macro/market context (/api/macro).
     market_cache_ttl: int = 120
 
-    # Telegram bot (notifications + two-way control)
+    # Telegram bot. The app (inbox + Web Push) is the delivery channel now;
+    # this stays as an opt-in mirror, off unless TELEGRAM_MIRROR_ENABLED=true.
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
+    telegram_mirror_enabled: bool = False
 
     model_config = {
         "env_file": ".env",
@@ -96,6 +97,15 @@ class Settings(BaseSettings):
 
     @property
     def telegram_enabled(self) -> bool:
+        """Credentials present AND the mirror explicitly turned on."""
+        return bool(
+            self.telegram_mirror_enabled and self.telegram_bot_token and self.telegram_chat_id
+        )
+
+    @property
+    def telegram_configured(self) -> bool:
+        """Credentials present, regardless of the mirror switch. Used by the
+        bot script itself, which is a surface, not a notification channel."""
         return bool(self.telegram_bot_token and self.telegram_chat_id)
 
     @field_validator("target_fixed_income", "target_stocks", "target_crypto")
