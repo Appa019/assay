@@ -72,11 +72,15 @@ completa 30 dias, um cron roda a análise de maturidade. Aporte é ad-hoc.
 - **Rotação de dry powder**: a revisão semanal pode recomendar VENDER CDB e
   COMPRAR uma ação/crypto se achar oportunidade relevante (a nova compra entra
   na trava de 30d).
-- **Mandato de alocação**: Renda Fixa = **só CDB Bradesco 100% CDI liquidez
+- **Mandato de alocação**: alvo **RF 55% · Ações 30% · Crypto 15%** (desde
+  2026-09-05, D33 — era 35/40/25). Vem de `settings.target_*`; NÃO repita o
+  número em lugar nenhum. Renda Fixa = **só CDB Bradesco 100% CDI liquidez
   diária** (instrumento ÚNICO e FIXO desde 2026-08-10 — o comitê decide QUANTO,
-  nunca QUAL CDB); Ações = **só equities da B3** (sem FII/ETF/BDR); Crypto =
-  **agressivo** (alto upside, com risco). Está nas ordens permanentes, no
-  preâmbulo, na síntese e nos cabeçalhos dos templates.
+  nunca QUAL CDB), e desde D34 isso é **imposto no ingest**: linha de RF é
+  renomeada para `order_service.CANONICAL_CDB_TICKER`, linhas repetidas são
+  fundidas numa só e alvo/stop de RF são descartados. Ações = **só equities da
+  B3** (sem FII/ETF/BDR); Crypto = **agressivo** (alto upside, com risco). Está
+  nas ordens permanentes, no preâmbulo, na síntese e nos cabeçalhos dos templates.
 - **Auto-resume (no processo)**: se uma etapa falha por limite de uso/taxa,
   `run_chain` espera (até a hora do reset, backoff até ~1h) e retoma a MESMA
   etapa via `--resume` automaticamente.

@@ -408,3 +408,45 @@ O track record fica com um buraco silencioso.
 agora). Quando for mexer: ou `delete_asset` vira exclusivamente correção de
 cadastro errado — registrando um `Trade` de estorno — ou some, e a saída de
 posição passa só por `sell_asset`.
+
+### D33 · Mandato mais defensivo: RF 55% · Ações 30% · Crypto 15%
+Em 2026-09-05 o cliente tirou **10 pontos de ações e 10 de crypto** e jogou os
+20 em renda fixa. O alvo sai de 35/40/25 para **55/30/15**: o dry powder deixa
+de ser o terceiro bolso e passa a ser mais da metade da carteira.
+
+Os alvos já vinham de fonte única (`settings.target_*` →
+`portfolio_service._target_allocation()` → snapshot do aporte → prompts), então
+a mudança é de configuração: `app/config.py` (defaults), `.env` do Pi e do
+desktop (que sobrescrevem), `.env.example`. O front lê da API, não tem número
+fixo. O validador de soma dos targets (`_validate_targets_sum`) garante 1,0.
+
+Um ajuste de texto foi necessário: o template 01 dizia, para carteira vazia,
+"ações B3 top-quality (25-40%, escalonado)" — a ponta superior era o alvo
+ANTIGO de ações e passaria a empurrar o comitê contra o mandato novo. Trocado
+por "em direção ao alvo do mandato (tabela acima — NÃO invente outro)".
+
+**Não alterado de propósito**: a tolerância de drawdown de 25% do patrimônio
+(template 01). Ela é premissa de risco, não alocação; com um mandato mais
+defensivo provavelmente deveria cair, mas isso é decisão do cliente.
+
+### D34 · A regra do CDB único vira código, não só prompt
+D29 fixou "Renda Fixa = só CDB Bradesco 100% CDI liquidez diária" em 7 pontos
+de texto (3 templates, ordens permanentes, revisão semanal, consultor, bot).
+Texto de prompt não é garantia: a PRIMEIRA folha que o comitê produziu trazia
+quatro CDBs de emissores diferentes, **dois deles de prazo** (Daycoval 113% 2A,
+BTG 112% 2A), que travam o dinheiro por ~2 anos — o oposto de dry powder.
+
+`ingest_contribution_orders` passa a impor a regra:
+
+- toda linha de `FIXED_INCOME` é renomeada para `CANONICAL_CDB_TICKER`
+  (`"CDB BRADESCO 100%CDI"`), com log do que foi proposto;
+- linhas de RF repetidas são **fundidas em uma só ordem**, somando valor e
+  percentual — com um instrumento único, N linhas seriam N lotes do mesmo papel;
+- `target_price`/`stop_price` de RF são descartados: um CDB de liquidez diária
+  não tem preço para alvo ou stop, e guardá-los armaria um alerta sem sentido.
+
+Renomear não perde informação **porque o mandato só admite um instrumento** — o
+comitê decide QUANTO, nunca QUAL (D29). Ações e cripto não são tocadas.
+
+Dois testes antigos fixavam o comportamento anterior e foram atualizados; um
+deles esperava `BTG_CDB_120CDI_180D`, ou seja, codificava a própria violação.
