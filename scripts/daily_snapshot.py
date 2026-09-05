@@ -19,10 +19,11 @@ if str(_PROJECT_ROOT) not in sys.path:
 from sqlmodel import Session  # noqa: E402
 
 from app.core.database import engine, init_db  # noqa: E402
+from app.models.notification import NotificationKind, NotificationLevel  # noqa: E402
 from app.services import (  # noqa: E402
+    notification_center,
     portfolio_service,
     price_refresh_service,
-    telegram_service,
 )
 
 
@@ -33,7 +34,11 @@ def main() -> int:
             refresh = asyncio.run(price_refresh_service.refresh_prices(session))
             snapshot = portfolio_service.record_daily_snapshot(session)
     except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
-        telegram_service.notify(f"✖ daily_snapshot falhou: {exc}")
+        notification_center.notify(
+            f"✖ daily_snapshot falhou: {exc}",
+            kind=NotificationKind.SYSTEM,
+            level=NotificationLevel.ERROR,
+        )
         print(f"daily_snapshot falhou: {exc}")
         return 1
     print(

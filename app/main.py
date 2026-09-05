@@ -12,6 +12,7 @@ from app.routers import (
     chat,
     contributions,
     macro,
+    notifications,
     orders,
     portfolio,
     push,
@@ -68,6 +69,7 @@ app.include_router(tax.router)
 app.include_router(cashflow.router)
 app.include_router(chat.router)
 app.include_router(push.router)
+app.include_router(notifications.router)
 
 
 @app.get("/api/health")

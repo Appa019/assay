@@ -19,7 +19,8 @@ if str(_PROJECT_ROOT) not in sys.path:
 from sqlmodel import Session  # noqa: E402
 
 from app.core.database import engine, init_db  # noqa: E402
-from app.services import insight_service, telegram_service  # noqa: E402
+from app.models.notification import NotificationKind, NotificationLevel  # noqa: E402
+from app.services import insight_service, notification_center  # noqa: E402
 
 
 def main() -> int:
@@ -28,7 +29,11 @@ def main() -> int:
         with Session(engine) as session:
             result = insight_service.run_daily(session)
     except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
-        telegram_service.notify(f"✖ daily_insights falhou: {exc}")
+        notification_center.notify(
+            f"✖ daily_insights falhou: {exc}",
+            kind=NotificationKind.SYSTEM,
+            level=NotificationLevel.ERROR,
+        )
         print(f"daily_insights falhou: {exc}")
         return 1
     print(

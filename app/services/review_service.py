@@ -19,9 +19,15 @@ from sqlmodel import Session, select
 from app.config import settings
 from app.models.asset import Asset
 from app.models.cashflow import CashflowEntry
+from app.models.notification import NotificationKind
 from app.models.report import Report, ReportKind
 from app.models.trade import Trade
-from app.services import analysis_runner, market_data_service, portfolio_service, telegram_service
+from app.services import (
+    analysis_runner,
+    market_data_service,
+    notification_center,
+    portfolio_service,
+)
 
 logger = structlog.get_logger()
 
@@ -209,13 +215,14 @@ def run_weekly_review(
 ) -> Report | None:
     if not has_reviewable_data(session):
         # Empty book: never start the opus chain. Callers control whether the
-        # short note reaches Telegram via ``notify`` (the daily cron throttles
+        # short note reaches the client via ``notify`` (the daily cron throttles
         # it on its side; the bot's /revisao answers the user directly).
         logger.info("weekly_review_skipped_empty")
-        if notify and telegram_service.is_enabled():
-            telegram_service.notify(
+        if notify:
+            notification_center.notify(
                 "📭 Carteira e ledger vazios: revisão semanal pulada. "
-                "Registre uma compra ou um gasto e eu volto a revisar toda semana."
+                "Registre uma compra ou um gasto e eu volto a revisar toda semana.",
+                kind=NotificationKind.REVIEW,
             )
         return None
     today = date.today()
@@ -232,9 +239,10 @@ def run_weekly_review(
         macro_ctx=macro_ctx,
         portfolio_rows=rows,
     )
-    if notify and telegram_service.is_enabled():
-        telegram_service.notify(
-            f"🗓️ Revisão semanal do comitê ({today.isoformat()})\n\n{summary.final_summary}"
+    if notify:
+        notification_center.notify(
+            f"🗓️ Revisão semanal do comitê ({today.isoformat()})\n\n{summary.final_summary}",
+            kind=NotificationKind.REVIEW,
         )
     logger.info("weekly_review_done", report_id=str(report.id), cost_usd=summary.total_cost_usd)
     return report
@@ -265,10 +273,11 @@ def run_maturity_review(
         macro_ctx=macro_ctx,
         portfolio_rows=matured_rows,
     )
-    if notify and telegram_service.is_enabled():
-        telegram_service.notify(
+    if notify:
+        notification_center.notify(
             f"🔓 Lotes liberados para venda · análise do comitê ({today.isoformat()})"
-            f"\n\n{summary.final_summary}"
+            f"\n\n{summary.final_summary}",
+            kind=NotificationKind.REVIEW,
         )
     logger.info("maturity_review_done", report_id=str(report.id), assets=len(matured_rows))
     return report

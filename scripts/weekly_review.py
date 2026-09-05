@@ -24,8 +24,13 @@ from sqlmodel import select  # noqa: E402
 
 from app.core.database import get_session, init_db  # noqa: E402
 from app.core.json_state import load_json_state, save_json_state  # noqa: E402
+from app.models.notification import NotificationKind, NotificationLevel  # noqa: E402
 from app.models.report import Report, ReportKind  # noqa: E402
-from app.services import analysis_runner, review_service, telegram_service  # noqa: E402
+from app.services import (  # noqa: E402
+    analysis_runner,
+    notification_center,
+    review_service,
+)
 
 _STATE_PATH = _PROJECT_ROOT / "storage" / "weekly_review_state.json"
 _SKIP_NOTE_KEY = "last_empty_skip_note"
@@ -101,7 +106,7 @@ def main() -> int:
             now = datetime.now(UTC)
             state = load_json_state(_STATE_PATH)
             if not args.no_telegram and _should_send_skip_note(state, now):
-                telegram_service.notify(_EMPTY_SKIP_NOTE)
+                notification_center.notify(_EMPTY_SKIP_NOTE, kind=NotificationKind.REVIEW)
                 state[_SKIP_NOTE_KEY] = now.isoformat()
                 save_json_state(_STATE_PATH, state)
             return 0
@@ -140,11 +145,19 @@ def main() -> int:
         if "em andamento" in str(exc):
             print(f"Adiada: {exc}")
             return 0
-        telegram_service.notify(f"✖ Revisão semanal falhou: {exc}")
+        notification_center.notify(
+            f"✖ Revisão semanal falhou: {exc}",
+            kind=NotificationKind.SYSTEM,
+            level=NotificationLevel.ERROR,
+        )
         print(f"Erro na revisão semanal: {exc}")
         return 1
     except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
-        telegram_service.notify(f"✖ Revisão semanal falhou: {exc}")
+        notification_center.notify(
+            f"✖ Revisão semanal falhou: {exc}",
+            kind=NotificationKind.SYSTEM,
+            level=NotificationLevel.ERROR,
+        )
         print(f"Erro na revisão semanal: {exc}")
         return 1
     finally:

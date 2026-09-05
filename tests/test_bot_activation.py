@@ -266,8 +266,11 @@ def test_run_weekly_review_skips_empty_book(
 
     monkeypatch.setattr(review_service.analysis_runner, "run_chain", never)
     sent: list[str] = []
-    monkeypatch.setattr(review_service.telegram_service, "is_enabled", lambda: True)
-    monkeypatch.setattr(review_service.telegram_service, "notify", lambda t: sent.append(t) or True)
+    monkeypatch.setattr(
+        review_service.notification_center,
+        "notify",
+        lambda t, **_kw: sent.append(t) or object(),
+    )
 
     report = review_service.run_weekly_review(session, macro_ctx={})
 
@@ -279,8 +282,11 @@ def test_run_weekly_review_skip_respects_notify_flag(
     session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     sent: list[str] = []
-    monkeypatch.setattr(review_service.telegram_service, "is_enabled", lambda: True)
-    monkeypatch.setattr(review_service.telegram_service, "notify", lambda t: sent.append(t) or True)
+    monkeypatch.setattr(
+        review_service.notification_center,
+        "notify",
+        lambda t, **_kw: sent.append(t) or object(),
+    )
     assert review_service.run_weekly_review(session, macro_ctx={}, notify=False) is None
     assert sent == []
 

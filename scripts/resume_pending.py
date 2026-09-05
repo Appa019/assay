@@ -30,25 +30,27 @@ import structlog  # noqa: E402
 from sqlmodel import Session  # noqa: E402
 
 from app.core.database import engine, init_db  # noqa: E402
-from app.services import analysis_runner, telegram_service  # noqa: E402
+from app.models.notification import NotificationKind, NotificationLevel  # noqa: E402
+from app.services import analysis_runner, notification_center  # noqa: E402
 
 logger = structlog.get_logger()
 
 
 def _notify_on_resume(name: str, payload: dict[str, Any]) -> None:
-    """Ping Telegram only once a resume actually begins (the lock was acquired)."""
-    if not telegram_service.is_enabled():
-        return
+    """Tell the client only once a resume actually begins (lock acquired)."""
     if name == "run_resume":
-        telegram_service.notify(
+        notification_center.notify(
             f"♻️ Limite de uso liberou — retomando a análise do aporte "
             f"{payload['contribution_id']} de onde parou "
-            f"(etapa {payload['from_step']}/{payload['total']})."
+            f"(etapa {payload['from_step']}/{payload['total']}).",
+            kind=NotificationKind.SYSTEM,
         )
     elif name == "run_resume_failed":
-        telegram_service.notify(
+        notification_center.notify(
             f"♻️ Sessão anterior do aporte {payload['contribution_id']} expirou — "
-            "refazendo a análise do zero."
+            "refazendo a análise do zero.",
+            kind=NotificationKind.SYSTEM,
+            level=NotificationLevel.WARNING,
         )
 
 
@@ -112,7 +114,11 @@ def main() -> int:
             run_once()
         except Exception as exc:  # noqa: BLE001 — last-resort alert, like every other cron
             logger.error("resume_pending_failed", error=str(exc))
-            telegram_service.notify(f"✖ resume_pending falhou: {exc}")
+            notification_center.notify(
+                f"✖ resume_pending falhou: {exc}",
+                kind=NotificationKind.SYSTEM,
+                level=NotificationLevel.ERROR,
+            )
             return 1
         return 0
 
@@ -123,7 +129,11 @@ def main() -> int:
             run_once()
         except Exception as exc:  # keep the watcher alive across unexpected errors
             logger.error("resume_watch_error", error=str(exc))
-            telegram_service.notify(f"✖ resume_pending (watch) falhou neste passe: {exc}")
+            notification_center.notify(
+                f"✖ resume_pending (watch) falhou neste passe: {exc}",
+                kind=NotificationKind.SYSTEM,
+                level=NotificationLevel.ERROR,
+            )
         try:
             time.sleep(interval)
         except KeyboardInterrupt:

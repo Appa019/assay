@@ -20,7 +20,12 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from app.config import settings  # noqa: E402
 from app.core.database import get_session, init_db  # noqa: E402
-from app.services import notification_service, review_service, telegram_service  # noqa: E402
+from app.models.notification import NotificationKind, NotificationLevel  # noqa: E402
+from app.services import (  # noqa: E402
+    notification_center,
+    notification_service,
+    review_service,
+)
 
 
 def main() -> int:
@@ -51,7 +56,11 @@ def main() -> int:
             print("Nenhum lote novo liberado.")
         return 0
     except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
-        telegram_service.notify(f"✖ check_cadence (maturidade) falhou: {exc}")
+        notification_center.notify(
+            f"✖ check_cadence (maturidade) falhou: {exc}",
+            kind=NotificationKind.SYSTEM,
+            level=NotificationLevel.ERROR,
+        )
         print(f"check_cadence falhou: {exc}")
         return 1
     finally:

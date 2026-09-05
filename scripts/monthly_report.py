@@ -26,10 +26,12 @@ from sqlmodel import Session, select  # noqa: E402
 from app.core.database import engine, init_db  # noqa: E402
 from app.models.chat import ChatMessage, ChatRole  # noqa: E402
 from app.models.contribution import ContributionPrompt  # noqa: E402
+from app.models.notification import NotificationKind, NotificationLevel  # noqa: E402
 from app.models.portfolio_snapshot import PortfolioSnapshot  # noqa: E402
 from app.models.report import Report, ReportKind  # noqa: E402
 from app.models.trade import Trade  # noqa: E402
 from app.services import (  # noqa: E402
+    notification_center,
     portfolio_service,
     price_refresh_service,
     tax_service,
@@ -190,8 +192,10 @@ def main() -> int:
             report.content = content
             session.add(report)
             session.commit()
+        notification_center.notify(content, kind=NotificationKind.REVIEW)
         if telegram_service.is_enabled():
-            telegram_service.notify(content)
+            # The .md attachment only exists on the Telegram mirror; in the app
+            # the full report is already readable in /investimentos?aba=analises.
             telegram_service.send_document(
                 f"relatorio_{start.strftime('%Y_%m')}.md",
                 content.encode("utf-8"),
@@ -200,7 +204,11 @@ def main() -> int:
         print(f"{title} salvo e enviado.")
         return 0
     except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
-        telegram_service.notify(f"✖ monthly_report falhou: {exc}")
+        notification_center.notify(
+            f"✖ monthly_report falhou: {exc}",
+            kind=NotificationKind.SYSTEM,
+            level=NotificationLevel.ERROR,
+        )
         print(f"monthly_report falhou: {exc}")
         return 1
 

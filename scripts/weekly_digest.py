@@ -21,7 +21,8 @@ if str(_PROJECT_ROOT) not in sys.path:
 from sqlmodel import Session  # noqa: E402
 
 from app.core.database import engine, init_db  # noqa: E402
-from app.services import insight_service, telegram_service  # noqa: E402
+from app.models.notification import NotificationKind, NotificationLevel  # noqa: E402
+from app.services import insight_service, notification_center, telegram_service  # noqa: E402
 
 
 def main() -> int:
@@ -41,7 +42,11 @@ def main() -> int:
         with Session(engine) as session:
             text = insight_service.build_weekly_digest(session)
     except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
-        telegram_service.notify(f"✖ weekly_digest falhou: {exc}")
+        notification_center.notify(
+            f"✖ weekly_digest falhou: {exc}",
+            kind=NotificationKind.SYSTEM,
+            level=NotificationLevel.ERROR,
+        )
         print(f"weekly_digest falhou: {exc}")
         return 1
     if not text:
@@ -50,7 +55,7 @@ def main() -> int:
     # Success side-effects stay OUTSIDE the failure path above: only a real
     # delivery (or Telegram intentionally disabled, e.g. on the desktop)
     # drains the queue and stamps the week.
-    delivered = telegram_service.notify(text)
+    delivered = notification_center.notify(text, kind=NotificationKind.LEDGER) is not None
     if delivered or not telegram_service.is_enabled():
         insight_service.mark_digest_sent()
     print(text)

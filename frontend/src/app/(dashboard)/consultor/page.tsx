@@ -62,8 +62,8 @@ const ConsultorPage = () => {
     }
   }, []);
 
-  // Poll fast while a turn is in flight, slowly otherwise — a reply can also
-  // arrive from Telegram, so the page keeps watching even when idle.
+  // Poll fast while a turn is in flight, slowly otherwise. It keeps watching
+  // when idle because a turn queued from another device settles server-side.
   useEffect(() => {
     const timer = setTimeout(() => void load(), 0);
     return () => clearTimeout(timer);

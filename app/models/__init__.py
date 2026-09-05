@@ -7,6 +7,7 @@ from app.models.contribution import (
     ContributionStatus,
     PromptKey,
 )
+from app.models.notification import Notification, NotificationKind, NotificationLevel
 from app.models.order import Order, OrderStatus
 from app.models.portfolio_snapshot import PortfolioSnapshot
 from app.models.push_subscription import PushSubscription
@@ -27,6 +28,9 @@ __all__ = [
     "Contribution",
     "ContributionPrompt",
     "ContributionStatus",
+    "Notification",
+    "NotificationKind",
+    "NotificationLevel",
     "Order",
     "OrderStatus",
     "PortfolioSnapshot",

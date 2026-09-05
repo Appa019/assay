@@ -23,7 +23,8 @@ from sqlmodel import Session, select  # noqa: E402
 
 from app.core.database import engine, init_db  # noqa: E402
 from app.models.asset import Asset  # noqa: E402
-from app.services import price_refresh_service, telegram_service  # noqa: E402
+from app.models.notification import NotificationKind, NotificationLevel  # noqa: E402
+from app.services import notification_center, price_refresh_service  # noqa: E402
 
 _STATE_PATH = _PROJECT_ROOT / "storage" / "alerts_state.json"
 
@@ -83,11 +84,17 @@ def main() -> int:
                         state[key] = False  # re-armed for the next crossing
         _save_state(state)
         if alerts:
-            telegram_service.notify("\n\n".join(alerts))
+            notification_center.notify(
+                "\n\n".join(alerts), kind=NotificationKind.ALERT, level=NotificationLevel.WARNING
+            )
         print(f"{len(alerts)} alerta(s) disparado(s).")
         return 0
     except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
-        telegram_service.notify(f"✖ check_alerts falhou: {exc}")
+        notification_center.notify(
+            f"✖ check_alerts falhou: {exc}",
+            kind=NotificationKind.SYSTEM,
+            level=NotificationLevel.ERROR,
+        )
         print(f"check_alerts falhou: {exc}")
         return 1
 

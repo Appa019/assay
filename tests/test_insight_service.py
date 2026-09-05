@@ -31,11 +31,11 @@ def state_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 def notified(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     sent: list[str] = []
 
-    def _fake_notify(text: str) -> bool:
+    def _fake_notify(text: str, **_kwargs: object) -> object:
         sent.append(text)
-        return True
+        return object()
 
-    monkeypatch.setattr(insight_service.telegram_service, "notify", _fake_notify)
+    monkeypatch.setattr(insight_service.notification_center, "notify", _fake_notify)
     return sent
 
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_ITEMS, isCurrentPath } from "@/lib/nav";
+import { NotificationsBell } from "@/components/notifications-bell";
 
 /** Desktop navigation. Below `md` the bottom tab bar replaces it entirely. */
 export const Sidebar = () => {
@@ -55,6 +56,11 @@ export const Sidebar = () => {
           );
         })}
       </nav>
+
+      {/* Pushed to the bottom: it is a place to check, not a destination. */}
+      <div className="mt-auto pt-8">
+        <NotificationsBell variant="sidebar" />
+      </div>
     </aside>
   );
 };

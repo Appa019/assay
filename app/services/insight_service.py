@@ -49,7 +49,8 @@ from sqlmodel import Session, select
 
 from app.models.asset import Asset
 from app.models.cashflow import CashflowKind
-from app.services import cashflow_service, telegram_service
+from app.models.notification import NotificationKind
+from app.services import cashflow_service, notification_center
 
 logger = structlog.get_logger()
 
@@ -309,7 +310,7 @@ def run_daily(session: Session, *, today: date | None = None) -> dict[str, Any]:
     # Success side-effect strictly AFTER the state is persisted; notify() never
     # raises, so a failed send cannot roll anything back.
     for insight in to_send:
-        telegram_service.notify(insight.text)
+        notification_center.notify(insight.text, kind=NotificationKind.LEDGER)
 
     result = {
         "date": today.isoformat(),
