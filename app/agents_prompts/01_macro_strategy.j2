@@ -167,7 +167,7 @@ Vieram via API. Onde `null`/`⚠️`, pesquisem. **Não inventem. URL + data.**
 
 > Os fundos acima são apenas **régua de performance** (não investíveis no
 > mandato). **Nosso target portfolio**: Sharpe líquido > 0.7 (após custos e
-> impostos) em 5y, drawdown 99% < 25%, expected return CDI + 4-6% líquido.
+> impostos) em 5y, drawdown 99% < 20%, expected return CDI + 4-6% líquido.
 
 ---
 
@@ -252,7 +252,7 @@ críticas do momento que definem as próximas 4 semanas:
 Cada questão: **hipótese inicial 1 frase** + **conviction inicial 0-10**.
 
 > **Mandato do cliente**: foco growth / income / preservation? Horizonte deste
-> aporte? Tolerância drawdown 99%: 25% do patrimônio (default — confirmar).
+> aporte? Tolerância drawdown 99%: 20% do patrimônio (default — confirmar).
 
 ## ROUND 1 — Brazil Macro Diagnosis (Helena lidera)
 
@@ -454,7 +454,7 @@ Entre: Ibov, BTC, ETH, alts agregado, USD/BRL, CDI (≈0 vol).
 ### 6.5 Stress test prévio
 Choque −15% Ibov, −30% crypto (BTC −25% / alts −45%), +8% USD/BRL → perda atual
 do patrimônio. Choque +200 bps Selic surpresa → impacto em B3 (CDB ~ neutro em
-principal; muda só taxa de reinvestimento). Compare vs tolerância 25% DD 99%.
+principal; muda só taxa de reinvestimento). Compare vs tolerância 20% DD 99%.
 
 > **A defesa é o CDB (dry powder) + USDC.** Não há bolso de "hedge" com
 > ouro/ETF/DOL. Se o regime pede defesa, suba o % de CDB líquido e/ou USDC.
@@ -657,7 +657,7 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
     "max_sharpe_pesos_pct": {}, "max_sharpe_esperado": 0, "min_variance_pesos_pct": {},
     "comparativo_final_gic_pct": {},
     "defesa_via_cdb_e_usdc": {"pct_cdb_liquido": 0, "pct_usdc": 0, "rationale": ""},
-    "stress_pre_aporte_pior_cenario_pct_pat": null, "viola_tolerancia_25pct_pre": false
+    "stress_pre_aporte_pior_cenario_pct_pat": null, "viola_tolerancia_dd_pre": false
   },
   "esg_e_special_sit": {
     "esg_controversias_30d": [], "esg_red_flags_setores_top": [],

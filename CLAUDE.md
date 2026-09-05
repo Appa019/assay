@@ -72,8 +72,8 @@ completa 30 dias, um cron roda a análise de maturidade. Aporte é ad-hoc.
 - **Rotação de dry powder**: a revisão semanal pode recomendar VENDER CDB e
   COMPRAR uma ação/crypto se achar oportunidade relevante (a nova compra entra
   na trava de 30d).
-- **Mandato de alocação**: alvo **RF 55% · Ações 30% · Crypto 15%** (desde
-  2026-09-05, D33 — era 35/40/25). Vem de `settings.target_*`; NÃO repita o
+- **Mandato de alocação**: alvo **RF 50% · Ações 35% · Crypto 15%** (desde
+  2026-09-05, D33 — era 35/40/25). Tolerância de drawdown 99% = **20%** (D35). Vem de `settings.target_*`; NÃO repita o
   número em lugar nenhum. Renda Fixa = **só CDB Bradesco 100% CDI liquidez
   diária** (instrumento ÚNICO e FIXO desde 2026-08-10 — o comitê decide QUANTO,
   nunca QUAL CDB), e desde D34 isso é **imposto no ingest**: linha de RF é

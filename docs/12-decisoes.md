@@ -409,10 +409,29 @@ agora). Quando for mexer: ou `delete_asset` vira exclusivamente correção de
 cadastro errado — registrando um `Trade` de estorno — ou some, e a saída de
 posição passa só por `sell_asset`.
 
-### D33 · Mandato mais defensivo: RF 55% · Ações 30% · Crypto 15%
-Em 2026-09-05 o cliente tirou **10 pontos de ações e 10 de crypto** e jogou os
-20 em renda fixa. O alvo sai de 35/40/25 para **55/30/15**: o dry powder deixa
-de ser o terceiro bolso e passa a ser mais da metade da carteira.
+### D33 · Mandato mais defensivo: RF 50% · Ações 35% · Crypto 15%
+Em 2026-09-05 o cliente fixou **renda fixa em 50%** e deixou o resto a critério
+técnico. O alvo sai de 35/40/25 para **50/35/15**: o dry powder deixa de ser o
+terceiro bolso e passa a ser metade da carteira.
+
+**Por que os 15 pontos saíram de crypto (25→15) e não de ações (40→35):**
+crypto domina o risco muito além do seu peso. A ~60% de vol contra ~22% das
+ações da B3, com 15% do capital ela ainda responde por mais da metade da
+volatilidade bruta da carteira. Comparando as duas repartições possíveis dos
+mesmos 50 pontos de risco (corr ações×crypto ≈ 0,4):
+
+| Alvo | σ da carteira | Perda no cenário Ibov −15% / crypto −30% |
+|---|---:|---:|
+| 50/35/15 (escolhido) | ~14,0% | −9,75% |
+| 50/30/20 | ~15,8% | −10,5% |
+
+Ou seja: a versão escolhida entrega MAIS exposição a equity de qualidade — o
+bolso core do mandato, com melhor retorno ajustado a risco — e ainda assim é a
+de menor volatilidade. Cortar crypto é o corte eficiente.
+
+Histórico: o cliente pediu primeiro "−10 pontos em ações e −10 em crypto"
+(55/30/15), depois fixou RF em 50%. Os 5 pontos que voltaram foram para ações
+pela razão acima.
 
 Os alvos já vinham de fonte única (`settings.target_*` →
 `portfolio_service._target_allocation()` → snapshot do aporte → prompts), então
@@ -425,9 +444,27 @@ Um ajuste de texto foi necessário: o template 01 dizia, para carteira vazia,
 ANTIGO de ações e passaria a empurrar o comitê contra o mandato novo. Trocado
 por "em direção ao alvo do mandato (tabela acima — NÃO invente outro)".
 
-**Não alterado de propósito**: a tolerância de drawdown de 25% do patrimônio
-(template 01). Ela é premissa de risco, não alocação; com um mandato mais
-defensivo provavelmente deveria cair, mas isso é decisão do cliente.
+### D35 · Tolerância de drawdown 25% → 20% (e o número sai do nome da chave)
+Com metade da carteira em CDB de liquidez diária, o limite de 25% deixou de
+morder. Rodando os cenários do próprio template contra os dois mandatos:
+
+| Cenário | Mandato antigo (35/40/25) | Novo (50/35/15) |
+|---|---:|---:|
+| Ibov −15%, crypto −30% | −13,5% | −9,75% |
+| Crise crypto (Ibov −5%, crypto −50%) | −14,5% | −9,25% |
+| Crash tipo 2008 (Ibov −50%, crypto −80%) | −40% | −29,5% |
+
+Antes, 25% era alcançável num ano ruim mas plausível; agora só um evento de
+cauda extrema chega lá, e o passo "compare vs tolerância" do comitê vira
+carimbo. Escalando pela fatia de risco (65% → 50%), 25% × 50/65 ≈ 19% — fixado
+em **20%**, que fica entre o ano ruim (−16% em Ibov −25% / crypto −50%) e a
+catástrofe. Um limite que não pode ser violado não é um limite.
+
+Aproveitando: as chaves de schema `viola_tolerancia_25pct` e
+`viola_tolerancia_25pct_pre` viravam mentira a cada mudança do número, porque o
+threshold estava **dentro do nome do campo**. Renomeadas para
+`viola_tolerancia_dd` / `viola_tolerancia_dd_pre`. Nenhum código lia essas
+chaves (só o comitê), então a renomeação é segura — confirmado por grep antes.
 
 ### D34 · A regra do CDB único vira código, não só prompt
 D29 fixou "Renda Fixa = só CDB Bradesco 100% CDI liquidez diária" em 7 pontos

@@ -159,7 +159,7 @@ Aplique à posição agregada pós-aporte:
 | **H. Evento de crédito bancário** | Bradesco (emissor único do CDB) sob estresse severo | Testa FGC + concentração R$ 250k |
 
 **Entregue**:
-- Perda/ganho R$ + % patrimônio por cenário · **Worst case**: viola 25%?
+- Perda/ganho R$ + % patrimônio por cenário · **Worst case**: viola a tolerância de drawdown da R1?
 - **No cenário H**: confirme que a exposição total no Bradesco não passa de R$ 250k (FGC cobre); se passar, o excedente é **perda potencial real** → sinalize ao cliente (o emissor é fixo por regra dele; a mitigação é sizing, não troca de banco).
 - **Probability-weighted expected return 31d** · **Conditional probability of 5% loss** · **Time to recover** se worst case
 
@@ -404,7 +404,7 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
       {"id": "G_bull_dovish_upside",   "ganho_brl": 0, "ganho_pct_pat": 0},
       {"id": "H_evento_credito_banco", "perda_brl": 0, "perda_pct_pat": 0, "exposicao_acima_fgc_brl": 0}
     ],
-    "worst_case_pct_pat": 0, "viola_tolerancia_25pct": false,
+    "worst_case_pct_pat": 0, "viola_tolerancia_dd": false,
     "expected_return_31d_probability_weighted_pct": 0,
     "conditional_prob_loss_5pct": 0, "time_to_recover_meses_se_worst": 0
   },
@@ -522,7 +522,7 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
 > 2. ✓ Todo `bolso` ∈ {cdb, acoes_b3, crypto}; toda `tax` ∈ lista válida (sem isento_lci_lca/ir15_etf_br/ir20_fii_ganho)
 > 3. ✓ Nenhum ativo com `vetado=true` em `risk_overlay`/`cdb_risk` aparece em `ordens_finais`
 > 4. ✓ Toda ordem de ação/crypto: stop_loss + target_31d/90d/12m numéricos; CDB usa "—" onde não se aplica
-> 5. ✓ `stress_test_8_cenarios.viola_tolerancia_25pct` avaliado; cenário H confirma FGC (≤ R$ 250k/instituição)
+> 5. ✓ `stress_test_8_cenarios.viola_tolerancia_dd` avaliado; cenário H confirma FGC (≤ R$ 250k/instituição)
 > 6. ✓ `portfolio_risk_aggregate` completo (VaR + CVaR + EVT + CDaR + HHI) · `effective_n_positions` ≥ 6 (universo máx. ~14 nomes — 12 era impossível)
 > 7. ✓ `cdb_final` tem EXATAMENTE 1 item: Bradesco 100% CDI liquidez diária (sinalize FGC se exposição no Bradesco > R$ 250k)
 > 8. ✓ `pre_mortem_final.fator_risco_dominante` identificado · `resumo_executivo` legível sozinho

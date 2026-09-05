@@ -25,7 +25,7 @@ vieram quatro mudanças estruturais:
 4. **Folha de ordens com ticker/quantidade/preço** (D32), com split de lote
    padrão vs fracionário da B3.
 5. **Mandato mais defensivo** (D33): alvo passa de 35/40/25 para
-   **RF 55% · Ações 30% · Crypto 15%**.
+   **RF 50% · Ações 35% · Crypto 15%**, com tolerância de drawdown 25%→20% (D35).
 6. **Regra do CDB único imposta no código** (D34), não só no prompt.
 
 Estado do banco depois do reset: **todas as tabelas em 0**. Preservado por
@@ -137,7 +137,7 @@ acionável foi corrigido na mesma data — detalhes em `12-decisoes.md`
 | 2026-08-06 (noite) | Consultor fixado em opus/max (.env do Pi); token de auth de 1 ano; reset zera a tela; push nativo do PWA + até 3 fotos por mensagem no site |
 | 2026-08-10 | **CDB vira instrumento fixo** (D29): só Bradesco 100% CDI liquidez diária, nos 3 templates que tocam RF + ordens permanentes + revisão semanal + consultor |
 | 2026-08-28 | (silencioso) acesso ao Claude Code revogado no Pi — motor de IA para de funcionar sem ninguém perceber |
-| 2026-09-05 | **Recomeço do zero**: banco zerado, auth restaurada (A40), Telegram aposentado (D30), roteador de 2 tiers (D31), boleta na folha de ordens (D32), mandato 55/30/15 (D33), CDB único imposto no ingest (D34) |
+| 2026-09-05 | **Recomeço do zero**: banco zerado, auth restaurada (A40), Telegram aposentado (D30), roteador de 2 tiers (D31), boleta na folha de ordens (D32), mandato 50/35/15 + DD 20% (D33/D35), CDB único imposto no ingest (D34) |
 
 ---
 

@@ -31,11 +31,13 @@ class Settings(BaseSettings):
     claude_code_oauth_token: str = ""
 
     # Portfolio targets (used to compute deviation, in fraction of 1.0).
-    # 2026-09-05: the client took 10 points off stocks and 10 off crypto and put
-    # all 20 into fixed income. Dry powder is now the majority of the book, so
-    # the mandate reads clearly more defensive than the 35/40/25 it replaced.
-    target_fixed_income: float = 0.55
-    target_stocks: float = 0.30
+    # 2026-09-05: fixed income goes 35 -> 50, taking 15 points off the risk side.
+    # The cut lands on crypto (25 -> 15) rather than equities (40 -> 35) because
+    # crypto drives the risk: at 15% of capital and ~60% vol it still carries
+    # more than half the portfolio's gross volatility, while B3 quality equities
+    # are the core sleeve of the mandate.
+    target_fixed_income: float = 0.50
+    target_stocks: float = 0.35
     target_crypto: float = 0.15
 
     # Investment agent (autonomous Claude runs). Contributions are ad-hoc (no
