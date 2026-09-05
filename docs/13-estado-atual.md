@@ -1,8 +1,35 @@
 # 13 · Estado atual
 
-> **Fotografia de 2026-08-06 (madrugada).** Este é o documento que envelhece —
+> **Fotografia de 2026-09-05.** Este é o documento que envelhece —
 > atualize-o quando mudar algo estrutural. Os outros 12 descrevem como o
 > sistema funciona; este descreve como ele está **agora**.
+
+## 2026-09-05 — recomeço do zero, app como canal único
+
+O banco de produção foi **zerado deliberadamente** a pedido do cliente (backup
+íntegro em `~/assay_backup_20260905_pre_reset/`, no Pi e no desktop). Junto
+vieram quatro mudanças estruturais:
+
+1. **Motor de IA ressuscitado.** O `claude` no Pi estava bloqueado desde ~28/08
+   ("organization has disabled Claude subscription access"): consultor morto,
+   revisão semanal falhando todo dia, aporte impossível. Token novo via
+   `claude setup-token` no `.env` do Pi + `hasTrustDialogAccepted` marcado (as
+   26 entradas de permissão estavam sendo ignoradas em modo headless). A
+   classificação do erro foi corrigida em A40.
+2. **Telegram aposentado** (D30). Tudo vai para o app: `notification_center`
+   escreve no inbox, dispara Web Push e só espelha no Telegram se
+   `TELEGRAM_MIRROR_ENABLED=true`. `investimentos-bot.service` parado e
+   desabilitado no Pi.
+3. **Roteador de 2 tiers determinístico** (D31). Registro de gasto em haiku,
+   todo o resto em opus, sem triagem por LLM.
+4. **Folha de ordens com ticker/quantidade/preço** (D32), com split de lote
+   padrão vs fracionário da B3.
+
+Estado do banco depois do reset: **todas as tabelas em 0**. Preservado por
+escolha do cliente: `agent_workspace/MEMORY.md` (422 linhas), `tools/` e
+`.mcp.agent.json` do comitê. Descartado: memória do consultor, sessões,
+workspaces efêmeros, chaves VAPID (é preciso reassinar o push em
+`/configuracoes`).
 
 ## Onde o repositório está
 
@@ -11,7 +38,7 @@
 | Branch | `feat/consultor-upgrade` (sobre `feat/state-of-art-overhaul`; `main` é a principal) |
 | Versão backend | `0.4.0` (`app/main.py`, `pyproject.toml`) |
 | Versão frontend | `0.3.0` (`frontend/package.json`) — desalinhada, cosmético |
-| Testes | **191 passando** (113 → 157 upgrade do consultor → 181 carteiras VR/VA → 191 push + anexos) |
+| Testes | **221 passando** (191 → 193 auth/entitlement → 204 sizing de ordem → 221 roteador + inbox) |
 | Tamanho | ~10.700 linhas de Python · ~8.400 de TS/CSS |
 
 ## O que aconteceu na madrugada de 2026-08-06 (upgrade do consultor)
@@ -87,7 +114,9 @@ acionável foi corrigido na mesma data — detalhes em `12-decisoes.md`
 | 3 | Sem teste de frontend | validação é lint + type-check + build |
 | 4 | `PromptKey.RESEARCH` | legado de aportes pré-2026-05-24 |
 | 5 | `README.md` desatualizado | ver tabela acima |
-| 6 | Bancos SEM dados de carteira (desktop e Pi zerados de lotes/trades) | o sistema roda "vazio"; posições reais precisam ser registradas (ou o histórico de maio/julho do desktop migrado deliberadamente) |
+| 6 | Banco zerado por decisão do cliente (2026-09-05) | esperado, não é dívida. Backup íntegro pré-reset em `~/assay_backup_20260905_pre_reset/` |
+| 7 | `delete_asset` apaga lote sem `Trade` nem trava de 30d (A41) | buraco silencioso no track record; sem risco agora (banco vazio), corrigir antes de acumular histórico |
+| 8 | Superfícies só-do-bot sem equivalente no app | o bot está desabilitado; se faltar algo (`/atualizar`, `/ir`), promover para a interface |
 
 ## Linha do tempo (o que aconteceu, em ordem)
 
@@ -104,6 +133,8 @@ acionável foi corrigido na mesma data — detalhes em `12-decisoes.md`
 | 2026-08-06 | **Carteiras no ledger** (D28): `wallet` conta/vr/va em todo o cashflow — API, classificador, bot, ordens do consultor, extrato |
 | 2026-08-06 (noite) | Consultor fixado em opus/max (.env do Pi); token de auth de 1 ano; reset zera a tela; push nativo do PWA + até 3 fotos por mensagem no site |
 | 2026-08-10 | **CDB vira instrumento fixo** (D29): só Bradesco 100% CDI liquidez diária, nos 3 templates que tocam RF + ordens permanentes + revisão semanal + consultor |
+| 2026-08-28 | (silencioso) acesso ao Claude Code revogado no Pi — motor de IA para de funcionar sem ninguém perceber |
+| 2026-09-05 | **Recomeço do zero**: banco zerado, auth restaurada (A40), Telegram aposentado (D30), roteador de 2 tiers (D31), boleta na folha de ordens (D32) |
 
 ---
 

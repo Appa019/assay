@@ -307,3 +307,104 @@ Vale para as 3 etapas que tocam RF (01 macro, 02 seleção, 05 decisão), para a
 ordens permanentes do agente (`analysis_runner`), para a revisão semanal
 (`review_service`) e para o consultor (`chat_service`) — a regra é a mesma em
 todas as bocas do produto.
+
+### D30 · O app é o canal; o Telegram vira espelho opt-in
+O cliente nunca usou o Telegram. Todo aviso do sistema — falha de cron, revisão
+semanal, alerta de alvo/stop, relatório mensal, folha de ordens pronta — era
+disparado só lá, ou seja, na prática não chegava a ninguém.
+
+A entrega agora passa por `notification_center.notify()`, com três pernas e uma
+ordem deliberada:
+
+1. **Inbox** (`Notification`) — SEMPRE escrito, primeiro. É o que torna o resto
+   confiável: Web Push falha em silêncio de várias formas ordinárias (permissão
+   revogada, aparelho offline, VAPID rotacionado, nenhum device inscrito) e um
+   buzz perdido não pode virar alerta perdido.
+2. **Web Push** — best-effort, para o celular vibrar sem o app aberto.
+3. **Telegram** — só com `TELEGRAM_MIRROR_ENABLED=true`. Desligado por padrão.
+
+`settings.telegram_enabled` passou a exigir o switch do espelho; quem precisa
+saber apenas se há credenciais (o próprio script do bot, que é uma SUPERFÍCIE e
+não um canal) usa `telegram_configured`. Os pontos que ficavam atrás de
+`if telegram_service.is_enabled()` foram desamarrados desse gate — mantê-los
+teria silenciado o aviso em vez de redirecioná-lo.
+
+No Pi o `investimentos-bot.service` foi parado e desabilitado (`disable`), o que
+também devolve RAM na máquina onde ela é o recurso escasso. API do inbox em
+`/api/notifications`; no app, sino na sidebar (desktop) e botão flutuante
+(celular), com painel deslizante.
+
+### D31 · Roteador de modelo: 2 tiers determinísticos, sem triagem por LLM
+O roteador de 3 tiers chamava uma triagem haiku para classificar cada turno. O
+projeto assumia que isso custava ~1s. **No Pi custa 5,6s**, porque cada triagem
+é um processo novo do CLI — medido: haiku sem MCP 5,6s · haiku com os MCPs do
+chat 6,6s · sonnet 9,5s · opus/high 13,4s. Ligar o roteador como estava deixaria
+pergunta de investimento MAIS LENTA que fixar opus (5,6 + 13,4 = 19s).
+
+Regra nova, definida pelo cliente: **haiku só para registrar gasto/ganho; opus
+para todo o resto. Na dúvida, opus.** Decidido por regex, sem processo extra:
+
+- passado + valor + sem pergunta + sem termo de mercado → `fast` (haiku)
+- saudação → `fast`
+- qualquer outra coisa → `deep` (opus)
+
+O que NÃO entra no caminho rápido, de propósito: verbos no presente
+("ganho 5000", "meu VR é 800") declaram um fato RECORRENTE que vai para o
+MEMORY.md e exige raciocínio; e qualquer frase com pergunta, mesmo colada a um
+lançamento ("gastei 300, quanto sobrou?"). `Tier.BALANCED`, `_triage`,
+`_TRIAGE_PROMPT` e o `router_workspace` foram removidos; o workspace nu que
+sobrou (resumo de rotação) virou `chat_service._AUX_WORKSPACE`.
+
+Medido em produção depois da mudança: "gastei 42 no mercado" → haiku, 18,7s,
+US$ 0,0775 · "gastei 18 na padaria" → haiku, 15,5s, US$ 0,0149 · "posso parcelar
+a geladeira em 10x?" → opus, 87,3s, US$ 0,5846.
+
+### D32 · A folha de ordens entrega ticker, quantidade e preço
+`Order` guardava só `amount_brl`. Na hora de comprar, a boleta da corretora pede
+TICKER, QTDE e PREÇO — então o cliente abria a calculadora e dividia à mão.
+
+`order_sizing` faz a conversão de forma determinística, a partir da cotação viva
+(nunca de um preço que o modelo lembrou):
+
+- **arredonda para BAIXO sempre** — estourar o sizing do comitê custa dinheiro
+  real; sobrar alguns reais não custa nada;
+- **ação da B3 vira uma linha POR LIVRO**: lote de 100 no ticker puro, resto de
+  1-99 no fracionário (`TICKER + "F"`). 30 ações digitadas como PETR3
+  simplesmente não executam — o split faz parte da resposta;
+- **cripto** com 8 casas; **CDB** não tem quantidade, é uma aplicação em reais.
+
+`suggested_quantity` + `reference_price` + `priced_at` ficam na `Order`, e a
+marcação a mercado que já roda de hora em hora reprecifica as ordens PENDENTES
+no mesmo passe (as cotações já estão quentes) — assim a leitura continua sendo
+uma query e o número nunca fica velho. O split derivado vai no campo `ticket`
+do `OrderRead`, então bot e front não reimplementam a regra.
+
+Nota: `_ensure_sqlite_columns` passou a citar a tabela entre aspas. `order` é
+palavra reservada do SQL e `PRAGMA table_info(order)` é erro de sintaxe — sem
+isso o `init_db()` derrubaria o boot.
+
+### A40 · Entitlement revogado era classificado como falha transitória
+Produção, 2026-09-05: a revisão semanal falhava todo dia desde 28/08 e o
+consultor estava morto. Causa: o CLI respondia *"Your organization has disabled
+Claude subscription access for Claude Code"* — mensagem que nenhum padrão de
+`_AUTH_PATTERNS` casava. Caía em `RetryableError`, queimava 3 retries (~4 min,
+530 MB) e o alerta dizia "falha transitória", então ninguém descobria que o
+login precisava ser refeito.
+
+`_AUTH_PATTERNS` ganhou a família de entitlement (`subscription access`,
+`organization has disabled`, `ask your admin to enable`, `use an anthropic api
+key instead`, `credit balance is too low`) e o `AuthError` deixou de afirmar
+"login expirado" — pode ser plano sem acesso. Como `AuthError` não herda de
+`RetryableError`, classificar certo já elimina os retries inúteis.
+
+### A41 · `delete_asset` apaga o lote sem passar pelo ledger
+Achado ao inventariar a produção: as 6 posições de cripto compradas em 11/08
+(BTC/ETH/SOL/USDC/ONDO/UNI) sumiram da tabela `asset` sem nenhum `Trade` de
+venda. `portfolio_service.delete_asset` faz `session.delete(asset)` puro: não
+escreve no ledger e não checa a trava de 30 dias, ao contrário de `sell_asset`.
+O track record fica com um buraco silencioso.
+
+**Não corrigido nesta leva** (o banco foi zerado, então não há dado em risco
+agora). Quando for mexer: ou `delete_asset` vira exclusivamente correção de
+cadastro errado — registrando um `Trade` de estorno — ou some, e a saída de
+posição passa só por `sell_asset`.
