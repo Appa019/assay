@@ -355,7 +355,10 @@ def test_auth_failure_tells_the_truth(chat_dirs: Path, monkeypatch: pytest.Monke
     with pytest.raises(chat_service.ChatUnavailableError) as excinfo:
         chat_service.run_chat_turn("oi")
     message = str(excinfo.value)
-    assert "autenticação" in message
+    # Assert the ACTION the user must take, not a particular noun: the copy
+    # covers both an expired login and a revoked plan, so it no longer says
+    # "autenticação" in so many words.
+    assert "renove o login" in message
     assert "manda a mensagem de novo" not in message
 
 

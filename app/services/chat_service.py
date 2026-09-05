@@ -49,6 +49,9 @@ logger = structlog.get_logger()
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 CHAT_WORKSPACE = _PROJECT_ROOT / "storage" / "chat_workspace"
+# Bare directory for cheap auxiliary steps (the rotation summary). No
+# .mcp.json lives here on purpose: no MCP servers boot, so it stays fast.
+_AUX_WORKSPACE = _PROJECT_ROOT / "storage" / "aux_workspace"
 _SESSION_FILENAME = "session.json"
 _CHAT_LOCK_NAME = "_chat_turn.lock"
 
@@ -667,37 +670,20 @@ def _rotation_summary() -> str:
             who = "Cliente" if m.role == ChatRole.USER else "Consultor"
             lines.append(f"{who}: {m.content.strip()[:400]}")
         convo = "\n".join(lines)[-16000:]
-        model_router._WORKSPACE.mkdir(parents=True, exist_ok=True)
+        _AUX_WORKSPACE.mkdir(parents=True, exist_ok=True)
         result = analysis_runner._run_claude_step(
             _ROTATION_SUMMARY_PROMPT.format(transcript=convo),
             resume_session_id=None,
             model=settings.chat_router_model,
             effort=settings.chat_router_effort,
             timeout=max(settings.chat_router_timeout, 120),
-            cwd=model_router._WORKSPACE,
+            cwd=_AUX_WORKSPACE,
             transcript_tag=None,
         )
         return (result.result or "").strip()[:3000]
     except Exception:  # noqa: BLE001 — the summary is an extra, not a dependency
         logger.warning("chat_rotation_summary_failed", exc_info=True)
         return ""
-
-
-def _triage_context() -> str:
-    """A few recent transcript lines so the router can read follow-ups.
-
-    "e vale a pena?" carries no signal on its own; the ongoing subject does.
-    Best-effort — an empty string just means context-free triage.
-    """
-    try:
-        msgs = [m for m in history(limit=6) if m.status == ChatTurnStatus.DONE and m.content]
-    except Exception:  # noqa: BLE001 — context is a hint, not a dependency
-        return ""
-    lines = []
-    for m in msgs[-4:]:
-        who = "Cliente" if m.role == ChatRole.USER else "Consultor"
-        lines.append(f"{who}: {m.content.strip()[:160]}")
-    return "\n".join(lines)
 
 
 def _turn_prompt(
@@ -775,7 +761,7 @@ def run_chat_turn(text: str) -> tuple[str, model_router.Route, StepResult]:
     # and holding the lock through it needlessly extends the window in which
     # every other message gets a ChatBusyError.
     # Same chained session either way — only the model answering it changes.
-    picked = model_router.route(text, context_provider=_triage_context)
+    picked = model_router.route(text)
     if not analysis_runner._try_acquire_lock_file(_chat_lock_path()):
         raise ChatBusyError("⏳ Ainda estou terminando a resposta anterior — já te respondo.")
     try:
@@ -833,9 +819,9 @@ def run_chat_turn(text: str) -> tuple[str, model_router.Route, StepResult]:
             # Not transient and not fixable by resending: without this branch
             # the OAuth-expired failure told the user to "just send it again".
             raise ChatUnavailableError(
-                "🔐 Minha autenticação com o Claude expirou no servidor e não "
-                "renovou sozinha. Reenviar não resolve: renove o login do "
-                f"`claude` no Pi para eu voltar. Detalhe: {exc}"
+                "🔐 Perdi o acesso ao Claude no servidor (login expirado ou "
+                "plano sem Claude Code). Reenviar não resolve: renove o login "
+                f"do `claude` no Pi para eu voltar. Detalhe: {exc}"
             ) from exc
         except RetryableError as exc:
             raise ChatUnavailableError(

@@ -450,3 +450,15 @@ def test_auth_failure_is_classified_as_auth_not_transient() -> None:
     )
     assert issubclass(ar.AuthError, ar.AnalysisError)
     assert not issubclass(ar.AuthError, ar.RetryableError)
+
+
+def test_revoked_entitlement_is_auth_not_transient() -> None:
+    """Production, 2026-09-05: the org disabled Claude Code and the CLI answered
+    with a message no pattern matched. Every cron then burned three retries and
+    alerted "falha transitória", so nobody learned the login had to be redone."""
+    blob = (
+        "your organization has disabled claude subscription access for claude "
+        "code · use an anthropic api key instead, or ask your admin to enable access"
+    )
+    assert any(p in blob for p in ar._AUTH_PATTERNS)
+    assert not any(p in blob for p in ar._LIMIT_PATTERNS)

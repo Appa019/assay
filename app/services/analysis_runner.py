@@ -11,6 +11,7 @@ deepest reasoning. Each step is persisted as it finishes, so progress is
 observable step by step via the normal contribution read endpoint.
 """
 
+import asyncio
 import json
 import os
 import re
@@ -35,10 +36,11 @@ from app.models.contribution import (
     ContributionStatus,
     PromptKey,
 )
+from app.models.notification import NotificationKind, NotificationLevel
 from app.models.order import Order, OrderStatus
 from app.models.report import Report, ReportKind
 from app.models.trade import Trade, TradeSide
-from app.services import telegram_service
+from app.services import notification_center
 
 logger = structlog.get_logger()
 
@@ -275,8 +277,10 @@ class SessionNotFoundError(AnalysisError):
 
 
 class AuthError(AnalysisError):
-    """The CLI cannot authenticate (login expired or revoked). Retrying can
-    never fix it — someone must renew the ``claude`` login on this machine."""
+    """The CLI has no usable Claude access: login expired or revoked, or the
+    account lost its entitlement (org disabled Claude Code, empty credit
+    balance). Retrying can never fix it — a human must renew the login or
+    restore the plan."""
 
 
 _MCP_FILENAME = ".mcp.json"  # effective config Claude loads (regenerated each run)
@@ -808,9 +812,11 @@ _HARD_PATTERNS = (
     "too long",
 )
 
-# Login problems get their own bucket: they look transient to the generic
-# classifier ("Failed to authenticate" matched nothing and fell through to
-# RetryableError), but retrying is pointless until a human renews the login.
+# Login AND entitlement problems share a bucket: they look transient to the
+# generic classifier ("Failed to authenticate" matched nothing and fell through
+# to RetryableError), but retrying is pointless until a human acts. The
+# "organization has disabled" family was found in production on 2026-09-05
+# after 8 days of daily weekly-review failures reported as "transitório".
 _AUTH_PATTERNS = (
     "failed to authenticate",
     "oauth session expired",
@@ -819,6 +825,12 @@ _AUTH_PATTERNS = (
     "not logged in",
     "invalid api key",
     "authentication",
+    # Entitlement revoked upstream: the token is valid, the plan is not.
+    "subscription access",
+    "organization has disabled",
+    "ask your admin to enable",
+    "use an anthropic api key instead",
+    "credit balance is too low",
 )
 # A resume target that no longer exists → fall back to a fresh run, don't retry.
 _SESSION_GONE_PATTERNS = (
@@ -954,7 +966,7 @@ def _run_claude_step(
         if _is(_SESSION_GONE_PATTERNS):
             raise SessionNotFoundError(f"Sessão de resume não encontrada: {detail}")
         if _is(_AUTH_PATTERNS):
-            raise AuthError(f"Login do Claude expirado nesta máquina: {detail}")
+            raise AuthError(f"Claude sem acesso válido nesta máquina: {detail}")
         if _is(_HARD_PATTERNS):
             raise AnalysisError(f"Erro não-recuperável do Claude: {detail}")
         if _is(_LIMIT_PATTERNS):
@@ -1683,21 +1695,33 @@ def _run_analysis_locked(
         logger.error("analysis_failed", contribution_id=str(contribution_id), error=str(exc))
         if (contribution.run_attempts or 0) == settings.max_run_attempts:
             # One-time heads-up that auto-resume gave up on this contribution.
-            telegram_service.notify(
+            notification_center.notify(
                 f"🛑 Desisti de retomar o aporte {contribution_id} após "
                 f"{settings.max_run_attempts} falhas consecutivas. "
-                f"Última: {exc}\nRe-dispare manualmente quando resolver a causa."
+                f"Última: {exc}\nRe-dispare manualmente quando resolver a causa.",
+                kind=NotificationKind.SYSTEM,
+                level=NotificationLevel.ERROR,
             )
         if isinstance(exc, AnalysisError):
             raise
         raise AnalysisError(str(exc)) from exc
 
-    # Success side-effects OUTSIDE the failure path: a Telegram hiccup after a
+    # Success side-effects OUTSIDE the failure path: a delivery hiccup after a
     # multi-hour completed run must never revert the contribution to READY.
     try:
         from app.services import order_service
 
-        order_service.ingest_contribution_orders(session, contribution)
+        created = order_service.ingest_contribution_orders(session, contribution)
+        if created:
+            # Price the sheet the moment it lands: the client opens /ordens to
+            # buy, and a ticket without a quantity sends them back to a
+            # calculator. Best-effort — a quote outage must not fail the run.
+            from app.services import price_refresh_service
+
+            try:
+                asyncio.run(price_refresh_service.reprice_pending_orders(session))
+            except Exception as quote_exc:  # noqa: BLE001
+                logger.warning("order_pricing_failed", error=str(quote_exc))
         # Sheet health alert: dropped rows or a sum that drifts from the aporte
         # must reach the client, not just a log line nobody reads.
         check = order_service.summarize_block(
@@ -1707,29 +1731,33 @@ def _run_analysis_locked(
         drifted = (
             check["deviation_pct"] is not None and check["deviation_pct"] > _ORDERS_SUM_TOLERANCE
         )
-        if (skipped or drifted or check["valid"] == 0) and notify and telegram_service.is_enabled():
-            telegram_service.notify(
+        if (skipped or drifted or check["valid"] == 0) and notify:
+            notification_center.notify(
                 "⚠️ Checagem da folha de ordens: "
                 f"{check['valid']}/{check['rows']} linhas válidas, "
                 f"soma R$ {check['total_brl']:,.2f} vs aporte "
-                f"R$ {float(contribution.amount_brl):,.2f}. Revise em /ordens."
+                f"R$ {float(contribution.amount_brl):,.2f}. Revise a folha.",
+                kind=NotificationKind.ORDERS,
+                level=NotificationLevel.WARNING,
             )
     except Exception as ingest_exc:  # noqa: BLE001 — orders are best-effort extras
         logger.warning("order_ingest_failed", error=str(ingest_exc))
 
-    if notify and telegram_service.is_enabled():
+    if notify:
         header = (
             f"📊 Recomendação do aporte de R$ {float(contribution.amount_brl):,.2f} "
             f"({_local_date(contribution.created_at).isoformat()})\n"
-            "Executou uma ordem? Confirme com /executei <ticker> <qtd> <preço>.\n\n"
+            "A folha de ordens já traz ticker, quantidade e preço prontos.\n\n"
         )
         try:
             from app.services import order_service
 
             # Client sees ONLY the clean allocation structure — the trailing
             # machine block stays in the DB for ingestion, never on the phone.
-            telegram_service.notify(
-                header + order_service.strip_machine_block(summary.final_summary)
+            notification_center.notify(
+                header + order_service.strip_machine_block(summary.final_summary),
+                kind=NotificationKind.ORDERS,
+                level=NotificationLevel.SUCCESS,
             )
         except Exception as notify_exc:  # noqa: BLE001 — never fail the run for this
             logger.error("final_notify_failed", error=str(notify_exc))
