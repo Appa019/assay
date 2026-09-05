@@ -33,6 +33,13 @@ from app.services import portfolio_service
 
 logger = structlog.get_logger()
 
+# The mandate allows exactly ONE fixed-income instrument (D29): the committee
+# decides HOW MUCH, never WHICH. Until now that lived only as prompt text, and
+# the very first sheet came back with four different CDBs — two of them TERM
+# papers that lock the money for ~2 years, which is the opposite of dry powder.
+# Ingest enforces it, so a drifting model cannot put a locked CDB in the book.
+CANONICAL_CDB_TICKER = "CDB BRADESCO 100%CDI"
+
 _JSON_BLOCK = re.compile(r"```json\s*(\{.*?\})\s*```", re.DOTALL)
 _MACHINE_TAIL = re.compile(r"\n*-{3,}\s*\n+```json.*?```\s*", re.DOTALL)
 _ANY_JSON_BLOCK = re.compile(r"```json.*?```", re.DOTALL)
@@ -152,6 +159,7 @@ def ingest_contribution_orders(session: Session, contribution: Contribution) -> 
 
     rows = parse_orders_block(contribution.final_summary or "")
     created: list[Order] = []
+    fixed_income: Order | None = None
     for row in rows:
         ticker = str(_first(row, "ticker", "symbol", "ativo") or "").strip().upper()
         asset_class = _normalize_class(_first(row, "classe", "class", "asset_class"))
@@ -160,11 +168,41 @@ def ingest_contribution_orders(session: Session, contribution: Contribution) -> 
             logger.warning("order_row_skipped", row=str(row)[:200])
             continue
         pct = _first(row, "pct", "pct_aporte", "pct_portfolio")
+        amount = amount.quantize(Decimal("0.01"))
+
+        if asset_class == AssetClass.FIXED_INCOME:
+            # One instrument, so every RF line IS that instrument: rename it and
+            # fold repeats into a single order instead of booking N lots of the
+            # same paper. Target/stop are meaningless on a daily-liquidity CDB.
+            if ticker != CANONICAL_CDB_TICKER:
+                logger.warning(
+                    "order_fixed_income_renamed", proposed=ticker, forced=CANONICAL_CDB_TICKER
+                )
+            if fixed_income is not None:
+                fixed_income.amount_brl += amount
+                if isinstance(pct, int | float):
+                    fixed_income.pct_of_contribution = (
+                        fixed_income.pct_of_contribution or 0.0
+                    ) + float(pct)
+                logger.info("order_fixed_income_merged", total=str(fixed_income.amount_brl))
+                continue
+            fixed_income = Order(
+                contribution_id=contribution.id,
+                ticker=CANONICAL_CDB_TICKER,
+                asset_class=asset_class,
+                amount_brl=amount,
+                pct_of_contribution=float(pct) if isinstance(pct, int | float) else None,
+                thesis=(str(_first(row, "tese_1_linha", "thesis", "tese") or "").strip() or None),
+            )
+            session.add(fixed_income)
+            created.append(fixed_income)
+            continue
+
         order = Order(
             contribution_id=contribution.id,
             ticker=ticker,
             asset_class=asset_class,
-            amount_brl=amount.quantize(Decimal("0.01")),
+            amount_brl=amount,
             pct_of_contribution=float(pct) if isinstance(pct, int | float) else None,
             target_price=_to_decimal(
                 _first(row, "preco_alvo", "target_31d_brl", "target_brl", "target")

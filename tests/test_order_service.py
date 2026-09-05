@@ -52,7 +52,12 @@ def test_parse_orders_block_takes_last_valid_block() -> None:
 def test_ingest_is_idempotent_and_filters_bad_rows(session: Session) -> None:
     contribution = _completed_contribution(session)
     created = order_service.ingest_contribution_orders(session, contribution)
-    assert [o.ticker for o in created] == ["PETR4", "BTC", "CDB-BTG"]
+    # "CDB-BTG" is off-mandate and gets renamed to the single legal instrument.
+    assert [o.ticker for o in created] == [
+        "PETR4",
+        "BTC",
+        order_service.CANONICAL_CDB_TICKER,
+    ]
     assert created[0].asset_class == AssetClass.STOCKS
     assert created[0].target_price == Decimal("45.0")
     assert created[2].asset_class == AssetClass.FIXED_INCOME
@@ -140,7 +145,14 @@ def test_ingest_tolerates_model_field_dialects(session: Session) -> None:
     session.refresh(contribution)
 
     created = order_service.ingest_contribution_orders(session, contribution)
-    assert [o.ticker for o in created] == ["ITUB4", "BTC", "BTG_CDB_120CDI_180D", "USDC"]
+    # The model proposed a 180-day TERM CDB; the mandate has one daily-liquidity
+    # instrument, so ingest renames it rather than booking locked money.
+    assert [o.ticker for o in created] == [
+        "ITUB4",
+        "BTC",
+        order_service.CANONICAL_CDB_TICKER,
+        "USDC",
+    ]
     itub = created[0]
     assert itub.asset_class == AssetClass.STOCKS
     assert itub.amount_brl == Decimal("212.70")
