@@ -20,12 +20,9 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from sqlmodel import select  # noqa: E402
-
 from app.core.database import get_session, init_db  # noqa: E402
 from app.core.json_state import load_json_state, save_json_state  # noqa: E402
 from app.models.notification import NotificationKind, NotificationLevel  # noqa: E402
-from app.models.report import Report, ReportKind  # noqa: E402
 from app.services import (  # noqa: E402
     analysis_runner,
     notification_center,
@@ -61,17 +58,9 @@ def _should_send_skip_note(state: dict, now: datetime) -> bool:
     return now - last >= _SKIP_NOTE_INTERVAL
 
 
-def _is_due(session, interval_days: int = 7) -> bool:
-    last = session.exec(
-        select(Report)
-        .where(Report.kind == ReportKind.WEEKLY)
-        .order_by(Report.created_at.desc())
-        .limit(1)
-    ).first()
-    if last is None:
-        return True
-    age = datetime.now(UTC) - last.created_at.replace(tzinfo=UTC)
-    return age >= timedelta(days=interval_days)
+def _is_due(session) -> bool:
+    """Shared with check_cadence, which defers maturity runs to a due weekly."""
+    return review_service.days_until_weekly_due(session) <= 0
 
 
 def _printer(name: str, payload: dict) -> None:

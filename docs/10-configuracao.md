@@ -46,7 +46,8 @@ validadores em `Settings` derrubam o boot com mensagem explícita se não somare
 
 | Variável | Default | O que faz |
 |---|---|---|
-| `MIN_HOLDING_DAYS` | `30` | Trava de venda **por lote**, só ações e crypto. Também é interpolada nas ordens permanentes e no preâmbulo |
+| `MIN_HOLDING_DAYS` | `30` | Trava de venda **por lote** das AÇÕES (compliance do cliente). Interpolada nas ordens permanentes e no preâmbulo |
+| `MIN_HOLDING_DAYS_CRYPTO` | `15` | Trava de venda **por lote** da CRIPTO. CDB nunca trava |
 | `AGENT_MODEL` | `opus` | Modelo do comitê |
 | `AGENT_EFFORT` | `max` | **Sempre `max` no fluxo automático** |
 | `AGENT_STEP_TIMEOUT` | `2400` | Teto (s) por etapa do subprocess. Opus/max com pesquisa ao vivo é lento — dê folga |
@@ -66,10 +67,12 @@ validadores em `Settings` derrubam o boot com mensagem explícita se não somare
 | Variável | Default | O que faz |
 |---|---|---|
 | `CHAT_ROUTER_ENABLED` | `true` | `false` fixa todo turno no tier DEEP (comportamento pré-roteador) |
-| `CHAT_ROUTER_MODEL` / `_EFFORT` / `_TIMEOUT` | `haiku` / `low` / `60` | A triagem |
-| `CHAT_FAST_MODEL` / `_EFFORT` | `haiku` / `low` | Saudação, lançamento no ledger, consulta simples |
-| `CHAT_BALANCED_MODEL` / `_EFFORT` | `sonnet` / `medium` | Explicação, opinião sobre o mês, planejamento. **É também o fallback quando a triagem falha** |
-| `CHAT_DEEP_MODEL` / `_EFFORT` | `opus` / `high` | Decisão de investimento, análise de ativo, macro, risco, tributação |
+| `CHAT_ROUTER_MODEL` / `_EFFORT` / `_TIMEOUT` | `haiku` / `low` / `60` | Modelo dos passos auxiliares (resumo de rotação da sessão) |
+| `CHAT_FAST_MODEL` / `_EFFORT` | `haiku` / `low` | Saudação e lançamento no ledger |
+| `CHAT_LOOKUP_MODEL` / `_EFFORT` | `sonnet` / `low` | Consulta factual: saldo, preço, ordens pendentes, extrato (D37) |
+| `CHAT_DEEP_MODEL` / `_EFFORT` | `opus` / `high` | Decisão de investimento, análise de ativo, macro, risco, tributação — e tudo o que não for provadamente os dois de cima |
+| `MACRO_DELTA_ENABLED` | `true` | `false` faz a Reunião nº 1 rodar sempre o macro completo (11 rodadas) |
+| `MACRO_DELTA_MAX_AGE_DAYS` | `7` | Idade máxima da revisão semanal para a Reunião nº 1 rodar em modo delta (D37) |
 
 ## Classificador de gasto
 

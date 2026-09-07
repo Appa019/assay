@@ -125,20 +125,32 @@ pelo roteador, custo e duração.
 
 ## Regras de negócio invioláveis
 
-### 1. Trava de venda: 30 dias, por LOTE, só ações e crypto
+### 1. Trava de venda: por LOTE **e por CLASSE**
 
 ```python
+# portfolio_service.holding_lock_days()  ← fonte única da regra
+fixed_income → 0                       (nunca trava)
+crypto       → MIN_HOLDING_DAYS_CRYPTO (7)
+stocks       → MIN_HOLDING_DAYS        (30)
+
 # portfolio_service.sell_lock_days_left()
-fixed_income → 0 (nunca trava)
-outros       → max(0, MIN_HOLDING_DAYS - (hoje - entry_date).days)
+max(0, holding_lock_days(classe) - (hoje - entry_date).days)
 ```
 
+Os 30 dias das ações são **exigência de compliance do cliente** (ele trabalha no
+mercado financeiro e a regra alcança valores mobiliários), não disciplina —
+não encurte. Cripto não é valor mobiliário e é o bolso que existe para fazer
+dinheiro: 7 dias, o suficiente para a revisão semanal ver o lote uma vez antes
+de ele destravar (D36).
+
 Aplicada **no service** (`sell_asset` levanta `SellLockedError` → API 409), não
-em cada caller. O bot pede confirmação em dois passos antes de vender.
+em cada caller. O bot pede confirmação em dois passos antes de vender. Nenhuma
+outra camada recalcula a regra: `AssetRead` já traz `lock_days_total` /
+`lock_days_left` e o `PortfolioSummary` traz `holding_lock_days` por classe.
 
 **CDB é dry powder:** liquidez diária, vendável a qualquer hora, excluído de
 `pending_maturities`. A revisão semanal pode recomendar vender CDB para comprar
-uma oportunidade — a nova compra entra na trava de 30d.
+uma oportunidade — a nova compra entra na trava da sua classe.
 
 ### 2. Marcação a mercado
 

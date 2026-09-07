@@ -39,8 +39,6 @@ import {
   parseLocalDate,
 } from "@/lib/format";
 
-const MIN_HOLDING_DAYS = 30;
-
 const ASSET_CLASSES: { value: AssetClass; label: string }[] = [
   { value: "fixed_income", label: "Renda Fixa" },
   { value: "stocks", label: "Ações" },
@@ -62,17 +60,17 @@ const FILTER_TABS = [
 
 type LockInfo =
   | { kind: "daily_liquidity" }
-  | { kind: "locked"; remainingDays: number; unlockDate: Date }
+  | { kind: "locked"; remainingDays: number; totalDays: number; unlockDate: Date }
   | { kind: "unlocked" };
 
-/** 30-day sell lock per LOT — stocks/crypto only; CDB has daily liquidity. */
+/** Sell lock per LOT, per class — the backend decides it and ships the days. */
 const lockInfoFor = (asset: Asset): LockInfo => {
   if (asset.asset_class === "fixed_income") return { kind: "daily_liquidity" };
-  const held = daysSince(asset.entry_date);
-  if (held >= MIN_HOLDING_DAYS) return { kind: "unlocked" };
+  const remainingDays = asset.lock_days_left;
+  if (remainingDays <= 0) return { kind: "unlocked" };
   const unlockDate = parseLocalDate(asset.entry_date);
-  unlockDate.setDate(unlockDate.getDate() + MIN_HOLDING_DAYS);
-  return { kind: "locked", remainingDays: MIN_HOLDING_DAYS - held, unlockDate };
+  unlockDate.setDate(unlockDate.getDate() + asset.lock_days_total);
+  return { kind: "locked", remainingDays, totalDays: asset.lock_days_total, unlockDate };
 };
 
 type SortField =
@@ -339,6 +337,9 @@ export const AtivosView = () => {
   };
 
   const sellLock = sellTarget ? lockInfoFor(sellTarget) : null;
+  // The mandate's lock rule (per class, in days) comes from the API — the
+  // front-end states it, it does not decide it.
+  const lockDays = data?.holding_lock_days ?? null;
 
   return (
     <div className="space-y-8 md:space-y-10 max-w-6xl">
@@ -354,9 +355,10 @@ export const AtivosView = () => {
             className="text-sm mt-3"
             style={{ color: "var(--text-secondary)" }}
           >
-            Cada compra é um lote com trava própria de {MIN_HOLDING_DAYS} dias
-            (ações e crypto). Os ativos abaixo viram &quot;Carteira atual&quot; nos
-            prompts do comitê.
+            {lockDays
+              ? `Cada compra é um lote com trava própria: ${lockDays.stocks} dias em ações, ${lockDays.crypto} em crypto, nenhuma no CDB.`
+              : "Cada compra é um lote com trava de venda própria."}{" "}
+            Os ativos abaixo viram &quot;Carteira atual&quot; nos prompts do comitê.
           </p>
         </div>
         <div className="flex items-center gap-2.5">
@@ -901,7 +903,7 @@ export const AtivosView = () => {
                               disabled={locked}
                               title={
                                 lock.kind === "locked"
-                                  ? `Trava de ${MIN_HOLDING_DAYS} dias por lote: libera em ${lock.remainingDays}d (${lock.unlockDate.toLocaleDateString("pt-BR")})`
+                                  ? `Trava de ${lock.totalDays} dias por lote: libera em ${lock.remainingDays}d (${lock.unlockDate.toLocaleDateString("pt-BR")})`
                                   : undefined
                               }
                               className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium disabled:opacity-45"

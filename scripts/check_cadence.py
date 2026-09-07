@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 """Daily maturity job (idempotent — safe to run every day via cron).
 
-Newly matured stock/crypto lots (crossed the 30-day lock) → run a committee
+Newly matured stock/crypto lots (crossed their class lock) → run a committee
 maturity review (saved + sent to Telegram). Contributions are ad-hoc, so there
 is no scheduled aporte reminder — the recurring touchpoint is the weekly review.
+
+Cost guard: when the weekly review is about to run anyway, the maturity run is
+DEFERRED instead of fired. The weekly reads every position and rules on every
+freed lot, so paying for a second committee chain days earlier buys nothing —
+and with a per-class lock (stocks 30d, crypto 7d) the unlock dates no longer
+coincide, which would otherwise double the number of maturity runs per cycle.
 
 Install with ``scripts/install_cron.sh``.
 
@@ -27,6 +33,10 @@ from app.services import (  # noqa: E402
     review_service,
 )
 
+# The weekly is close enough that it will absorb these lots (it marks them
+# handled on success). Bigger than the daily cron interval, on purpose.
+_MATURITY_DEFER_DAYS = 2.0
+
 
 def main() -> int:
     # No Telegram? Still run: the Report is saved and consulted by future
@@ -37,7 +47,12 @@ def main() -> int:
     try:
         # 1) Maturity reviews for lots that just unlocked.
         matured, keys = notification_service.pending_maturities(session)
-        if matured:
+        if matured and review_service.days_until_weekly_due(session) <= _MATURITY_DEFER_DAYS:
+            print(
+                f"Lotes recém-liberados: {len(matured)} — revisão semanal sai em até "
+                f"{_MATURITY_DEFER_DAYS:.0f}d e cobre esses lotes; análise de maturidade adiada."
+            )
+        elif matured:
             print(f"Lotes recém-liberados: {len(matured)} — rodando análise de maturidade…")
             try:
                 from app.services import price_refresh_service

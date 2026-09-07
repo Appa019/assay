@@ -487,3 +487,119 @@ comitê decide QUANTO, nunca QUAL (D29). Ações e cripto não são tocadas.
 
 Dois testes antigos fixavam o comportamento anterior e foram atualizados; um
 deles esperava `BTG_CDB_120CDI_180D`, ou seja, codificava a própria violação.
+
+### D36 · A trava de venda passa a ser por CLASSE: ação 30d, cripto 7d
+A trava de 30 dias nasceu como um número só para tudo que não é renda fixa, e o
+sistema a justificava como disciplina. Errado nas duas pontas, segundo o
+cliente: os 30 dias são **exigência de compliance** dele (trabalha no mercado
+financeiro, e a regra alcança valores mobiliários), e por isso valem para as
+**ações da B3**. Cripto não é valor mobiliário: não havia exigência nenhuma, e o
+código travava por engano.
+
+O prazo da cripto ficou em **7 dias**, por decisão do cliente — cripto é o bolso
+que existe para fazer dinheiro, e sem exigência legal a fricção ali é escolha,
+não obrigação. A favor do número curto:
+
+- cripto quebra mais rápido e mais feio que ação (exploit, depeg, token morto);
+  trava longa prende o cliente **dentro** do naufrágio;
+- 7 dias amarram o lote a **um ciclo da revisão semanal**: nenhum lote destrava
+  sem o comitê ter olhado para ele pelo menos uma vez;
+- no IR dá no mesmo: cripto é tributada por venda no mês (isenção de R$ 35 mil),
+  sem benefício por tempo de posse.
+
+O que se abriu mão, registrado porque foi discutido antes de decidir: com 15
+dias todo lote passaria por **duas** revisões antes de poder ser vendido, e a
+trava também servia de barra de convicção na COMPRA ("só entro no que aceito
+segurar N dias"). Com 7, a barra é mais baixa e o freio contra vender no susto
+cobre só a primeira semana. É reversível: uma chave de `.env` e um restart.
+
+A regra virou **função única** (`portfolio_service.holding_lock_days`), porque
+espalhar um `settings.min_holding_days` por seis superfícies foi exatamente o
+que deixou a cripto travada errado. Quem precisa do número agora recebe pronto:
+`AssetRead` traz `lock_days_total` / `lock_days_left`, `PortfolioSummary` traz
+`holding_lock_days` por classe (ao lado do `target_allocation`, que já é
+mandato), e o front deixou de ter a constante `MIN_HOLDING_DAYS = 30`. Uma
+classe desconhecida cai na trava mais longa de propósito.
+
+`min_holding_days` foi mantido com o nome atual (é a trava das ações e já está
+no `.env` do Pi); a nova chave é `MIN_HOLDING_DAYS_CRYPTO`. O parâmetro
+`min_holding_days` que era passado por `run_chain`/`run_analysis` até o
+workspace foi removido: nenhum caller passava valor próprio, e duplicá-lo para
+duas classes só multiplicaria a chance de divergência.
+
+### D37 · Cortar custo sem cortar qualidade: os números primeiro
+O histórico pré-reset deu a conta real de um aporte: **US$ 62,99** em 93 min e
+53 turnos, assim distribuídos:
+
+| Etapa | Custo | Turnos |
+|---|---:|---:|
+| 3 · DD Ações | $28,95 | 20 |
+| 1 · Macro | $19,84 | 17 |
+| 4 · DD Crypto | $6,32 | 5 |
+| 2 · Seleção | $4,25 | 5 |
+| 5 · Decisão | $3,63 | 6 |
+
+**Macro + DD Ações = 77%.** Toda economia fora dessas duas é ruído — e é
+exatamente onde a intuição manda mexer primeiro (baixar o effort da etapa 5
+economizaria uns centavos e degradaria a folha de ordens). Quatro mudanças:
+
+**1. Modo delta na Reunião nº 1.** A revisão semanal ($8) já faz macro e já
+era injetada no prompt da etapa 1 como consulta — que mesmo assim refazia as 11
+rodadas do zero, em opus/max. Com revisão de até 7 dias, a etapa 1 passa a
+precificar só o delta (`01_macro_delta.j2`, 75% menor, orçamento de ~8 buscas).
+Sem revisão fresca, template completo: o comitê nunca começa às cegas. O delta
+emite o MESMO contrato JSON das reuniões seguintes, com teste fixando cada
+chave — quebrar esse contrato quebraria a cadeia inteira em silêncio.
+
+**2. Cauda de valuation cortada na DD de ações.** Eram 6 métodos por nome
+(DCF 3-stage, Reverse, CCA, Precedent, LBO, SOTP) + preço-alvo casa por casa em
+8 corretoras. Ficaram múltiplos + Reverse DCF + DCF 3-stage + CCA + consenso com
+≥3 fontes. Precedent/LBO/SOTP não movem uma compra de varejo na B3; custavam uma
+rodada de pesquisa cada, vezes o número de nomes.
+
+**3. Menos nomes, mais profundidade.** Seleção de 5-8 ações → **4-5** (cripto
+3-5 → 3-4). O custo da DD escala com a contagem, e 4 teses fundamentadas valem
+mais que 8 rasas.
+
+**4. Maturidade cede a vez à semanal.** A trava por classe (D36) fez ação e
+cripto destravarem em dias diferentes, o que dobraria os runs de maturidade por
+ciclo. Agora, se a semanal vence em ≤2 dias, `check_cadence` não abre run
+próprio: a semanal julga todo lote liberado e chama `mark_maturities` ao
+concluir (só no sucesso — falhou, o lote volta na próxima passada).
+
+**5. O chat: hipótese testada e REPROVADA (registrar o erro é o ponto).**
+O consultor queimou **US$ 118,79 em 71 turnos** (média $1,67), quase o dobro do
+aporte inteiro. A hipótese era "só registro de gasto sai do opus; consulta
+factual vai junto e é isso que custa" → criar um tier `lookup` (sonnet/low)
+cortaria a conta pela metade.
+
+O tier foi implementado e depois **rodado contra as 80 mensagens reais do
+histórico**. Resultado: **zero** consultas factuais. As 2 únicas que casaram
+eram FOTOS cuja legenda dizia "carteira"/"fatura" — falso positivo, agora
+barrado (`_ATTACHMENT_MARK`: o roteador não vê a imagem, então nunca a precifica
+como leitura de saldo). O tráfego real era outro: fatos recorrentes do cliente
+("meu salário é 9120"), planejamento ("cabe 150 de custo fixo?") e follow-ups.
+Tudo isso é opus com razão.
+
+O tier ficou (é barato, está guardado e "quanto tenho em cripto?" é pergunta
+natural agora que existe carteira), mas **sem prometer economia**. Duas medições
+seguintes apontam para onde o custo do chat realmente está:
+
+- custo NÃO cresce com a posição na sessão (turnos 1-5: $1,66; 6-10: $1,72), então
+  não é acúmulo de contexto encadeado nem falta de rotação;
+- um turno de **US$ 7,64 durou 62s**, ou seja, poucas chamadas com contexto
+  ENORME cada.
+
+O que entra em toda chamada: 17,4k chars de ordens permanentes + os schemas de
+**6 MCPs** (fetch, memory, coingecko, yahoo-finance, defillama, exa) + o
+conteúdo do que ele busca. O próximo corte mora aí — e envolve tirar capacidade
+do consultor (sem `exa` ele perde busca web), então é decisão do cliente, não
+uma otimização silenciosa.
+
+D31 segue de pé: a decisão é por REGRA, sem triagem por LLM.
+
+**O que NÃO foi tocado, e por quê:** opus nas etapas de julgamento; a sessão
+encadeada (a etapa 5 custa $3,63 justamente porque herda o contexto — refazer
+sem encadeamento sairia mais caro e pior); a cadência da revisão semanal, que é
+o melhor custo-benefício do sistema e é o que viabiliza o modo delta; e não
+existe `--max-turns`, que limitaria a cauda mas truncaria um memo no meio.

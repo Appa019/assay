@@ -79,3 +79,80 @@ def test_render_context_validates_amount() -> None:
             warnings=[],
             captured_at="now",
         )
+
+
+# --- macro delta mode -------------------------------------------------------
+
+
+def _delta_context(age_days: int | None) -> dict:
+    ctx = _sample_context(date(2026, 9, 6))
+    return pg.build_render_context(
+        contribution_id="cid-delta",
+        amount_brl=5000.0,
+        contribution_date=date(2026, 9, 6),
+        portfolio_total=10000.0,
+        weekly_review_age_days=age_days,
+        allocation_current=ctx["allocation_current"],
+        allocation_target=ctx["allocation_target"],
+        allocation_deviation=ctx["allocation_deviation"],
+        assets=[],
+        macro=ctx["macro"],
+        ibovespa=ctx["ibovespa"],
+        crypto_global=ctx["crypto_global"],
+        fear_greed_index=60,
+        warnings=[],
+        captured_at="2026-09-06T00:00:00Z",
+    )
+
+
+def _macro_prompt(context: dict) -> str:
+    return next(p["content"] for p in pg.render_all_prompts(context) if p["prompt_order"] == 1)
+
+
+def test_fresh_weekly_review_switches_meeting_one_to_delta_mode() -> None:
+    """The expensive 11-round macro is skipped when the committee just did it."""
+    body = _macro_prompt(_delta_context(2))
+    assert "MODO DELTA" in body
+    assert "ORÇAMENTO DE PESQUISA" in body
+    assert "há 2 dia(s)" in body
+
+
+def test_stale_or_missing_weekly_review_keeps_the_full_macro() -> None:
+    for age in (None, 30):
+        body = _macro_prompt(_delta_context(age))
+        assert "MODO DELTA" not in body
+        assert "CAST DO GIC (12 personas simultâneas)" in body
+
+
+def test_delta_mode_can_be_turned_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "macro_delta_enabled", False)
+    assert "MODO DELTA" not in _macro_prompt(_delta_context(1))
+
+
+def test_delta_prompt_keeps_the_contract_the_next_meetings_read() -> None:
+    """Meetings 2-5 parse these keys out of meeting #1 — the short form must
+    still emit every one of them or the chain breaks downstream."""
+    body = _macro_prompt(_delta_context(3))
+    for key in (
+        "final_tactical_brl",
+        "final_tactical_pct",
+        "juros_e_cdb",
+        "cdb_postura",
+        "setores_b3",
+        "top3_ow",
+        "bottom3_uw",
+        "tilt_dominante",
+        "digital_assets",
+        "narrativas_top",
+        "split_btc_eth_core_vs_alts_pct",
+        "top_of_mind",
+        "pre_mortem_gic",
+        "viola_tolerancia_dd_pre",
+    ):
+        assert key in body, key
+
+
+def test_delta_prompt_is_far_smaller_than_the_full_macro() -> None:
+    assert len(_macro_prompt(_delta_context(2))) < len(_macro_prompt(_delta_context(None))) / 2

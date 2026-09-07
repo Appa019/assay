@@ -62,7 +62,8 @@ Para **CADA** ação de `selecao_acoes_b3`, produza um **memo 1-2 páginas**:
 1. **Investment Thesis (3 frases GS-style)**: (1) tese fundamental; (2) catalyst path 31d (data + evento); (3) por que o mercado errou (consensus miss / under-pricing)
 2. **Identidade**: ticker, nome, CNPJ, segmento, controlador, free float
 3. **Fundamentos 12m**: Receita + CAGR 3y/5y · EBITDA + margem · Lucro + margem · ROE 12m + 3y · **ROIC + WACC + Economic Profit (EVA) bps** · Dív. líq/EBITDA, Net Debt/Equity, Current/Quick · FCF + FCF yield + trend · **Owner Earnings** · Payout, dividend coverage
-4. **Valuation Triangulada**: (A) P/E fwd vs setor · (B) EV/EBITDA vs setor · (C) EV/Sales · (D) P/B · (E) DY 12m+24m fwd · (F) **Preço-alvo consenso analyst-by-analyst** (XP, BTG, UBS BB, Itaú BBA, Bradesco BBI, GS, MS, JPM) média+range+fontes · (G) Implied upside · (H) **Reverse DCF** (implied growth) · (I) **3-stage DCF** (Júlia via Bash): stage1 1-5y, stage2 6-10y fade, stage3 perpetuity g=2-3% → fair value + sensitivity (WACC×g) · (J) **CCA** peers 3-5 + justified P/E · (K) **Precedent Transactions** · (L) **SOTP** se conglomerado · (M) **LBO check** 5-7× EBITDA
+4. **Valuation Triangulada — TRÊS métodos, não seis**: (A) múltiplos vs setor (P/E fwd, EV/EBITDA, EV/Sales, P/B, DY 12m+24m fwd) · (B) **Reverse DCF** (implied growth: o que o preço já paga) · (C) **3-stage DCF** (Júlia via Bash): stage1 1-5y, stage2 6-10y fade, stage3 perpetuity g=2-3% → fair value + sensitivity (WACC×g) · (D) **CCA** peers 3-5 + justified P/E · (E) **Preço-alvo consenso**: média + range + **≥ 3 fontes** (não precisa varrer casa por casa) → implied upside.
+   **NÃO faça** Precedent Transactions, SOTP nem LBO check: são caros em pesquisa e não movem uma decisão de compra de varejo na B3. Se a empresa for um conglomerado onde a soma das partes é A tese, diga isso em 2 linhas no memo — sem montar o SOTP completo.
 5. **Forensic (Vera)**: Piotroski X/9 + breakdown · Altman Z + zona · Beneish M + flag · Sloan accruals % · Dechow · Earnings Quality H/M/L
 6. **Capital Allocation Scorecard** (Buffett-Munger) preenchido
 7. **Earnings Quality detail** preenchido
@@ -123,8 +124,7 @@ Markdown (os memos) + **JSON validável** entre ` ```json ` e ` ``` `:
         "consenso_analistas": [{"analista": "", "preco_alvo_brl": 0, "data": ""}],
         "upside_pct": 0, "reverse_dcf_implied_growth_5y_pct": 0,
         "dcf_3_stage_fair_value_brl": 0, "dcf_sensitivity": {}, "cca_peers": [],
-        "cca_justified_pe": 0, "precedent_transactions": [], "sotp_breakdown": [],
-        "lbo_check_viable_5_7x_ebitda": false
+        "cca_justified_pe": 0
       },
       "forensic": {
         "piotroski_f_score": 0, "piotroski_breakdown": {}, "altman_z_score": 0,
@@ -195,7 +195,7 @@ Markdown (os memos) + **JSON validável** entre ` ```json ` e ` ``` `:
 > 4. ✓ Cada ação: Bull/Base/Bear probs = 100% + asymmetry numérico
 > 5. ✓ Σ `position_sizing_pct_acoes` = 100 · nenhum setor > 50% · asymmetry média ≥ 1.5:1
 > 6. ✓ Forense: ninguém com F < 4 / Z < 1.81 / M > -2.22 sem justificativa
-> 7. ✓ ≥ 12 fontes verificáveis distintas (URL + data)
+> 7. ✓ ≥ 8 fontes verificáveis distintas (URL + data)
 > 8. ✓ **`nenhuma_recomendacao_fora_do_mandato=true`** — só equities da B3
 
 ---

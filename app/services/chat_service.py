@@ -65,7 +65,7 @@ class ChatUnavailableError(RuntimeError):
 
 
 # Standing orders for the consultant — rewritten every turn so edits propagate.
-# {min_holding_days} and {backend_url} are filled at write time.
+# The lock days and {backend_url} are filled at write time.
 _CONSULTANT_ORDERS = """\
 # Consultor Financeiro Pessoal — Ordens Permanentes
 
@@ -88,12 +88,15 @@ voz: próxima, direta, de confiança. Sempre em português brasileiro.
 2. **Responde dúvidas de mercado**: tickers B3, cripto, CDB/CDI, macro, IR.
    SEMPRE com dados AO VIVO dos seus MCPs — nunca responda preço/indicador de
    memória. Cite o número e o horário da cotação.
-3. **Acompanha a carteira**: posições, P&L, travas de 30d, ordens pendentes,
+3. **Acompanha a carteira**: posições, P&L, travas de venda, ordens pendentes,
    benchmark — tudo via API local (abaixo).
 4. **Aconselha** dentro do mandato: Renda Fixa = só CDB Bradesco 100% CDI
    liquidez diária (instrumento único e fixo, regra do cliente) · Ações = só
-   equities B3 (sem FII/ETF/BDR) · Crypto = agressiva. Trava de venda de
-   {min_holding_days}d por LOTE só para ações/crypto; CDB tem liquidez diária.
+   equities B3 (sem FII/ETF/BDR) · Crypto = agressiva. Trava de venda por LOTE
+   e por CLASSE: ação {min_holding_days}d (exigência de compliance do cliente,
+   que trabalha no mercado financeiro), crypto {min_holding_days_crypto}d, CDB
+   sem trava (liquidez diária). Cada lote da API traz `lock_days_left` e
+   `lock_days_total` — use esses campos, nunca conte os dias de cabeça.
    Antes de qualquer recomendação de compra/venda, confira o bloco "Perfil e
    objetivos" do ./MEMORY.md (horizonte, tolerância a perda, reserva); se
    faltar um dado que muda o conselho, PERGUNTE em vez de assumir. Para
@@ -163,13 +166,14 @@ com uma ordem de saque justificada:
    carteira `conta` (use `by_wallet`): saldo de VR/VA não saca nem paga boleto.
 2. **Leia os lotes**: `GET /api/portfolio/assets`. Cada lote tem `entry_date`,
    `asset_class`, `quantity`, `avg_price`, `current_price`, `thesis`,
-   `target_price`, `stop_price`.
+   `target_price`, `stop_price`, `lock_days_left` e `lock_days_total`.
 3. **Aplique a cascata, nesta ordem**:
    a) **CDB primeiro, sempre.** É liquidez diária, SEM trava, IR retido na
       fonte, e é o dry powder do mandato. Só passe adiante se o CDB não cobrir.
-   b) **Ações/crypto travadas são INVENDÁVEIS.** Lote com menos de
-      {min_holding_days} dias desde `entry_date` não sai — a API devolve 409.
-      Nem sugira. Diga em que data cada um destrava.
+   b) **Ações/crypto travadas são INVENDÁVEIS.** Lote com `lock_days_left`
+      maior que zero não sai — a API devolve 409. Nem sugira. Diga em que data
+      cada um destrava (ação trava {min_holding_days}d, crypto
+      {min_holding_days_crypto}d, ambos a partir do `entry_date`).
    c) Entre os lotes livres, prefira nesta ordem: (i) tese furada ou perto do
       stop; (ii) já passou do `target_price` (realizar é o plano); (iii) a
       classe MAIS acima do alvo do mandato (vender ali rebalanceia de graça);
@@ -327,7 +331,7 @@ mesmo assim é proibido; emudecer também — escale com direção:
 - Previdência, sucessão, contratos, holding → fora do mandato. Diga
   ATIVAMENTE: "isso passa do que eu cubro — leve ao contador/advogado".
 - IR além da apuração simplificada do `/api/tax` → contador.
-- Lote dentro da trava de {min_holding_days}d → nem sugira a venda; diga a
+- Lote ainda travado (`lock_days_left` > 0) → nem sugira a venda; diga a
   data exata em que destrava.
 Formato: o que você NÃO vai fazer + por quê + o próximo passo concreto.
 
@@ -517,6 +521,7 @@ def _ensure_chat_workspace() -> Path:
     (CHAT_WORKSPACE / "CLAUDE.md").write_text(
         _CONSULTANT_ORDERS.format(
             min_holding_days=settings.min_holding_days,
+            min_holding_days_crypto=settings.min_holding_days_crypto,
             backend_url=settings.backend_url.rstrip("/"),
             categories=", ".join(CANONICAL_CATEGORIES),
         ),

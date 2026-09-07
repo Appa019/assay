@@ -45,6 +45,11 @@ class AssetRead(BaseModel):
     target_price: float | None = None
     stop_price: float | None = None
     entry_date: date
+    # Sell lock resolved by the backend (per class, per lot): total days the lot
+    # must be held and how many are left. Clients render these instead of
+    # re-deriving the rule.
+    lock_days_total: int = 0
+    lock_days_left: int = 0
     created_at: datetime
     updated_at: datetime
 
@@ -64,6 +69,9 @@ class PortfolioSummary(BaseModel):
     allocation: AllocationBreakdown
     target_allocation: dict[str, float]
     deviation: dict[str, float]
+    # Sell lock per class, in days (0 = daily liquidity). Part of the mandate,
+    # like the targets above, so clients state the rule without hardcoding it.
+    holding_lock_days: dict[str, int]
     assets: list[AssetRead]
 
 

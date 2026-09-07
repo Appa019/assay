@@ -51,8 +51,10 @@ Config em `pyproject.toml`: `asyncio_mode = "auto"`, `pythonpath = ["."]`.
 | Fixture | O que dá |
 |---|---|
 | `session` | SQLite em memória **com `PRAGMA foreign_keys=ON`** — espelha produção. Sem isso, um bug de ordenação de delete passou despercebido uma vez |
-| `stock_locked` | lote de PETR4 de 5 dias atrás (dentro da trava) |
+| `stock_locked` | lote de PETR4 de 5 dias atrás (dentro da trava de 30d) |
 | `stock_unlocked` | lote de VALE3 de 45 dias atrás (liberado) |
+| `crypto_locked` | lote de BTC de 5 dias atrás (dentro da trava de 7d) |
+| `crypto_unlocked` | lote de ETH de 20 dias: livre como cripto, travado se fosse ação |
 | `cdb` | lote de CDB (nunca trava) |
 | `isolated_runner_dirs` | redireciona **todo** efeito de filesystem do `analysis_runner` para `tmp_path` e neutraliza `_sleep` (testes não dormem de verdade) |
 

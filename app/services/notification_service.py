@@ -1,7 +1,8 @@
-"""Detect per-lot 30-day maturity milestones (idempotent state).
+"""Detect per-lot maturity milestones (idempotent state).
 
-When a stock/crypto LOT crosses ``min_holding_days`` since its entry it becomes
-sellable, which fires a committee maturity review. Contributions are ad-hoc
+When a stock/crypto LOT crosses its own holding lock (30d for stocks, 7d for
+crypto — ``portfolio_service.holding_lock_days``) it becomes sellable, which
+fires a committee maturity review. Contributions are ad-hoc
 (no fixed cycle), so there is NO scheduled "time to invest" nag — the recurring
 touchpoint is the weekly review.
 
@@ -17,8 +18,8 @@ from typing import Any
 import structlog
 from sqlmodel import Session, select
 
-from app.config import settings
 from app.models.asset import Asset, AssetClass
+from app.services import portfolio_service
 
 logger = structlog.get_logger()
 
@@ -44,7 +45,7 @@ def _lot_key(asset: Asset) -> str:
     return f"{asset.id}:{asset.entry_date.isoformat()}"
 
 
-def _row(asset: Asset, days: int) -> dict[str, Any]:
+def _row(asset: Asset, days: int, lock_days: int) -> dict[str, Any]:
     price = asset.current_price if asset.current_price is not None else asset.avg_price
     return {
         "ticker": asset.ticker,
@@ -59,6 +60,8 @@ def _row(asset: Asset, days: int) -> dict[str, Any]:
             else None
         ),
         "days_in_portfolio": days,
+        "lock_days_total": lock_days,
+        "lock_days_left": 0,
         "entry_date": asset.entry_date.isoformat(),
     }
 
@@ -68,7 +71,6 @@ def pending_maturities(
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """Lots that just crossed the lock and were never handled. (rows, keys)."""
     today = today or date.today()
-    min_days = settings.min_holding_days
     done = set(_load_state().get("asset_unlocks", []))
     rows: list[dict[str, Any]] = []
     keys: list[str] = []
@@ -76,13 +78,15 @@ def pending_maturities(
         # CDB / fixed income has daily liquidity — it never "unlocks", skip it.
         if asset.asset_class == AssetClass.FIXED_INCOME:
             continue
+        # Each class has its own lock (stocks 30d, crypto 7d).
+        lock_days = portfolio_service.holding_lock_days(asset.asset_class)
         days = (today - asset.entry_date).days
-        if days < min_days:
+        if days < lock_days:
             continue
         key = _lot_key(asset)
         if key in done:
             continue
-        rows.append(_row(asset, days))
+        rows.append(_row(asset, days, lock_days))
         keys.append(key)
     return rows, keys
 

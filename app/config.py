@@ -41,8 +41,15 @@ class Settings(BaseSettings):
     target_crypto: float = 0.15
 
     # Investment agent (autonomous Claude runs). Contributions are ad-hoc (no
-    # fixed cadence); min_holding_days is the per-lot sell lock for stocks/crypto.
+    # fixed cadence); the sell lock is PER LOT and PER CLASS.
+    # Stocks: 30 days is a compliance requirement on the client's side (he works
+    # at a brokerage, and the rule covers securities), so it is not negotiable.
+    # Crypto: 7 days — no legal hold applies, crypto breaks faster and harder
+    # (exploit, depeg, dead token), and this is the sleeve the client runs to
+    # make money, so the friction is deliberately minimal. CDB/fixed income
+    # never locks (daily liquidity).
     min_holding_days: int = 30
+    min_holding_days_crypto: int = 7
     agent_model: str = "opus"
     agent_effort: str = "max"
     # Per-step subprocess ceiling (seconds) for the headless Claude CLI.
@@ -68,18 +75,32 @@ class Settings(BaseSettings):
     classifier_effort: str = "low"
     classifier_timeout: int = 90
 
-    # Model router: two tiers, decided by rules (no triage model call). Booking
-    # a spend runs on the fast tier; everything else is deep. When in doubt,
-    # deep. CHAT_ROUTER_ENABLED=false pins every turn to the deep tier.
+    # Model router: three tiers, decided by rules (no triage model call).
+    # Booking a spend runs fast; a FACTUAL lookup of data the app already owns
+    # (balance, price, pending orders) runs on the middle tier; everything that
+    # needs judgment is deep. When in doubt, deep.
+    # CHAT_ROUTER_ENABLED=false pins every turn to the deep tier.
     chat_router_enabled: bool = True
     chat_fast_model: str = "haiku"
     chat_fast_effort: str = "low"
+    # Middle tier: reading a number out of the local API or a live quote is
+    # retrieval, not advice — opus/high there was measured at ~US$ 1.67/turn.
+    chat_lookup_model: str = "sonnet"
+    chat_lookup_effort: str = "low"
     chat_deep_model: str = "opus"
     chat_deep_effort: str = "high"
     # Small model for auxiliary steps (the chat's rotation summary).
     chat_router_model: str = "haiku"
     chat_router_effort: str = "low"
     chat_router_timeout: int = 60
+
+    # Macro delta mode: when a weekly review this fresh (in days) exists, the
+    # contribution's meeting #1 reads it and prices only the DELTA instead of
+    # re-running the full 11-round macro from scratch. The weekly already did
+    # that research days ago, on the same committee, for a fraction of the cost.
+    # MACRO_DELTA_ENABLED=false always renders the full template.
+    macro_delta_enabled: bool = True
+    macro_delta_max_age_days: int = 7
 
     # CDB accrual assumption: % of CDI the paper pays (mandate: CDB >= 100%).
     # Used to mark fixed-income lots to market from the BCB daily CDI series.

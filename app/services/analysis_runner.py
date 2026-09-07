@@ -58,7 +58,7 @@ DEFAULT_EFFORT = settings.agent_effort
 DEFAULT_STEP_TIMEOUT = settings.agent_step_timeout
 
 # Standing orders for the agent — written to WORKSPACE/CLAUDE.md every run so
-# updates here propagate. {min_holding_days} is filled at write time.
+# updates here propagate. The lock days are filled at write time.
 _STANDING_ORDERS = """\
 # Agente de Investimentos — Ordens Permanentes
 
@@ -140,15 +140,21 @@ analista só. Rigor máximo institucional, sempre.
 - Desconfie de fontes promocionais; exija sempre 2ª fonte independente para
   números que movem decisão (preço, unlock, TVL, guidance).
 
-## Trava de venda — {min_holding_days} dias POR LOTE (só AÇÕES e CRYPTO)
-- A trava de {min_holding_days} dias vale APENAS para AÇÕES e CRYPTO, por LOTE
-  de compra (não por ticker): cada compra matura {min_holding_days} dias a
-  partir da SUA data. Ex.: 10 ações de hoje liberam antes de 15 do mesmo ticker
-  compradas semana que vem.
+## Trava de venda — POR LOTE e POR CLASSE
+- **AÇÕES B3: {min_holding_days} dias.** É exigência de COMPLIANCE do cliente
+  (ele trabalha no mercado financeiro, e a regra alcança valores mobiliários),
+  não uma preferência: não relativize nem sugira encurtar.
+- **CRYPTO: {min_holding_days_crypto} dias.** Não há exigência legal aqui, e
+  cripto quebra mais rápido (exploit, depeg, token morto) — trava curta reduz o
+  risco de ficar preso dentro de um naufrágio.
+- A trava é por LOTE de compra (não por ticker): cada compra matura a partir da
+  SUA data. Ex.: 10 ações de hoje liberam antes de 15 do mesmo ticker compradas
+  semana que vem.
 - **CDB / Renda Fixa = LIQUIDEZ DIÁRIA**: pode ser vendido a QUALQUER momento,
   sem trava. É o DRY POWDER (caixa estratégico) da carteira.
-- Portanto: (a) ações/crypto só com convicção de segurar ≥{min_holding_days}
-  dias; (b) na revisão semanal, se surgir uma OPORTUNIDADE de mercado relevante
+- Portanto: (a) só compre com convicção de segurar o prazo da classe
+  (≥{min_holding_days} dias em ação, ≥{min_holding_days_crypto} em cripto);
+  (b) na revisão semanal, se surgir uma OPORTUNIDADE de mercado relevante
   (ação B3 ou crypto), pode recomendar VENDER CDB e comprar o ativo — o CDB
   existe pra isso; (c) ao revisar, trate cada lote de ação/crypto separadamente
   (travado vs liberado); o CDB está sempre disponível.
@@ -540,7 +546,7 @@ def _effective_mcp_config(workspace: Path, profile: str = "committee") -> dict[s
     return {"mcpServers": servers}
 
 
-def _ensure_workspace(min_holding_days: int) -> Path:
+def _ensure_workspace() -> Path:
     """Create the agent workspace, refresh standing orders + MCP config, seed memory.
 
     The effective ``.mcp.json`` is regenerated each run (so curated baseline
@@ -554,7 +560,11 @@ def _ensure_workspace(min_holding_days: int) -> Path:
     (WORKSPACE / "out").mkdir(exist_ok=True)
     (WORKSPACE / "notes").mkdir(exist_ok=True)
     (WORKSPACE / "CLAUDE.md").write_text(
-        _STANDING_ORDERS.format(min_holding_days=min_holding_days), encoding="utf-8"
+        _STANDING_ORDERS.format(
+            min_holding_days=settings.min_holding_days,
+            min_holding_days_crypto=settings.min_holding_days_crypto,
+        ),
+        encoding="utf-8",
     )
     # Agent-owned MCP file: seed once, then it's the agent's to extend.
     agent_mcp = WORKSPACE / _AGENT_MCP_FILENAME
@@ -592,9 +602,7 @@ def _ensure_git_repo(workspace: Path) -> None:
         logger.warning("workspace_git_init_failed", error=str(exc))
 
 
-def _build_preamble(
-    *, amount_brl: float, when: str, min_holding_days: int, contribution_id: str = ""
-) -> str:
+def _build_preamble(*, amount_brl: float, when: str, contribution_id: str = "") -> str:
     """Short context block prepended to the first meeting."""
     out_hint = f"./out/{contribution_id or 'este_aporte'}"
     return (
@@ -604,9 +612,10 @@ def _build_preamble(
         "- MANDATO: Renda Fixa = só CDB Bradesco 100% CDI liquidez diária "
         "(instrumento único e fixo); Ações = só equities da B3 (sem "
         "FII/ETF/BDR); Crypto = agressivo (alto upside, com risco controlado).\n"
-        f"- Trava POR LOTE só de AÇÕES e CRYPTO: cada compra vende após "
-        f"{min_holding_days} dias da sua data. CDB/Renda Fixa tem liquidez "
-        "diária (dry powder) — vende quando quiser.\n"
+        f"- Trava POR LOTE e POR CLASSE: ação B3 vende após "
+        f"{settings.min_holding_days} dias da sua data (compliance do cliente), "
+        f"crypto após {settings.min_holding_days_crypto} dias. CDB/Renda Fixa tem "
+        "liquidez diária (dry powder) — vende quando quiser.\n"
         "- LEIA seu ./MEMORY.md (memória dos ciclos anteriores) antes de decidir; "
         "ATUALIZE-o ao final.\n"
         f"- Ao FINAL de cada reunião, SALVE o JSON da reunião em {out_hint}/"
@@ -662,8 +671,13 @@ def _track_record_context(session: Session, *, max_trades: int = 12) -> str:
     return "\n".join(lines)
 
 
-def _latest_weekly_context(session: Session, *, max_chars: int = 6000) -> str:
-    """Latest weekly review as a consult block to prepend to a contribution run."""
+def _latest_weekly_context(session: Session, *, max_chars: int = 10000) -> str:
+    """Latest weekly review as a consult block to prepend to a contribution run.
+
+    Deliberately generous: in macro delta mode this block IS the macro research
+    meeting #1 no longer redoes, so truncating it would cost far more than the
+    tokens it saves.
+    """
     report = session.exec(
         select(Report)
         .where(Report.kind == ReportKind.WEEKLY)
@@ -1100,7 +1114,6 @@ def run_chain(
     effort: str = DEFAULT_EFFORT,
     step_timeout: int = DEFAULT_STEP_TIMEOUT,
     step_timeouts: list[int] | None = None,
-    min_holding_days: int | None = None,
     on_event: EventCallback | None = None,
     persist: Callable[[int, str, StepResult], None] | None = None,
     resume_session_id: str | None = None,
@@ -1126,10 +1139,7 @@ def run_chain(
     ``steps``) overrides the flat ceiling per step — the per-name due-diligence
     meetings legitimately run far longer than the macro one.
     """
-    min_holding_days = (
-        min_holding_days if min_holding_days is not None else settings.min_holding_days
-    )
-    workspace = _ensure_workspace(min_holding_days)
+    workspace = _ensure_workspace()
     summary = RunSummary(run_id=run_id)
     summary.session_id = resume_session_id or ""
     total = total_steps if total_steps is not None else step_offset + len(steps)
@@ -1434,7 +1444,6 @@ def run_analysis(
     model: str = DEFAULT_MODEL,
     effort: str = DEFAULT_EFFORT,
     step_timeout: int = DEFAULT_STEP_TIMEOUT,
-    min_holding_days: int | None = None,
     notify: bool = True,
     on_event: EventCallback | None = None,
     fail_fast_on_limit: bool = False,
@@ -1466,7 +1475,6 @@ def run_analysis(
             model=model,
             effort=effort,
             step_timeout=step_timeout,
-            min_holding_days=min_holding_days,
             notify=notify,
             on_event=on_event,
             limit_backoff=[120] if fail_fast_on_limit else None,
@@ -1482,15 +1490,11 @@ def _run_analysis_locked(
     model: str,
     effort: str,
     step_timeout: int,
-    min_holding_days: int | None,
     notify: bool,
     on_event: EventCallback | None,
     limit_backoff: list[int] | None = None,
 ) -> RunSummary:
     contribution_id = contribution.id
-    min_holding_days = (
-        min_holding_days if min_holding_days is not None else settings.min_holding_days
-    )
 
     prompts = list(
         session.exec(
@@ -1505,7 +1509,6 @@ def _run_analysis_locked(
     preamble = _build_preamble(
         amount_brl=float(contribution.amount_brl),
         when=_local_date(contribution.created_at).isoformat(),
-        min_holding_days=min_holding_days,
         contribution_id=str(contribution_id),
     )
     # Consult blocks: latest weekly review, the committee's own track record,
@@ -1620,7 +1623,6 @@ def _run_analysis_locked(
             effort=effort,
             step_timeout=step_timeout,
             step_timeouts=step_timeouts[from_index:],
-            min_holding_days=min_holding_days,
             on_event=on_event,
             persist=_persist,
             resume_session_id=sess,

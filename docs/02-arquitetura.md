@@ -78,7 +78,7 @@ Tradução de exceção usada em todo lugar:
 | `chat_service.py` | 695 | Consultor: turno de chat, workspace próprio, sessão persistente, transcrição compartilhada, anexos |
 | `market_data_service.py` | 452 | BCB (Selic/IPCA/CDI/USD) + Yahoo (Ibov, fundamentos) + CoinGecko (preços, dominância) + Fear&Greed. Best-effort: nunca levanta exceção, devolve `warnings` |
 | `telegram_service.py` | 366 | Cliente da Bot API: markdown→HTML, tabela→`<pre>`, chunking de 4000 chars, envio de documento, download de arquivo |
-| `portfolio_service.py` | 285 | Carteira: CRUD de lote, **venda com trava de 30d**, alocação, snapshot diário |
+| `portfolio_service.py` | 285 | Carteira: CRUD de lote, **venda com trava por classe (30d ação · 7d cripto)**, alocação, snapshot diário |
 | `order_service.py` | 224 | Parseia o bloco ```json {"orders"} do fechamento → linhas `Order`; executar ordem cria o lote herdando tese/alvo/stop |
 | `prompt_generator.py` | 204 | Renderiza os 5 templates Jinja2 com contexto de datas dinâmico |
 | `tax_service.py` | 182 | IR simplificado: isenções 20k/35k, compensação de prejuízo, DARF mínima |
@@ -88,7 +88,7 @@ Tradução de exceção usada em todo lugar:
 | `classifier_service.py` | 152 | "gastei 42,90 no mercado" → rascunho estruturado (haiku, sem MCP) |
 | `model_router.py` | 148 | Triagem que escolhe fast/balanced/deep para cada turno de chat |
 | `contribution_service.py` | 100 | Cria o aporte + captura snapshot + renderiza os 5 prompts |
-| `notification_service.py` | 95 | Detecta lote que cruzou 30d (estado idempotente em JSON) |
+| `notification_service.py` | 95 | Detecta lote que cruzou a trava da classe (estado idempotente em JSON) |
 | `review_service.py` | 243 | Revisão semanal e de maturidade — usa `run_chain` do motor |
 
 ## Regra de dependência do motor de IA

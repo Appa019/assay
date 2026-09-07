@@ -11,7 +11,12 @@ import structlog
 from sqlmodel import Session
 
 from app.models.contribution import Contribution, ContributionPrompt, ContributionStatus
-from app.services import market_data_service, portfolio_service, prompt_generator
+from app.services import (
+    market_data_service,
+    portfolio_service,
+    prompt_generator,
+    review_service,
+)
 
 logger = structlog.get_logger()
 
@@ -60,6 +65,9 @@ async def create_contribution_with_prompts(
         amount_brl=float(amount_brl),
         contribution_date=today,
         portfolio_total=float(summary.total_value),
+        # A fresh weekly review turns meeting #1 into a delta instead of a
+        # full macro re-run — the single biggest cost item of a contribution.
+        weekly_review_age_days=review_service.last_weekly_age_days(session),
         allocation_current=allocation_current,
         allocation_target=summary.target_allocation,
         allocation_deviation=summary.deviation,

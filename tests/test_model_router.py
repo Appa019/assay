@@ -113,3 +113,62 @@ def test_routing_never_costs_a_model_call() -> None:
 def test_tiers_map_to_the_configured_models() -> None:
     assert model_router.route("gastei 42 no mercado").model == settings.chat_fast_model
     assert model_router.route("devo comprar PETR4?").model == settings.chat_deep_model
+
+
+# --- the lookup tier --------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "quanto tenho em cripto?",
+        "qual o preço da PETR4?",
+        "como está a carteira?",
+        "quanto rendeu meu CDB?",
+        "ordens pendentes",
+        "quanto vale minha carteira hoje?",
+        "quando destrava meu BTC?",
+        "quanto gastei no mercado esse mês?",
+        "qual a cotação do bitcoin?",
+    ],
+)
+def test_factual_lookups_go_to_the_middle_tier(text: str) -> None:
+    """Reading a number the app already has is retrieval, not advice."""
+    route = model_router.route(text)
+    assert route.tier is model_router.Tier.LOOKUP
+    assert route.model == settings.chat_lookup_model
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "quanto tenho em cripto? devo aumentar?",  # lookup + decision
+        "qual o preço da PETR4? vale a pena comprar?",
+        "quanto tenho parado? qual a melhor aplicação?",
+        "como está a carteira? preciso rebalancear?",
+        "quanto rendeu o CDB? compensa trocar por ação?",
+    ],
+)
+def test_a_lookup_carrying_a_decision_still_goes_to_opus(text: str) -> None:
+    """The guard that keeps the middle tier honest: any advice word wins."""
+    assert _tier(text) is model_router.Tier.DEEP
+
+
+def test_long_lookup_falls_back_to_opus() -> None:
+    """Past a certain length the message is a briefing, not a question."""
+    long_text = "quanto tenho em cripto? " + "e me conta como foi a semana do mercado " * 5
+    assert _tier(long_text) is model_router.Tier.DEEP
+
+
+def test_lookup_tier_maps_to_the_configured_model() -> None:
+    assert model_router.route("quanto tenho em cripto?").model == settings.chat_lookup_model
+    assert model_router.route("quanto tenho em cripto?").reason == "consulta factual"
+
+
+def test_an_attachment_never_takes_the_lookup_tier() -> None:
+    """Measured on real history: every LOOKUP hit was a photo whose caption
+    mentioned "carteira"/"fatura". The router cannot see the image, so it must
+    not price the turn as if it were a balance read."""
+    assert _tier("📎 IMG_1365.png\nEssa é minha carteira completa de cripto") is (
+        model_router.Tier.DEEP
+    )

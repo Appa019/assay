@@ -46,7 +46,7 @@ Registrados via `setMyCommands` no boot (aparecem no menu do Telegram).
 | `/ordens` | folha de ordens pendente do último aporte |
 | `/executei <ticker> <qtd> <preço>` | confirma execução; o lote **herda tese, alvo e stop** do comitê |
 | `/comprei <ticker> <classe> <qtd> <preço>` | compra avulsa. Classe: `rf`, `acoes` ou `crypto` (aceita aliases) |
-| `/vender <ticker>` | venda com **confirmação em 2 passos** (expira em 120s). Bloqueia ação/crypto antes de 30d; CDB sempre libera |
+| `/vender <ticker>` | venda com **confirmação em 2 passos** (expira em 120s). Bloqueia ação antes de 30d e cripto antes de 7d; CDB sempre libera |
 | `/carteira` | posições e o que já pode ser vendido |
 | `/atualizar` | marcação a mercado agora |
 | `/revisao` | roda a revisão semanal do comitê agora |
@@ -102,7 +102,7 @@ O bot é o canal de saída de tudo:
 |---|---|
 | Aporte concluído | folha de ordens limpa (bloco de máquina removido) + lembrete do `/executei` |
 | Revisão semanal | relatório executivo |
-| Lote maturou (30d) | aviso de maturidade com recomendação por lote |
+| Lote maturou (30d ação · 7d cripto) | aviso de maturidade com recomendação por lote |
 | Alvo/stop cruzado | alerta de nível (1 por cruzamento) |
 | Relatório mensal | texto + anexo `.md` |
 | **Qualquer cron que quebrou** | erro explícito — não só o sucesso |

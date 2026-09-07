@@ -1,8 +1,41 @@
 # 13 · Estado atual
 
-> **Fotografia de 2026-09-05.** Este é o documento que envelhece —
+> **Fotografia de 2026-09-06.** Este é o documento que envelhece —
 > atualize-o quando mudar algo estrutural. Os outros 12 descrevem como o
 > sistema funciona; este descreve como ele está **agora**.
+
+## 2026-09-06 — corte de custo do motor (D37)
+
+Com os números do backup pré-reset na mão (aporte = **US$ 62,99**; consultor =
+**US$ 118,79 em 71 turnos**), quatro cortes cirúrgicos, todos com `make check`
+verde e nenhum modelo rebaixado nas etapas de julgamento:
+
+1. **Reunião nº 1 em modo delta** quando há revisão semanal ≤7 dias
+   (`01_macro_delta.j2`, prompt 75% menor, mesmo contrato JSON).
+2. **DD de ações enxuta**: 3 métodos de valuation em vez de 6, consenso com ≥3
+   fontes em vez de casa por casa.
+3. **Seleção de 4-5 ações** (era 5-8) e 3-4 criptos.
+4. **Tier `lookup` (sonnet/low)** no consultor para consulta factual, e
+   **maturidade absorvida pela revisão semanal** quando ela vence em ≤2 dias.
+
+Expectativa: aporte ~US$ 63 → ~US$ 35-40. É projeção — a próxima rodada real
+confirma.
+
+**O chat continua caro e o motivo NÃO é o roteador** (D37, item 5): o tier
+`lookup` foi testado contra as 80 mensagens reais do histórico e não pegou
+nenhuma. O custo está no contexto de cada chamada (17,4k chars de ordens + 6
+MCPs). Cortar ali tira capacidade do consultor — decisão pendente do cliente.
+
+## 2026-09-06 — trava de venda por classe
+
+A trava de 30 dias passou a valer **só para ações** (é compliance do cliente,
+que trabalha no mercado financeiro); **cripto trava 7 dias** e o CDB segue sem
+trava (D36). A regra saiu de seis superfícies e virou uma função só,
+`portfolio_service.holding_lock_days`; a API passou a entregar
+`lock_days_total`/`lock_days_left` por lote e `holding_lock_days` por classe no
+resumo da carteira, e o front deixou de ter a constante `MIN_HOLDING_DAYS = 30`.
+Nova chave: `MIN_HOLDING_DAYS_CRYPTO=7` (não precisa entrar no `.env` do Pi:
+sem a chave vale o default do código, que já é 7).
 
 ## 2026-09-05 — recomeço do zero, app como canal único
 
@@ -41,7 +74,7 @@ workspaces efêmeros, chaves VAPID (é preciso reassinar o push em
 | Branch | `feat/consultor-upgrade` (sobre `feat/state-of-art-overhaul`; `main` é a principal) |
 | Versão backend | `0.4.0` (`app/main.py`, `pyproject.toml`) |
 | Versão frontend | `0.3.0` (`frontend/package.json`) — desalinhada, cosmético |
-| Testes | **227 passando** (191 → 193 auth/entitlement → 204 sizing de ordem → 221 roteador + inbox → 227 mandato do CDB) |
+| Testes | **252 passando** (191 → 193 auth/entitlement → 204 sizing de ordem → 221 roteador + inbox → 227 mandato do CDB → 231 trava por classe → 252 corte de custo) |
 | Tamanho | ~10.700 linhas de Python · ~8.400 de TS/CSS |
 
 ## O que aconteceu na madrugada de 2026-08-06 (upgrade do consultor)

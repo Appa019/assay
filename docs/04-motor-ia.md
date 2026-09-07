@@ -32,7 +32,6 @@ disco** com `CLAUDE.md`, `MEMORY.md`, ferramentas e notas.
 |---|---|---|---|
 | `storage/agent_workspace/` | comitê (aporte, semanal, maturidade) | `opus` / effort `max` | sim, baseline completo |
 | `storage/chat_workspace/` | consultor (chat) | roteado: haiku/sonnet/opus | sim, **perfil enxuto** (`profile="chat"`: só dados financeiros + fetch + memory) |
-| `storage/router_workspace/` | triagem do roteador | `haiku` / `low` | **não, de propósito** |
 | `storage/classifier_workspace/` | classificador de gasto | `haiku` / `low` | **não, de propósito** |
 
 > A **ausência** do `.mcp.json` é o que mantém os dois últimos rápidos (~5s):
@@ -214,8 +213,10 @@ Antes da Reunião nº 1, quatro blocos são prefixados ao primeiro prompt:
 
 1. **Preâmbulo** (`_build_preamble`) — valor do aporte, data LOCAL, mandato,
    trava por lote, ordem de ler/atualizar `MEMORY.md`, onde salvar os JSONs.
-2. **Consulta à última revisão semanal** (`_latest_weekly_context`) — até 6000
-   chars, cortado em fronteira de parágrafo.
+2. **Consulta à última revisão semanal** (`_latest_weekly_context`) — até 10000
+   chars, cortado em fronteira de parágrafo. Generoso de propósito: no **modo
+   delta** (abaixo) este bloco É a pesquisa macro que a Reunião nº 1 deixou de
+   refazer, então truncá-lo custaria mais do que economiza.
 3. **Track record** (`_track_record_context`) — últimas 12 vendas com P&L e hit
    rate. Sem isso o comitê é um oráculo sem memória de ter errado.
 4. **Ordens pendentes** (`_pending_orders_context`, 2026-08-06) — a folha
@@ -224,6 +225,23 @@ Antes da Reunião nº 1, quatro blocos são prefixados ao primeiro prompt:
 
 As Reuniões nº 3 e nº 4 (DD por nome) rodam com **2× o timeout** das demais
 (`step_timeouts` do `run_chain`).
+
+### Modo delta da Reunião nº 1 (D37)
+
+A Reunião nº 1 tem **dois templates**. O completo roda as 11 rodadas de macro do
+zero e mediu **US$ 19,84** dos ~US$ 63 de um aporte. Quando existe uma revisão
+semanal com até `MACRO_DELTA_MAX_AGE_DAYS` (7) dias, essa pesquisa já foi feita
+pelo mesmo comitê e está colada no prompt como bloco de consulta — então
+`prompt_generator` renderiza `01_macro_delta.j2`: precifica só **o que mudou**,
+com orçamento explícito de ~8 buscas, e refaz a alocação tática.
+
+Sem revisão semanal (ou com uma velha), cai no template completo — o comitê
+nunca começa um aporte às cegas. `contribution_service` resolve a idade da
+revisão (`review_service.last_weekly_age_days`) na hora de renderizar; o delta
+emite **o mesmo contrato JSON** que as Reuniões 2-5 leem (`final_tactical_brl`,
+`juros_e_cdb`, `setores_b3`, `digital_assets`, `top_of_mind`, `pre_mortem_gic`),
+e há teste fixando isso. `MACRO_DELTA_ENABLED=false` volta ao template completo
+sempre.
 
 ## Fechamento e bloco de ordens
 
@@ -288,27 +306,32 @@ anti-duplicação, MCPs disponíveis, anti-manipulação e formato de resposta
 ## Roteador de modelo
 
 `model_router.py`. Antes, todo turno era opus/high — correto para "devo trocar
-CDB por PETR4?" e absurdo para "oi".
+CDB por PETR4?" e absurdo para "oi". **Três tiers, decididos por regra, sem
+chamar modelo nenhum** (a triagem por LLM foi removida em D31: no Pi custava
+5,6s de processo novo).
 
 ```
-atalho: saudação (≤24 chars, regex)          → FAST,     sem custo de triagem
-atalho: verbo de lançamento + valor          → FAST,     economiza ~6s
-        (dígito OU por extenso: "mil reais";
-         e SEM palavra de mercado — ticker
-         B3 ancorado em sufixo real 3/4/5/6/11)
-senão:  triagem haiku (1 palavra), COM as    → FAST | BALANCED | DEEP
-        últimas mensagens como contexto
-        (follow-up curto herda o tier do
-         assunto em curso)
-falha na triagem                             → BALANCED  (nunca derruba o chat)
-CHAT_ROUTER_ENABLED=false                    → DEEP sempre (comportamento antigo)
+saudação (≤24 chars, regex)              → FAST    haiku/low
+verbo de lançamento + valor              → FAST    (dígito OU por extenso;
+                                                    SEM palavra de mercado)
+consulta FACTUAL (≤160 chars):           → LOOKUP  sonnet/low
+  frase de recuperação (quanto tenho,
+  qual o preço, ordens pendentes…)
+  E nenhuma palavra de julgamento
+tudo o mais                              → DEEP    opus/high
+CHAT_ROUTER_ENABLED=false                → DEEP sempre
 ```
 
-A triagem roda ANTES de o turno adquirir o `_chat_turn.lock` — o tempo dela
-não estende mais a janela em que outra mensagem leva `ChatBusyError`.
+O tier LOOKUP (D37) existe porque ler um número que o app já tem não é
+consultoria: o histórico media **US$ 1,67 por turno** em opus, o preço de uma
+opinião de investimento, não o de um saldo. Ele é estreito de propósito —
+precisa de match positivo numa frase de recuperação **e** de nenhuma palavra de
+julgamento (`_ADVICE_RE`: devo, vale a pena, recomenda, comprar, vender, tese,
+risco…). "quanto tenho em cripto, devo aumentar?" carrega uma decisão e vai
+para opus. **Na dúvida, opus** continua valendo.
 
-Tiers (configuráveis): FAST = haiku/low · BALANCED = sonnet/medium ·
-DEEP = opus/high. O modelo e o tier usados ficam gravados na `ChatMessage`.
+O roteamento acontece ANTES de o turno adquirir o `_chat_turn.lock`. O modelo e
+o tier usados ficam gravados na `ChatMessage`.
 
 ## Classificador de gasto
 

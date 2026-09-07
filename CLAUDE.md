@@ -55,23 +55,28 @@ O agente roda autônomo: workspace persistente próprio
 (`storage/agent_workspace/` com CLAUDE.md de ordens permanentes + MEMORY.md
 que ele mesmo gerencia entre ciclos), carta branca (web + Bash + criar
 ferramentas via `--dangerously-skip-permissions`), effort sempre `max`, e
-respeita a trava de venda de `MIN_HOLDING_DAYS` (30) dias (só ações/crypto). Ao
-concluir, avisa no **app** (inbox + push); quando um lote de ação/crypto
-completa 30 dias, um cron roda a análise de maturidade. Aporte é ad-hoc.
+respeita a trava de venda por CLASSE (`MIN_HOLDING_DAYS` 30 nas ações,
+`MIN_HOLDING_DAYS_CRYPTO` 15 na cripto). Ao concluir, avisa no **app** (inbox +
+push); quando um lote cruza a trava da sua classe, um cron roda a análise de
+maturidade. Aporte é ad-hoc.
 
 ### Ciclos e mandato (2026-05)
 - **Aporte (ad-hoc)**: 5 etapas encadeadas + fechamento → folha de ordens.
 - **Revisão semanal (7d)**: comitê analisa macro + desempenho das posições +
   maturidade → `Report(weekly)` salvo + aviso no app; injetado como consulta nos
   aportes (`analysis_runner._latest_weekly_context`).
-- **Maturidade (por LOTE, só AÇÕES e CRYPTO)**: a trava de 30d é por compra
-  (cada `Asset` é um lote com seu `entry_date`). **CDB/Renda Fixa = liquidez
+- **Maturidade (por LOTE, só AÇÕES e CRYPTO)**: a trava é por compra (cada
+  `Asset` é um lote com seu `entry_date`) e **por CLASSE**: ação 30d (exigência
+  de compliance do cliente), cripto 7d (D36). **CDB/Renda Fixa = liquidez
   diária, SEM trava** (dry powder) — excluído de `pending_maturities`, vendável
-  a qualquer hora no `/vender`. Ao um lote de ação/crypto cruzar 30d,
+  a qualquer hora no `/vender`. Ao um lote cruzar a trava da sua classe,
   `check_cadence` roda análise de maturidade → `Report(maturity)` + aviso no app.
+  A regra mora em `portfolio_service.holding_lock_days` e SÓ lá — a API entrega
+  `lock_days_total`/`lock_days_left` no lote e `holding_lock_days` no resumo da
+  carteira; não recalcule em nenhum caller nem no front.
 - **Rotação de dry powder**: a revisão semanal pode recomendar VENDER CDB e
   COMPRAR uma ação/crypto se achar oportunidade relevante (a nova compra entra
-  na trava de 30d).
+  na trava da sua classe).
 - **Mandato de alocação**: alvo **RF 50% · Ações 35% · Crypto 15%** (desde
   2026-09-05, D33 — era 35/40/25). Tolerância de drawdown 99% = **20%** (D35). Vem de `settings.target_*`; NÃO repita o
   número em lugar nenhum. Renda Fixa = **só CDB Bradesco 100% CDI liquidez
@@ -134,8 +139,9 @@ sem Playwright.
 - **Ledger `Trade`**: toda compra/venda vira linha imutável com P&L realizado
   (`GET /api/portfolio/trades`); a venda continua removendo o `Asset`, mas o
   histórico é permanente (base de track record e IR).
-- **Trava de 30d é enforced no service** (`portfolio_service.sell_asset` →
-  `SellLockedError` → API 409). O bot pede confirmação em 2 passos no /vender.
+- **A trava é enforced no service** (`portfolio_service.sell_asset` →
+  `SellLockedError` → API 409), com o prazo da classe. O bot pede confirmação em
+  2 passos no /vender.
 - **Snapshot diário** (`portfolio_snapshot`, upsert) → curva de patrimônio em
   `GET /api/portfolio/history` (cron `daily_snapshot.py`).
 - **SQLite em WAL** + busy_timeout (API + bot + crons concorrentes) e backup
@@ -162,6 +168,11 @@ sem Playwright.
   observação fora do mandato.
 - **Alertas de falha**: todo cron avisa quando QUEBRA, não só no sucesso — via
   `notification_center`, que grava no inbox do app e dispara Web Push.
+- **Maturidade cede a vez à revisão semanal** (D37): se a semanal vence em ≤2
+  dias, `check_cadence` NÃO abre run próprio — a semanal já julga todo lote
+  liberado e marca as chaves (`mark_maturities`) ao concluir. Com trava por
+  classe as datas de destravamento deixaram de coincidir, o que dobraria o
+  número de runs por ciclo.
 - **systemd (preferido)**: `scripts/install_systemd.sh` instala backend +
   frontend (Restart=always) e timers persistentes (recuperam janelas perdidas
   com a máquina desligada). Cron continua disponível via `install_cron.sh`
@@ -242,10 +253,15 @@ Telegram for religado um dia, as duas portas compartilham a mesma transcrição.
   volta 202 na hora — um turno leva minutos, ninguém segura HTTP), `POST
   /api/chat/reset`. O front faz polling: 2,5s ocupado, 12s ocioso (o turno
   conclui no servidor, então a resposta chega mesmo se a página recarregar).
-- **Roteador de modelo** (`model_router`, D31): **2 tiers, decididos por regra,
-  sem chamar modelo nenhum**. `fast` = haiku/low SÓ para registrar gasto/ganho
-  ("gastei 42 no mercado") e saudação; `deep` = opus/high para TODO o resto.
-  **Na dúvida, opus.** Ficam de fora do caminho rápido de propósito: verbo no
+- **Roteador de modelo** (`model_router`, D31 + D37): **3 tiers, decididos por
+  regra, sem chamar modelo nenhum**. `fast` = haiku/low SÓ para registrar
+  gasto/ganho ("gastei 42 no mercado") e saudação; `lookup` = sonnet/low para
+  CONSULTA FACTUAL do que o app já tem (saldo, preço, ordens pendentes,
+  extrato) — precisa casar frase de recuperação, NÃO ter anexo (📎) e não ter
+  nenhuma palavra de julgamento; `deep` = opus/high para TODO o resto. **Na
+  dúvida, opus.** O tier `lookup` foi medido contra as 80 mensagens reais do
+  histórico e não pegou nenhuma (D37): ele existe pelo caso natural futuro, NÃO
+  como economia prometida. O custo do chat está no contexto por chamada. Ficam de fora do caminho rápido de propósito: verbo no
   presente ("ganho 5000", "meu VR é 800" — é fato recorrente, vai pro MEMORY.md)
   e qualquer pergunta, mesmo colada a um lançamento. NÃO reintroduza a triagem
   por LLM: no Pi ela custa 5,6s (processo novo do CLI) e deixava pergunta de
@@ -256,7 +272,7 @@ Telegram for religado um dia, as duas portas compartilham a mesma transcrição.
   Não manda mais o cliente usar comando.
 - **Sourcing de liquidez**: "preciso tirar 5 mil, de onde?" tem framework nas
   ordens permanentes — caixa primeiro, depois CDB (liquidez diária), nunca lote
-  travado nos 30d, e conta a isenção de IR (20k ações / 35k cripto) antes de
+  com `lock_days_left` > 0, e conta a isenção de IR (20k ações / 35k cripto) antes de
   recomendar. Ele recomenda; QUEM VENDE é o cliente.
 - **Classificador de gasto** (`classifier_service`): `POST /api/cashflow/classify`
   transforma "gastei 42,90 no mercado ontem" em rascunho estruturado (resolve
@@ -345,7 +361,8 @@ rsync -a --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
 - `.venv/bin/python scripts/telegram_bot.py`: bot interativo (também sobe no
   start.sh se Telegram configurado)
 - `.venv/bin/python scripts/check_cadence.py`: roda análise de maturidade dos
-  lotes de ação/crypto que cruzaram 30d (cron diário). Sem nag de aporte (ad-hoc)
+  lotes de ação/crypto que cruzaram a trava da classe (cron diário). Sem nag de
+  aporte (ad-hoc)
 - `.venv/bin/python scripts/weekly_review.py [--force]`: revisão semanal do
   comitê (macro + carteira + maturidade); auto-regula a 7 dias
 - `.venv/bin/python scripts/resume_pending.py [--watch [s]]`: retoma análises de
@@ -372,7 +389,7 @@ rsync -a --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
     memória; `run_analysis` p/ aporte), review_service (revisão semanal +
     maturidade via run_chain → Report), notification_center (inbox do app +
     Web Push + espelho opcional), telegram_service (Bot API),
-    notification_service (marcos de 30 dias por lote), chat_service (consultor
+    notification_service (marcos de maturidade por lote), chat_service (consultor
     turno de chat = `_run_claude_step` no chat_workspace),
     cashflow_service (ledger pessoal de gastos/ganhos)
 - `/scripts/`: run_analysis (aporte→análise), telegram_setup, telegram_bot,
@@ -433,9 +450,11 @@ rsync -a --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
   `Contribution.claude_session_id` para retomar entre reinícios de processo)
 - effort SEMPRE `max` no fluxo automático; agente tem carta branca e gerencia
   a própria memória em `storage/agent_workspace/MEMORY.md`
-- Trava de venda: `MIN_HOLDING_DAYS` (30) dias por LOTE vale só p/ AÇÕES e
-  CRYPTO. CDB/Renda Fixa = liquidez diária (vende a qualquer hora). O bot
-  bloqueia `/vender` de ação/crypto antes do prazo, mas libera CDB sempre
+- Trava de venda por LOTE e por CLASSE: `MIN_HOLDING_DAYS` (30) nas AÇÕES —
+  compliance do cliente, não encurte — e `MIN_HOLDING_DAYS_CRYPTO` (7) na
+  CRYPTO. CDB/Renda Fixa = liquidez diária (vende a qualquer hora). Fonte única:
+  `portfolio_service.holding_lock_days`. O bot bloqueia `/vender` antes do prazo
+  da classe, mas libera CDB sempre
 - Bot do Telegram é PRIVADO: responde só ao `TELEGRAM_CHAT_ID` configurado
 - Os prompts são para Claude Code CLI (com WebSearch/WebFetch/Bash) —
   não para claude.ai web
@@ -464,7 +483,13 @@ Templates em `app/agents_prompts/` (01_macro_strategy, 02_research_selection,
 macro/selection/equity_diligence/crypto_diligence/decision.
 
 ### Reunião nº 1 — Macro · Alocação Tática (GIC)
-12 personas. 11 rounds: Top of Mind → macro BR → macro global → juros & CDB
+**Dois templates (D37):** se existe revisão semanal com ≤ `MACRO_DELTA_MAX_AGE_DAYS`
+(7) dias, roda `01_macro_delta.j2` — precifica só o DELTA desde aquela revisão
+(4 rodadas, orçamento de ~8 buscas), com o MESMO contrato JSON. Sem revisão
+fresca, roda o completo abaixo. Não duplique a regra: quem decide é
+`prompt_generator._macro_delta_applies`.
+
+Completo: 12 personas. 11 rounds: Top of Mind → macro BR → macro global → juros & CDB
 (curva DI como SINAL de CDI; FGC) → setor B3 + style tilts → crypto on-chain →
 risk frame + Black-Litterman (3 buckets) → ESG/special sit → tax → behavioral →
 decisão tactical (BL+RP+HRP) → pre-mortem. Saída: `final_tactical_brl`
@@ -472,15 +497,17 @@ decisão tactical (BL+RP+HRP) → pre-mortem. Saída: `final_tactical_brl`
 
 ### Reunião nº 2 — Universo, Filtros e Seleção (+ CDB final)
 12 personas + 2 vetos. Universo → long lists → filtros (quant + forense preview)
-→ **SELEÇÃO** (5-8 ações + 3-5 cryptos, com sizing-alvo) → **CDB final**
+→ **SELEÇÃO** (4-5 ações + 3-4 cryptos, com sizing-alvo — poucos nomes de
+propósito: a DD escreve um memo completo por nome, D37) → **CDB final**
 (instrumento fixo: Bradesco 100% CDI liquidez diária; só valor + sanidade de
 crédito). Saída: `selecao_acoes_b3`, `selecao_crypto`, `shortlist_cdb`
 (1 item, valor_brl + credit do emissor), `sanidade_selecao`. NÃO escreve o memo final.
 
 ### Reunião nº 3 — Due Diligence de Ações B3
 Equity desk. Memo COMPLETO por ação de `selecao_acoes_b3`: thesis + valuation
-triangulada (DCF 3-stage/Reverse/CCA/Precedent/LBO/SOTP) + forense (Piotroski/
-Altman/Beneish/Sloan/Dechow) + Capital Allocation + técnica + factor + bull/base/
+triangulada em **3 métodos** (múltiplos + Reverse DCF + DCF 3-stage + CCA +
+consenso com ≥3 fontes; Precedent/LBO/SOTP foram CORTADOS em D37 — não
+reintroduza) + forense (Piotroski/Altman/Beneish/Sloan/Dechow) + Capital Allocation + técnica + factor + bull/base/
 bear. Saída: `shortlist_acoes_b3` (objeto completo por nome) + pair_trades. Pode
 usar subagentes (Task) por ticker (memo em ./dd/), best-effort.
 

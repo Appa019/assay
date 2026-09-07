@@ -65,6 +65,41 @@ def stock_unlocked(session: Session) -> Asset:
 
 
 @pytest.fixture()
+def crypto_locked(session: Session) -> Asset:
+    """A crypto lot bought 5 days ago — still inside the 7-day crypto lock."""
+    asset = Asset(
+        ticker="BTC",
+        asset_class=AssetClass.CRYPTO,
+        quantity=Decimal("0.01"),
+        avg_price=Decimal("300000.00"),
+        current_price=Decimal("330000.00"),
+        entry_date=date.today() - timedelta(days=5),
+    )
+    session.add(asset)
+    session.commit()
+    session.refresh(asset)
+    return asset
+
+
+@pytest.fixture()
+def crypto_unlocked(session: Session) -> Asset:
+    """A crypto lot bought 20 days ago — free at 7 days, still locked if it
+    were a stock (30d). Guards the per-class rule against a regression."""
+    asset = Asset(
+        ticker="ETH",
+        asset_class=AssetClass.CRYPTO,
+        quantity=Decimal("1"),
+        avg_price=Decimal("10000.00"),
+        current_price=Decimal("11000.00"),
+        entry_date=date.today() - timedelta(days=20),
+    )
+    session.add(asset)
+    session.commit()
+    session.refresh(asset)
+    return asset
+
+
+@pytest.fixture()
 def cdb(session: Session) -> Asset:
     asset = Asset(
         ticker="CDB-ITAU",

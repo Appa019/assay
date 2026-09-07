@@ -99,13 +99,38 @@ def delete_asset(session: Session, asset_id: UUID) -> Asset:
     return asset
 
 
+def holding_lock_days(asset_class: AssetClass | str) -> int:
+    """How many days a lot of this class must be held before it can be sold.
+
+    The lock is PER CLASS and this is its single source of truth — every
+    surface (API, bot, reviews, prompts, front-end) reads the rule from here.
+    Stocks carry the client's 30-day compliance hold; crypto has no such legal
+    requirement and uses a shorter one; CDB has daily liquidity and never
+    locks. An unknown class falls back to the strictest lock on purpose.
+    """
+    if asset_class == AssetClass.FIXED_INCOME:
+        return 0
+    if asset_class == AssetClass.CRYPTO:
+        return settings.min_holding_days_crypto
+    return settings.min_holding_days
+
+
 def sell_lock_days_left(asset: Asset, *, today: date | None = None) -> int:
     """Days until this lot unlocks. 0 = sellable. CDB never locks."""
-    if asset.asset_class == AssetClass.FIXED_INCOME:
+    lock_days = holding_lock_days(asset.asset_class)
+    if lock_days <= 0:
         return 0
     today = today or date.today()
     held = (today - asset.entry_date).days
-    return max(0, settings.min_holding_days - held)
+    return max(0, lock_days - held)
+
+
+def to_asset_read(asset: Asset, *, today: date | None = None) -> AssetRead:
+    """Serialize a lot WITH its lock state, so no client re-implements the rule."""
+    read = AssetRead.model_validate(asset, from_attributes=True)
+    read.lock_days_total = holding_lock_days(asset.asset_class)
+    read.lock_days_left = sell_lock_days_left(asset, today=today)
+    return read
 
 
 def sell_asset(
@@ -129,8 +154,9 @@ def sell_asset(
     if days_left > 0:
         raise SellLockedError(
             f"{asset.ticker} ainda travado: lote de {asset.entry_date.isoformat()} "
-            f"libera em {days_left} dia(s) (trava de {settings.min_holding_days}d "
-            "por lote para ações e crypto)."
+            f"libera em {days_left} dia(s) (trava de "
+            f"{holding_lock_days(asset.asset_class)}d por lote para "
+            f"{'crypto' if asset.asset_class == AssetClass.CRYPTO else 'ações'})."
         )
 
     if price is None:
@@ -251,12 +277,17 @@ def get_portfolio_summary(session: Session) -> PortfolioSummary:
         "stocks": allocation.stocks_pct - target["stocks"],
         "crypto": allocation.crypto_pct - target["crypto"],
     }
-    asset_reads = [AssetRead.model_validate(a, from_attributes=True) for a in assets]
+    asset_reads = [to_asset_read(a) for a in assets]
     return PortfolioSummary(
         total_value=allocation.total_value,
         allocation=allocation,
         target_allocation=target,
         deviation=deviation,
+        holding_lock_days={
+            "fixed_income": holding_lock_days(AssetClass.FIXED_INCOME),
+            "stocks": holding_lock_days(AssetClass.STOCKS),
+            "crypto": holding_lock_days(AssetClass.CRYPTO),
+        },
         assets=asset_reads,
     )
 
@@ -283,6 +314,8 @@ def build_portfolio_snapshot(session: Session) -> list[dict[str, Any]]:
                 "total_value": round(total_value, 2),
                 "pnl_pct": round(pnl_pct, 2) if pnl_pct is not None else None,
                 "days_in_portfolio": (today - asset.entry_date).days,
+                "lock_days_total": holding_lock_days(asset.asset_class),
+                "lock_days_left": sell_lock_days_left(asset, today=today),
                 "entry_date": asset.entry_date.isoformat(),
                 "thesis": asset.thesis,
                 "target_price": float(asset.target_price) if asset.target_price else None,

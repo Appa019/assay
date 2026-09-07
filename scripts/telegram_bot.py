@@ -476,7 +476,6 @@ def _cmd_status() -> str:
 
 def _cmd_carteira() -> str:
     today = date.today()
-    min_days = settings.min_holding_days
     with Session(engine) as s:
         assets = portfolio_service.list_assets(s)
     if not assets:
@@ -486,12 +485,13 @@ def _cmd_carteira() -> str:
         days = (today - a.entry_date).days
         price = a.current_price if a.current_price is not None else a.avg_price
         value = float(a.quantity * price)
+        days_left = portfolio_service.sell_lock_days_left(a, today=today)
         if a.asset_class == AssetClass.FIXED_INCOME:
             lock = "🔓 liquidez diária"  # CDB has no lock
-        elif days >= min_days:
+        elif days_left == 0:
             lock = "🔓 liberado"
         else:
-            lock = f"🔒 faltam {min_days - days}d"
+            lock = f"🔒 faltam {days_left}d"
         lines.append(f"• {a.ticker} ({a.asset_class}) · {_fmt_brl(value)} · {days}d · {lock}")
     return "\n".join(lines)
 
@@ -522,7 +522,8 @@ def _cmd_comprei(args: list[str]) -> str:
     if asset_class == AssetClass.FIXED_INCOME:
         liquidez = "Liquidez diária: pode vender quando quiser."
     else:
-        liquidez = f"Liberado para venda em {settings.min_holding_days} dias (trava por lote)."
+        lock_days = portfolio_service.holding_lock_days(asset_class)
+        liquidez = f"Liberado para venda em {lock_days} dias (trava por lote)."
     return (
         f"✅ Registrado: {asset.ticker} ({asset.asset_class}): "
         f"{float(asset.quantity)} @ {_fmt_brl(float(asset.avg_price))}.\n{liquidez}"
@@ -535,7 +536,6 @@ def _cmd_vender(args: list[str]) -> str:
     ticker = args[0].strip().upper()
     confirming = len(args) > 1 and args[1].lower() in {"confirmar", "sim", "confirma"}
     today = date.today()
-    min_days = settings.min_holding_days
     with Session(engine) as s:
         # Lots = one row per purchase. Sell the OLDEST lot that has matured.
         lots = list(
@@ -543,17 +543,14 @@ def _cmd_vender(args: list[str]) -> str:
         )
         if not lots:
             return f"Não achei {ticker} na carteira."
-        # CDB / fixed income = daily liquidity (no lock). Stocks/crypto: 30d per lot.
-        sellable = [
-            a
-            for a in lots
-            if a.asset_class == AssetClass.FIXED_INCOME or (today - a.entry_date).days >= min_days
-        ]
+        # CDB = daily liquidity; stocks and crypto each carry their own lock.
+        sellable = [a for a in lots if portfolio_service.sell_lock_days_left(a, today=today) == 0]
         if not sellable:
-            soonest = min(min_days - (today - a.entry_date).days for a in lots)
+            soonest = min(portfolio_service.sell_lock_days_left(a, today=today) for a in lots)
+            lock_days = portfolio_service.holding_lock_days(lots[0].asset_class)
             return (
                 f"🔒 {ticker} ainda travado: o lote mais próximo libera em {soonest} dia(s) "
-                f"(trava de {min_days}d vale só p/ ações e crypto)."
+                f"(trava de {lock_days}d para esta classe; CDB não trava)."
             )
         target = sellable[0]
         days = (today - target.entry_date).days
@@ -659,7 +656,8 @@ def _cmd_executei(args: list[str]) -> str:
     return (
         f"✅ Ordem executada: {ticker} · {float(qty)} @ {_fmt_brl(float(price))} = {total} "
         f"(planejado {planned}).\nO lote herdou a tese, o alvo e o stop do comitê; "
-        f"trava de {settings.min_holding_days}d se ação/crypto."
+        f"trava de {portfolio_service.holding_lock_days(order.asset_class)}d "
+        "(CDB não trava)."
     )
 
 

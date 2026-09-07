@@ -80,7 +80,8 @@ execute_order()
  └─ Order.status = executed + quantity/price/asset_id/executed_at
 ```
 
-A partir daqui o lote entra na trava de 30d, aparece na revisão semanal com a
+A partir daqui o lote entra na trava da sua classe (ação 30d, cripto 7d),
+aparece na revisão semanal com a
 tese registrada, e o `check_alerts.py` passa a vigiar alvo/stop.
 
 ---
@@ -110,14 +111,14 @@ dizer "manter CDB, sem rotação esta semana".
 
 ---
 
-## Fluxo 4 — Maturidade de lote (30 dias)
+## Fluxo 4 — Maturidade de lote (30d ação · 7d cripto)
 
 `scripts/check_cadence.py` (timer diário 09:00, idempotente).
 
 ```
 notification_service.pending_maturities()
   ├─ ignora fixed_income (liquidez diária, nunca "destrava")
-  ├─ lotes com (hoje - entry_date) >= 30 dias
+  ├─ lotes com (hoje - entry_date) >= holding_lock_days(classe)
   └─ menos os já tratados (storage/notifications_state.json)
 
 se houver → review_service.run_maturity_review()

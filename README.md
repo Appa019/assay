@@ -116,7 +116,7 @@ Com o `./start.sh` rodando, o bot sobe junto e responde **só ao seu chat**:
 /aporte 5000                      roda o comitê e devolve a folha de ordens aqui
 /comprei PETR4 acoes 100 38,50    registra a compra (cada compra = um lote)
 /carteira                         posições + o que já pode ser vendido (por lote)
-/vender PETR4                     vende o lote mais antigo já liberado (≥30 dias)
+/vender PETR4                     vende o lote mais antigo já liberado (trava da classe)
 /revisao                          dispara a revisão semanal do comitê agora
 /relatorios                       últimos relatórios (semanais + maturidade)
 /status   ·   /ajuda
@@ -147,10 +147,11 @@ Com o `./start.sh` rodando, o bot sobe junto e responde **só ao seu chat**:
 |---|---|---|
 | **Aporte** | Ad-hoc (quando você quiser) | 5 etapas encadeadas → folha de ordens → Telegram |
 | **Revisão semanal** | A cada 7 dias (cron) | Macro + desempenho das posições + rotação de CDB para oportunidades |
-| **Maturidade** | Quando um lote de ação/crypto cruza 30 dias | Comitê reavalia manter / vender / aumentar |
+| **Maturidade** | Quando um lote cruza a trava da classe (ação 30d · cripto 7d) | Comitê reavalia manter / vender / aumentar |
 
-- **Trava de venda por lote (30 dias):** cada compra matura na sua própria data;
-  vale só para ações e crypto. **CDB tem liquidez diária** (vende quando quiser).
+- **Trava de venda por lote e por classe:** cada compra matura na sua própria
+  data — **ação 30 dias** (exigência de compliance do cliente) e **cripto 7
+  dias**. **CDB tem liquidez diária** (vende quando quiser).
 - **Auto-resume (no processo):** se bater o limite de uso, o agente espera o reset
   e retoma a mesma etapa sozinho, na mesma sessão.
 - **Auto-retomada entre reinícios:** se o processo cair no meio (créditos/queda),
@@ -262,7 +263,8 @@ SQLITE_PATH=storage/portfolio.db
 TARGET_FIXED_INCOME=0.35      # alvo de alocação (CDB)
 TARGET_STOCKS=0.40            # alvo de alocação (Ações B3)
 TARGET_CRYPTO=0.25            # alvo de alocação (Crypto)
-MIN_HOLDING_DAYS=30           # trava de venda por lote (ações/crypto; CDB é líquido)
+MIN_HOLDING_DAYS=30           # trava de venda por lote das ações (compliance)
+MIN_HOLDING_DAYS_CRYPTO=7     # trava da cripto (CDB é líquido, nunca trava)
 AGENT_MODEL=opus
 AGENT_EFFORT=max
 COINGECKO_API_KEY=            # opcional (CoinGecko Pro)

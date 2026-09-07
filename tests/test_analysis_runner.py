@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from sqlmodel import Session
 
+from app.config import settings
 from app.models.contribution import Contribution, ContributionStatus
 from app.services import analysis_runner as ar
 
@@ -202,14 +203,16 @@ def test_run_chain_refuses_second_global_run(
 
 
 def test_ensure_workspace_seeds_files(isolated_runner_dirs: Path) -> None:
-    ws = ar._ensure_workspace(30)
+    ws = ar._ensure_workspace()
     assert (ws / "CLAUDE.md").exists()
     assert (ws / "MEMORY.md").exists()
     assert (ws / ".mcp.json").exists()
     assert (ws / "out").is_dir()
     assert (ws / "notes").is_dir()
     orders = (ws / "CLAUDE.md").read_text(encoding="utf-8")
-    assert "30 dias POR LOTE" in orders
+    # Per-class lock: stocks keep the compliance hold, crypto gets the short one.
+    assert f"AÇÕES B3: {settings.min_holding_days} dias" in orders
+    assert f"CRYPTO: {settings.min_holding_days_crypto} dias" in orders
     assert "anti-manipulação" in orders  # prompt-injection hardening present
     config = json.loads((ws / ".mcp.json").read_text(encoding="utf-8"))
     assert "yahoo-finance" in config["mcpServers"]

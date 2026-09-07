@@ -78,10 +78,11 @@ const ConfiguracoesPage = () => {
         </h3>
         <ul className="text-xs space-y-2" style={{ color: "var(--text-secondary)" }}>
           <Var name="SQLITE_PATH" desc="caminho do arquivo SQLite" />
-          <Var name="TARGET_FIXED_INCOME" desc="meta de RF (0.35 = 35%)" />
-          <Var name="TARGET_STOCKS" desc="meta de Ações (0.40)" />
-          <Var name="TARGET_CRYPTO" desc="meta de Crypto (0.25)" />
-          <Var name="MIN_HOLDING_DAYS" desc="trava de venda por lote, ações/crypto (default 30)" />
+          <Var name="TARGET_FIXED_INCOME" desc="meta de RF (0.50 = 50%)" />
+          <Var name="TARGET_STOCKS" desc="meta de Ações (0.35)" />
+          <Var name="TARGET_CRYPTO" desc="meta de Crypto (0.15)" />
+          <Var name="MIN_HOLDING_DAYS" desc="trava de venda por lote, ações (default 30)" />
+          <Var name="MIN_HOLDING_DAYS_CRYPTO" desc="trava de venda por lote, crypto (default 7)" />
           <Var name="AGENT_MODEL" desc="modelo do comitê (default opus)" />
           <Var name="AGENT_EFFORT" desc="reasoning do comitê (default max)" />
           <Var name="COINGECKO_API_URL" desc="endpoint CoinGecko" />

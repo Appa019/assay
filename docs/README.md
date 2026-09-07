@@ -74,7 +74,7 @@ Se você quebrar uma destas, quebrou o produto:
 |---|---|---|
 | 1 | **O Pi é produção.** O desktop só escreve código. Nunca rode o bot em duas máquinas (polling duplicado = resposta em dobro). | `docs/09-operacao.md` |
 | 2 | **Bind sempre em `127.0.0.1`.** A LAN é compartilhada com o prédio. Quem publica é o `tailscale serve`. | `scripts/install_systemd.sh` |
-| 3 | **Trava de venda de 30 dias por LOTE, só ações e crypto.** CDB tem liquidez diária (é o dry powder). | `portfolio_service.sell_asset` |
+| 3 | **Trava de venda por LOTE e por CLASSE: ação 30d (compliance), cripto 7d.** CDB tem liquidez diária (é o dry powder). | `portfolio_service.holding_lock_days` |
 | 4 | **Mandato de 3 classes:** Renda Fixa = só CDB Bradesco 100% CDI liquidez diária (instrumento único e fixo) · Ações = só equities B3 (sem FII/ETF/BDR) · Crypto = agressivo. | ordens permanentes + todos os prompts |
 | 5 | **Nunca mencione Claude em commit, código ou co-author.** Nunca comite `.env` nem `storage/`. | `.gitignore`, convenção de commits |
 

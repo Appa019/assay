@@ -15,7 +15,7 @@ Base: `http://127.0.0.1:8000` (o navegador nunca fala direto — o Next reescrev
 | `GET` | `/assets` | Todos os lotes |
 | `POST` | `/assets` | Cria lote → também grava `Trade(buy)`. Body: `ticker`, `asset_class`, `quantity>0`, `avg_price>0`, `current_price?`, `entry_date?`, `name?` |
 | `PATCH` | `/assets/{id}` | Atualiza `name`, `quantity`, `avg_price`, `current_price`, `thesis`, `target_price`, `stop_price` |
-| `POST` | `/assets/{id}/sell` | Vende o lote. Body OPCIONAL `{"price", "quantity"}`: `price` = preço REAL de execução (sem ele usa a marcação); `quantity` = venda PARCIAL (o resto do lote mantém `entry_date`/PM). **409** dentro da trava de 30d · **422** quantidade > lote |
+| `POST` | `/assets/{id}/sell` | Vende o lote. Body OPCIONAL `{"price", "quantity"}`: `price` = preço REAL de execução (sem ele usa a marcação); `quantity` = venda PARCIAL (o resto do lote mantém `entry_date`/PM). **409** dentro da trava da classe (ação 30d · cripto 7d) · **422** quantidade > lote |
 | `DELETE` | `/assets/{id}` | Remove sem gravar venda (correção de cadastro) |
 | `POST` | `/refresh` | Marca tudo a mercado. Best-effort, devolve contagens |
 | `GET` | `/history?days=365` | Snapshots diários, cronológicos (curva de patrimônio) |

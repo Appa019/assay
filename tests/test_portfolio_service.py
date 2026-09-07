@@ -3,6 +3,7 @@ from decimal import Decimal
 import pytest
 from sqlmodel import Session, select
 
+from app.config import settings
 from app.models.asset import Asset, AssetClass
 from app.models.trade import Trade, TradeSide
 from app.schemas.asset import AssetCreate
@@ -93,6 +94,41 @@ def test_sell_lock_days_left(stock_locked: Asset, stock_unlocked: Asset, cdb: As
     assert portfolio_service.sell_lock_days_left(stock_locked) == 25
     assert portfolio_service.sell_lock_days_left(stock_unlocked) == 0
     assert portfolio_service.sell_lock_days_left(cdb) == 0  # daily liquidity
+
+
+def test_holding_lock_is_per_class(
+    crypto_locked: Asset, crypto_unlocked: Asset, cdb: Asset
+) -> None:
+    """Crypto carries the short lock; the 30-day hold is a stock-only rule."""
+    assert portfolio_service.holding_lock_days(AssetClass.STOCKS) == settings.min_holding_days
+    assert (
+        portfolio_service.holding_lock_days(AssetClass.CRYPTO) == settings.min_holding_days_crypto
+    )
+    assert portfolio_service.holding_lock_days(AssetClass.FIXED_INCOME) == 0
+    assert portfolio_service.sell_lock_days_left(crypto_locked) == 2  # 7 − 5
+    # 20 days old: free as crypto, would still be locked as a stock.
+    assert portfolio_service.sell_lock_days_left(crypto_unlocked) == 0
+
+
+def test_sell_locked_crypto_lot_raises(session: Session, crypto_locked: Asset) -> None:
+    with pytest.raises(portfolio_service.SellLockedError):
+        portfolio_service.sell_asset(session, crypto_locked.id)
+    assert session.get(Asset, crypto_locked.id) is not None
+
+
+def test_sell_crypto_lot_past_its_shorter_lock(session: Session, crypto_unlocked: Asset) -> None:
+    result = portfolio_service.sell_asset(session, crypto_unlocked.id)
+    assert result.sale_value == Decimal("11000.00")
+    assert session.get(Asset, crypto_unlocked.id) is None
+
+
+def test_asset_read_carries_the_lock(crypto_locked: Asset, cdb: Asset) -> None:
+    """Clients render the lock from the API instead of re-deriving the rule."""
+    crypto = portfolio_service.to_asset_read(crypto_locked)
+    assert crypto.lock_days_total == settings.min_holding_days_crypto
+    assert crypto.lock_days_left == 2
+    fixed = portfolio_service.to_asset_read(cdb)
+    assert fixed.lock_days_total == 0 and fixed.lock_days_left == 0
 
 
 def test_daily_snapshot_upserts(session: Session, stock_unlocked: Asset) -> None:

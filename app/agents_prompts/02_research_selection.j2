@@ -11,7 +11,7 @@ Mesma conversa/sessão da Reunião nº 1. O GIC entregou a alocação tática po
 classe para o aporte de **R$ {{ amount_brl_formatted }}** em **{{ contribution_date }}**.
 
 Esta é a etapa de **AFUNILAMENTO**: universo → long list → filtros →
-**seleção da shortlist** (decidir QUAIS 5-8 ações B3 e 3-5 cryptos vão para a due
+**seleção da shortlist** (decidir QUAIS 4-5 ações B3 e 3-4 cryptos vão para a due
 diligence profunda) e a **finalização do CDB** (emissor FIXO: Bradesco, 100% CDI,
 liquidez diária — só confirmar valor e sanidade de crédito).
 A due diligence completa por nome acontece nas Reuniões nº 3 (Ações) e nº 4
@@ -24,7 +24,8 @@ A due diligence completa por nome acontece nas Reuniões nº 3 (Ações) e nº 4
 > **(3) Crypto = agressivo**. **NÃO** analisar/recomendar Tesouro, LCI/LCA,
 > debêntures, CRI/CRA, fundos, FII, ETF (GOLD11/BOVA11/IVVB11), BDR, ouro, DOL ou
 > internacional. USD só via stablecoin USDC (crypto). Trava de venda por LOTE de
-> compra (ações/crypto maturam 30 dias; CDB é líquido).
+> compra (ação matura {{ lock_days_stocks }} dias, cripto
+> {{ lock_days_crypto }}; CDB é líquido).
 
 ## CAST (12 personas + 2 vetos)
 
@@ -135,7 +136,10 @@ NÃO troque de emissor — reduza o bolso CDB e sinalize ao cliente no JSON.
 ## ROUND 4 — SELEÇÃO da Shortlist (Lucas + Rafael + CRO)
 
 Da long list filtrada, **escolha os finalistas que irão à due diligence profunda**:
-- **5-8 ações B3** e **3-5 cryptos** (BTC/ETH core sempre presentes; alts conforme narrativa).
+- **4-5 ações B3** e **3-4 cryptos** (BTC/ETH core sempre presentes; alts conforme narrativa).
+  Poucos nomes de propósito: a due diligence seguinte escreve um memo COMPLETO por
+  nome, e é melhor ter 4 teses fundamentadas do que 8 rasas. Corte por convicção,
+  não por setor.
 - Para cada selecionado: motivo da seleção (1-2 frases, ligado à tese/rating da R1) + **sizing-alvo %**
   dentro do bolso (preliminar; a Reunião nº 5 fecha o número final).
 - Respeite na seleção: nenhum setor domina (> 50% das ações); BTC+ETH ≥ 50% do conjunto crypto.
@@ -239,7 +243,7 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
 
 > **VALIDAÇÕES OBRIGATÓRIAS:**
 >
-> 1. ✓ 5-8 ações e 3-5 cryptos selecionadas; cada uma com `motivo_selecao` + `sizing_alvo`
+> 1. ✓ 4-5 ações e 3-4 cryptos selecionadas; cada uma com `motivo_selecao` + `sizing_alvo`
 > 2. ✓ Σ `sizing_alvo_pct_acoes` = 100 e Σ `sizing_alvo_pct_crypto` = 100
 > 3. ✓ BTC + ETH presentes no conjunto crypto; nenhum setor > 50% das ações
 > 4. ✓ Cada selecionado: `validado_3_fontes=true`

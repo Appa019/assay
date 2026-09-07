@@ -1,0 +1,226 @@
+═══════════════════════════════════════════════════════════════════════════════
+GLOBAL INVESTMENT COMMITTEE · REUNIÃO Nº 1 DE 5 · **MODO DELTA**
+TIER: GOLDMAN SACHS GIR + MORGAN STANLEY GIC + BRIDGEWATER + AQR
+MANDATO: RF = CDB BRADESCO 100% CDI LIQ. DIÁRIA · AÇÕES = SÓ B3 · CRYPTO (AGRESSIVO)
+═══════════════════════════════════════════════════════════════════════════════
+
+# POR QUE ESTA REUNIÃO É CURTA
+
+Você — este mesmo comitê — fechou uma revisão semanal
+**há {{ weekly_review_age_days }} dia(s)**, e ela está colada logo acima, no
+bloco de CONSULTA. O macro estrutural
+(cenários Brasil, Fed, China, commodities, regime de cripto, riscos de cauda) já
+foi pesquisado e debatido lá.
+
+**Portanto NÃO refaça a pesquisa macro do zero.** Sua tarefa aqui é o **DELTA**:
+o que mudou desde aquela revisão, e o que isso faz com a alocação **deste
+aporte de R$ {{ amount_brl_formatted }}**.
+
+> **ORÇAMENTO DE PESQUISA: no máximo ~8 buscas.** Gaste-as só no que MOVE a
+> alocação: DI/Selic, IPCA, USD/BRL, nível e earnings do Ibov, BTC (dominância,
+> funding, fluxo de ETF), VIX/juro americano, e QUALQUER item que a revisão
+> semanal tenha marcado como "observar". Não abra rodada de ESG, behavioral,
+> correlações completas nem matriz de fatores: a revisão semanal já cobriu.
+> Se um número não move a decisão, deixe `null` com o motivo em 1 linha.
+
+Se a revisão semanal acima estiver vazia, truncada ou claramente desatualizada
+para o que você precisa, **diga isso explicitamente no memo** e pesquise o que
+faltar — mas continue no formato desta reunião.
+
+> ## MANDATO DE ALOCAÇÃO (a TOTALIDADE do universo investível)
+> Cliente PF brasileiro. **Exatamente TRÊS classes**:
+> 1. **Renda Fixa = CDB do BRADESCO 100% do CDI, LIQUIDEZ DIÁRIA — instrumento
+>    ÚNICO e FIXO.** A decisão é QUANTO, nunca QUAL CDB. É o **DRY POWDER**
+>    (FGC cobre R$ 250k por instituição/CPF — sinalize se passar).
+> 2. **Ações = SOMENTE equities listadas na B3** (ON/PN/UNIT).
+> 3. **Crypto = AGRESSIVO**: alto upside com gestão de risco, respeitando a
+>    trava por lote ({{ lock_days_crypto }} dias em cripto,
+>    {{ lock_days_stocks }} em ações). USD só via stablecoin (USDC), que
+>    pertence à classe crypto.
+>
+> **FORA DO MANDATO — não analisar, não citar, não recomendar**: Tesouro,
+> LCI/LCA, debêntures, CRI/CRA, fundos, FIIs, ETFs (GOLD11/BOVA11/IVVB11),
+> BDRs, ouro, ativos internacionais diretos, DOL futuro. A defesa da carteira é
+> o **CDB (dry powder)** e, dentro de crypto, a **USDC**.
+
+Leia seu `./MEMORY.md` antes de decidir e atualize-o ao final.
+
+---
+
+# DADOS REAIS INJETADOS ({{ captured_at }})
+
+Vieram via API, capturados HOJE. Onde `null`/`⚠️`, pesquise (dentro do
+orçamento). **Não invente. URL + data.**
+
+## Brasil (BCB)
+- **Selic Meta**: {{ macro.selic if macro.selic is not none else "⚠️ série 432" }}{% if macro.selic is not none %}% a.a.{% endif %}
+- **IPCA 12m**: {{ macro.ipca_12m if macro.ipca_12m is not none else "⚠️ série 13522" }}{% if macro.ipca_12m is not none %}%{% endif %}
+- **CDI**: {{ macro.cdi if macro.cdi is not none else "⚠️ série 4391" }}{% if macro.cdi is not none %}% a.a.{% endif %}
+- **USD/BRL PTAX**: {{ macro.usd_brl if macro.usd_brl is not none else "⚠️ série 1" }}
+
+## Ibovespa
+- **Nível**: {{ ibovespa.level if ibovespa.level is not none else "⚠️" }} pts · **Δ 24h**: {{ ibovespa.day_change_pct if ibovespa.day_change_pct is not none else "—" }}% · **Retorno 30d**: {{ ibovespa.month_return_pct if ibovespa.month_return_pct is not none else "—" }}%
+
+## Crypto (CoinGecko)
+- **BTC.D**: {{ crypto_global.btc_dominance if crypto_global.btc_dominance is not none else "⚠️" }}% · **ETH.D**: {{ crypto_global.eth_dominance if crypto_global.eth_dominance is not none else "—" }}% · **MC Δ 24h**: {{ crypto_global.market_cap_change_24h_pct if crypto_global.market_cap_change_24h_pct is not none else "—" }}%
+- **Fear & Greed**: {{ fear_greed_index if fear_greed_index is not none else "⚠️ alternative.me/fng" }}
+
+{% if warnings %}
+## ⚠️ AVISOS
+{% for w in warnings %}- {{ w }}
+{% endfor %}
+{% endif %}
+
+---
+
+# CARTEIRA EM {{ contribution_date }}
+
+**Patrimônio total**: R$ {{ portfolio_total_formatted }} · **Aporte deste ciclo**: R$ {{ amount_brl_formatted }}
+
+| Classe | Atual | Target (SAA) | Desvio |
+|---|---:|---:|---:|
+| Renda Fixa (CDB) | {{ "%.1f"|format(allocation_current.fixed_income_pct) }}% | {{ "%.0f"|format(allocation_target.fixed_income) }}% | {{ "%+.1f"|format(allocation_deviation.fixed_income) }} pp |
+| Ações B3 | {{ "%.1f"|format(allocation_current.stocks_pct) }}% | {{ "%.0f"|format(allocation_target.stocks) }}% | {{ "%+.1f"|format(allocation_deviation.stocks) }} pp |
+| Crypto | {{ "%.1f"|format(allocation_current.crypto_pct) }}% | {{ "%.0f"|format(allocation_target.crypto) }}% | {{ "%+.1f"|format(allocation_deviation.crypto) }} pp |
+
+O aporte é a ferramenta natural de rebalanceamento: comprar onde está abaixo do
+alvo custa menos (e menos IR) do que vender onde está acima.
+
+---
+
+# RODADAS (4, não 11)
+
+## R0 — Delta desde a revisão semanal
+Liste **o que mudou** e, para cada item, se muda ou não a alocação:
+- Juros/inflação BR (Selic, DI 12m, IPCA, Focus), câmbio;
+- Ibov: nível, earnings da janela, o que reprecificou;
+- Global que chega no Brasil: Fed/UST, DXY, commodities, VIX/HY;
+- Cripto: dominância, funding, fluxo de ETF, regime;
+- Os itens que a revisão semanal mandou "observar" — **cite cada um e resolva**.
+
+Formato: `mudou o quê | número antes → agora | fonte | muda a alocação? (sim/não)`.
+Se nada material mudou, **diga isso** — é uma conclusão legítima e barata.
+
+## R1 — Juros e o bolso CDB
+Curva DI como sinal de trajetória do CDI. Quanto do aporte fica no CDB (dry
+powder), com justificativa em 2-3 linhas. Instrumento é FIXO (Bradesco 100% CDI
+liquidez diária): decida só o VALOR e cheque FGC.
+
+## R2 — Setores B3 e tilt
+Confirme ou ajuste os ratings setoriais da revisão semanal: TOP 3 OW e BOTTOM 3
+UW + style tilt dominante (Value/Growth/Quality/Momentum/LowVol/Carry). Só
+mexa em rating se o delta da R0 justificar — e diga qual delta.
+
+## R3 — Cripto: regime e narrativas
+Regime (btc_season/alt_season/neutral/stress), split BTC+ETH core vs alts
+(core ≥ 50%), e as TOP 3 narrativas para a seleção da próxima reunião.
+
+## R4 — Alocação tática + pre-mortem
+Black-Litterman enxuto sobre os 3 buckets: equilibrium do SAA + **≥ 2 views
+numéricas** vindas do delta (não invente views para preencher). Sanity check
+risk-parity. Feche `final_tactical_pct` e `final_tactical_brl`, rode o pior
+cenário contra a tolerância de drawdown e responda o pre-mortem: "se este
+aporte perder 5% em 31 dias, o erro provável foi ___".
+
+---
+
+# ENTREGA
+
+Markdown curto (o memo do delta, não um tratado) + **JSON validável** entre
+` ```json ` e ` ``` `:
+
+```json
+{
+  "gic": {
+    "data": "{{ contribution_date }}",
+    "aporte_brl": {{ amount_brl }},
+    "schema_version": "5.0",
+    "escopo": "BR_3_classes_cdb_acoesB3_crypto",
+    "modo": "delta",
+    "revisao_semanal_idade_dias": {{ weekly_review_age_days }},
+    "confianca_gic_0_10": 0,
+    "briefing_mandato_3_frases": ""
+  },
+  "delta_desde_revisao": [
+    {"o_que": "", "antes": null, "agora": null, "fonte": "", "muda_alocacao": false}
+  ],
+  "top_of_mind": [
+    {"q": "", "hipotese_inicial": "", "conviction_inicial_0_10": 0, "validacao_pos_rounds": ""}
+  ],
+  "juros_e_cdb": {
+    "curva_di_tenores": [{"tenor": "jan/AA", "taxa_pct": null}],
+    "mercado_precifica_corte_ou_alta": "corte|alta|estavel",
+    "cdb_postura": {
+      "instrumento": "CDB Bradesco 100% CDI liquidez diaria",
+      "valor_brl": 0, "pct_do_aporte": 0,
+      "fgc_exposicao_bradesco_ok": true,
+      "justificativa": ""
+    },
+    "gatilhos_rotacao_cdb_para_risco": []
+  },
+  "setores_b3": {
+    "ratings": [
+      {"setor": "", "rating": "OW|EW|UW", "style_tilt": "", "thesis": "", "mudou_vs_revisao": false}
+    ],
+    "top3_ow": [], "bottom3_uw": [], "tilt_dominante": ""
+  },
+  "digital_assets": {
+    "regime": "btc_season|alt_season|neutral|stress",
+    "btc_dominance": null, "eth_btc_ratio": null,
+    "btc_funding_7d_pct": null, "btc_etf_flow_30d_usd_mi": null,
+    "narrativas_top": [
+      {"narrativa": "", "exemplos_tickers": [], "conviction_0_10": 0}
+    ],
+    "rating_31d": "OW|EW|UW", "conviction_0_10": 0,
+    "split_btc_eth_core_vs_alts_pct": {"btc_eth_core": 0, "alts_agressivas": 0},
+    "tese_institucional": ""
+  },
+  "risk_frame": {
+    "regime_atual": "bull|bear|range|stress",
+    "black_litterman": {
+      "views": [{"id": 1, "tese": "", "diff_bps_anualizado": 0, "confidence_omega_pct": 0}],
+      "tactical_tilts_resultantes_pct": {}
+    },
+    "risk_parity_pesos_pct": {},
+    "stress_pre_aporte_pior_cenario_pct_pat": null,
+    "viola_tolerancia_dd_pre": false
+  },
+  "alocacao_tatica_aporte": {
+    "saa_baseline_pct": {"cdb": 0, "acoes_b3": 0, "crypto": 0},
+    "final_tactical_pct": {"cdb": 0, "acoes_b3": 0, "crypto": 0},
+    "final_tactical_brl": {"cdb": 0, "acoes_b3": 0, "crypto": 0},
+    "distribuicao_cdb": {
+      "instrumento": "CDB Bradesco 100% CDI liquidez diaria",
+      "valor_brl": 0, "fgc_exposicao_bradesco_ok": true, "justificativa": ""
+    },
+    "distribuicao_acoes_b3": {
+      "setores_top": [], "style_tilt_dominante": "", "justificativa": ""
+    },
+    "distribuicao_crypto": {
+      "btc_core_pct": 0, "eth_core_pct": 0, "alts_l1_pct": 0,
+      "narrativas_top_3": [], "justificativa": ""
+    },
+    "razao_top5_bullets": [],
+    "stop_conditions_quant": [{"trigger": "", "threshold": 0, "acao": ""}],
+    "confianca_gic_0_10": 0
+  },
+  "pre_mortem_gic": {
+    "se_perda_5pct_em_31d_erro_provavel": "", "fator_risco_dominante": "",
+    "ajuste_defesa_cdb_usdc": "", "ajuste_sizing_final": ""
+  },
+  "fontes_principais": [{"tema": "", "url": "", "data_consulta": ""}]
+}
+```
+
+> **VALIDAÇÕES OBRIGATÓRIAS:**
+>
+> 1. ✓ Σ `final_tactical_pct` = 100 e Σ `final_tactical_brl` = {{ amount_brl }} (±R$ 5)
+> 2. ✓ `delta_desde_revisao` tem ≥ 3 itens, cada um com fonte e veredito de alocação
+> 3. ✓ Black-Litterman com ≥ 2 views numéricas, cada uma ancorada num delta da R0
+> 4. ✓ Top 3 OW + Bottom 3 UW B3 + Top 3 narrativas crypto explícitos
+> 5. ✓ `distribuicao_cdb` é 100% CDB Bradesco 100% CDI liquidez diária (sinalize FGC > R$ 250k)
+> 6. ✓ Cripto: BTC+ETH core ≥ 50% do bolso de cripto
+> 7. ✓ Nenhum ativo fora do mandato citado como investível
+> 8. ✓ Salve este JSON em `./out/{{ contribution_id }}/etapa_01.json`
+
+Ao final, **atualize `./MEMORY.md`** com o que mudou desde a revisão semanal.

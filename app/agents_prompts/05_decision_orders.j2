@@ -22,9 +22,10 @@ Etapa final. Já temos, na mesma sessão encadeada:
 > dry powder; FGC R$ 250k/instituição); **(2) Ações = só equities da B3**;
 > **(3) Crypto = agressivo**. **NADA** de Tesouro, LCI/LCA, debêntures, CRI/CRA,
 > fundos, FII, ETF (GOLD11/BOVA11/IVVB11), BDR, ouro, DOL ou internacional. USD
-> só via stablecoin USDC (crypto). Trava de venda **por lote** (cada compra de
-> ação/crypto matura 30 dias; CDB é liquidez diária, sem trava). A **defesa** da
-> carteira é o CDB líquido (dry powder) + USDC — não há bolso de hedge externo.
+> só via stablecoin USDC (crypto). Trava de venda **por lote** (ação matura
+> {{ lock_days_stocks }} dias, cripto {{ lock_days_crypto }}; CDB é liquidez
+> diária, sem trava). A **defesa** da carteira é o CDB líquido (dry powder) +
+> USDC — não há bolso de hedge externo.
 
 Agora o **Investment Committee Final** (CIO desk) executa:
 - Risk overlay completo (VaR/CVaR/Sharpe/Sortino/Calmar/IR/TE/EVT/CDaR)
@@ -322,9 +323,9 @@ Cada persona 1 linha. Identifique: **fator de risco dominante** · **ajuste de d
 
 ### Monitoring weekly
 - **Semana 1 (D+0–D+7)**: confirmação técnica, gatilhos < stop −5%, earnings da janela
-- **Semana 2 (D+8–D+14)**: earnings das empresas em carteira, CPI/PCE US
+- **Semana 2 (D+8–D+14)**: earnings das empresas em carteira, CPI/PCE US; lotes de cripto liberam da trava (≥{{ lock_days_crypto }}d)
 - **Semana 3 (D+15–D+21)**: PMI BR/US, inflação
-- **Semana 4 (D+22–D+30)**: lotes de ação/crypto liberam da trava (≥30d); rebalanceamento se desvio > 10pp; tax-loss harvesting; PnL. Aporte novo só quando o cliente quiser (ad-hoc). CDB pode ser rotacionado a qualquer momento.
+- **Semana 4 (D+22–D+30)**: lotes de ação liberam da trava (≥{{ lock_days_stocks }}d); rebalanceamento se desvio > 10pp; tax-loss harvesting; PnL. Aporte novo só quando o cliente quiser (ad-hoc). CDB pode ser rotacionado a qualquer momento.
 
 ### Panic Review Triggers
 - COPOM ±100 bps surpresa · Fed ±50 bps · VIX > 30 (de < 20) · HY OAS > 600 bps · BTC ±25% em 7d · Ibov −10% em 7d · USD/BRL ±8% em 7d · **notícia de crédito no Bradesco (emissor único do CDB)**

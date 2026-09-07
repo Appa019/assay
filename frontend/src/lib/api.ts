@@ -29,6 +29,10 @@ export type Asset = {
   thesis: string | null;
   target_price: number | null;
   stop_price: number | null;
+  // Sell lock resolved by the backend, per class and per lot (stocks 30d,
+  // crypto 7d, CDB none). Never re-derive the rule here.
+  lock_days_total: number;
+  lock_days_left: number;
   created_at: string;
   updated_at: string;
 };
@@ -64,6 +68,7 @@ export type PortfolioSummary = {
   allocation: AllocationBreakdown;
   target_allocation: { fixed_income: number; stocks: number; crypto: number };
   deviation: { fixed_income: number; stocks: number; crypto: number };
+  holding_lock_days: { fixed_income: number; stocks: number; crypto: number };
   assets: Asset[];
 };
 

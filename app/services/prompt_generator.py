@@ -1,4 +1,12 @@
-"""Render the 5-prompt meeting sequence for a contribution from captured context."""
+"""Render the 5-prompt meeting sequence for a contribution from captured context.
+
+Meeting #1 has two templates. The full one runs 11 macro rounds from scratch
+(~US$ 20 of the ~US$ 63 a contribution costs). When a weekly review is recent,
+that research was already done days ago by the same committee and is injected
+as a consult block, so meeting #1 renders the DELTA template instead: price
+what changed, then re-do the tactical allocation. ``macro_delta_mode`` in the
+render context decides which, and it is resolved by ``contribution_service``.
+"""
 
 from datetime import date
 from pathlib import Path
@@ -7,7 +15,10 @@ from typing import Any
 import structlog
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
+from app.config import settings
+from app.models.asset import AssetClass
 from app.models.contribution import PromptKey
+from app.services.portfolio_service import holding_lock_days
 
 logger = structlog.get_logger()
 
@@ -21,6 +32,9 @@ _env = Environment(
     lstrip_blocks=False,
 )
 
+
+# Meeting #1, short form: used when a fresh weekly review already did the macro.
+_MACRO_DELTA_TEMPLATE = "01_macro_delta.j2"
 
 _PROMPT_DEFINITIONS = [
     {
@@ -42,7 +56,7 @@ _PROMPT_DEFINITIONS = [
         "title": "Reunião nº 2 — Universo, Filtros e Seleção",
         "description": (
             "Define o universo investível, monta long lists, aplica filtros (quant + forense + "
-            "técnico) e SELECIONA a shortlist (5-8 ações B3 + 3-5 cryptos). Confirma a fatia de CDB "
+            "técnico) e SELECIONA a shortlist (4-5 ações B3 + 3-4 cryptos). Confirma a fatia de CDB "
             "(instrumento fixo: Bradesco 100% CDI liquidez diária) com sanidade de crédito do emissor."
         ),
     },
@@ -53,7 +67,7 @@ _PROMPT_DEFINITIONS = [
         "title": "Reunião nº 3 — Due Diligence de Ações B3",
         "description": (
             "Memo completo por ação selecionada: investment thesis, valuation triangulada "
-            "(DCF 3-estágios + Reverse DCF + CCA + Precedent + LBO + SOTP), forense "
+            "(múltiplos + Reverse DCF + DCF 3-estágios + CCA + consenso), forense "
             "(Piotroski/Altman/Beneish/Sloan/Dechow), Capital Allocation, técnica institucional, "
             "factor exposure, bull/base/bear e sizing."
         ),
@@ -130,6 +144,7 @@ def build_render_context(
     amount_brl: float,
     contribution_date: date,
     portfolio_total: float,
+    weekly_review_age_days: int | None = None,
     allocation_current: dict[str, float],
     allocation_target: dict[str, float],
     allocation_deviation: dict[str, float],
@@ -155,6 +170,11 @@ def build_render_context(
     return {
         "contribution_id": contribution_id,
         "contribution_date": contribution_date.isoformat(),
+        # Sell lock per class — templates state it, they never decide it.
+        "lock_days_stocks": holding_lock_days(AssetClass.STOCKS),
+        "lock_days_crypto": holding_lock_days(AssetClass.CRYPTO),
+        "weekly_review_age_days": weekly_review_age_days,
+        "macro_delta_mode": _macro_delta_applies(weekly_review_age_days),
         **_date_context(contribution_date),
         "amount_brl": amount_brl,
         "amount_brl_formatted": _format_brl(amount_brl),
@@ -175,6 +195,18 @@ def build_render_context(
     }
 
 
+def _macro_delta_applies(weekly_review_age_days: int | None) -> bool:
+    """True when meeting #1 can price the delta instead of redoing the macro.
+
+    Needs a weekly review young enough to still describe today's world. No
+    review (or a stale one) falls back to the full 11-round template — the
+    committee never starts a contribution blind.
+    """
+    if not settings.macro_delta_enabled or weekly_review_age_days is None:
+        return False
+    return 0 <= weekly_review_age_days <= settings.macro_delta_max_age_days
+
+
 class _NamespaceLike(dict):
     """Dict that also supports attribute access — lets templates use macro.selic."""
 
@@ -188,8 +220,12 @@ class _NamespaceLike(dict):
 def render_all_prompts(context: dict[str, Any]) -> list[dict[str, Any]]:
     """Render the 5 prompts in order. Returns rows ready for persistence."""
     out: list[dict[str, Any]] = []
+    delta = bool(context.get("macro_delta_mode"))
     for definition in _PROMPT_DEFINITIONS:
-        template = _env.get_template(definition["template"])
+        name = definition["template"]
+        if delta and definition["key"] is PromptKey.MACRO:
+            name = _MACRO_DELTA_TEMPLATE
+        template = _env.get_template(name)
         content = template.render(**context)
         out.append(
             {
