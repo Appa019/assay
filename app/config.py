@@ -94,6 +94,14 @@ class Settings(BaseSettings):
     chat_router_effort: str = "low"
     chat_router_timeout: int = 60
 
+    # Contributions run at night by default. The committee is the heaviest job
+    # here (~90 min) and the plan's usage limit is a rolling window shared with
+    # the consultant chat, so running it on demand at 14h ate the window the
+    # client wanted for the rest of the day. Asking for an aporte now schedules
+    # it for the next night slot; POST ...?run=true&now=true forces immediate.
+    contribution_night_run: bool = True
+    contribution_night_hour: int = 1
+
     # Macro delta mode: when a weekly review this fresh (in days) exists, the
     # contribution's meeting #1 reads it and prices only the DELTA instead of
     # re-running the full 11-round macro from scratch. The weekly already did

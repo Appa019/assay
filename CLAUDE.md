@@ -48,6 +48,14 @@ Há dois modos de execução:
   e produz um fechamento "onde investir e quanto". Dispare via CLI
   (`scripts/run_analysis.py`), via `POST /api/contributions?run=true`, ou via
   `POST /api/contributions/{id}/run`. O front faz polling e mostra etapa por etapa.
+  **Desde D38 o aporte NÃO roda na hora**: `run=true` grava `scheduled_for` na
+  próxima janela da madrugada (`CONTRIBUTION_NIGHT_HOUR`, 1h) e o timer
+  `investimentos-scheduled` (01:00) chama `scripts/run_scheduled.py`, que
+  executa e desarma o agendamento. `&now=true` (ou
+  `CONTRIBUTION_NIGHT_RUN=false`) força imediato; a CLI segue rodando na hora.
+  Motivo: o limite do plano é uma janela rotativa COMPARTILHADA com o chat do
+  consultor, e 90 min de comitê no meio da tarde faziam o consultor responder
+  "bati no limite" justo quando o cliente precisava dele.
 - **Manual**: `POST /api/contributions` (sem `run`) só gera os prompts para
   colar à mão; o front mantém esse fluxo como fallback.
 
@@ -268,8 +276,8 @@ Telegram for religado um dia, as duas portas compartilham a mesma transcrição.
   investimento mais lenta que fixar opus. `CHAT_ROUTER_ENABLED=false` volta a
   tudo-opus. O modelo usado fica gravado na mensagem.
 - **O consultor DISPARA aportes**: "quero investir 5000" → ele confirma o valor
-  e chama `POST /api/contributions?run=true` (BackgroundTasks, volta na hora).
-  Não manda mais o cliente usar comando.
+  e chama `POST /api/contributions?run=true`, que **AGENDA** o comitê para a
+  madrugada e volta na hora. Não manda mais o cliente usar comando.
 - **Sourcing de liquidez**: "preciso tirar 5 mil, de onde?" tem framework nas
   ordens permanentes — caixa primeiro, depois CDB (liquidez diária), nunca lote
   com `lock_days_left` > 0, e conta a isenção de IR (20k ações / 35k cripto) antes de
@@ -365,6 +373,9 @@ rsync -a --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
   aporte (ad-hoc)
 - `.venv/bin/python scripts/weekly_review.py [--force]`: revisão semanal do
   comitê (macro + carteira + maturidade); auto-regula a 7 dias
+- `.venv/bin/python scripts/run_scheduled.py [--all]`: roda os aportes que o
+  cliente pediu e ficaram agendados para a madrugada (timer 01:00). Desarma o
+  `scheduled_for` ao iniciar — daí em diante é o `resume_pending` que cuida
 - `.venv/bin/python scripts/resume_pending.py [--watch [s]]`: retoma análises de
   aporte interrompidas (limite/queda), continuando de onde pararam; roda no cron
   a cada 15 min

@@ -4,12 +4,13 @@ Shared by the HTTP router and the terminal orchestrator so both build the
 exact same snapshot + prompts from a single source of truth.
 """
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import structlog
 from sqlmodel import Session
 
+from app.config import settings
 from app.models.contribution import Contribution, ContributionPrompt, ContributionStatus
 from app.services import (
     market_data_service,
@@ -19,6 +20,22 @@ from app.services import (
 )
 
 logger = structlog.get_logger()
+
+
+def next_night_run(*, now: datetime | None = None) -> datetime:
+    """Next local-night slot for a deferred committee run (aware UTC).
+
+    The run is the heaviest thing this system does and the plan's usage limit
+    is a rolling window shared with the consultant chat, so it goes where
+    nobody is waiting on it. Local time, not UTC: "1 da manhã" means 1am for
+    the client, and Brazil is three hours off.
+    """
+    now = now or datetime.now(UTC)
+    local = now.astimezone()
+    slot = local.replace(hour=settings.contribution_night_hour, minute=0, second=0, microsecond=0)
+    if slot <= local:
+        slot += timedelta(days=1)
+    return slot.astimezone(UTC)
 
 
 async def create_contribution_with_prompts(

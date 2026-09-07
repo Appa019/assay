@@ -49,6 +49,7 @@ _ADDED_COLUMNS: dict[str, dict[str, str]] = {
     "contribution": {
         "claude_session_id": "TEXT",
         "run_attempts": "INTEGER NOT NULL DEFAULT 0",
+        "scheduled_for": "TIMESTAMP",
     },
     "contribution_prompt": {
         "cost_usd": "REAL",

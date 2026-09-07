@@ -6,6 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import case, func
 from sqlmodel import Session, select
 
+from app.config import settings
 from app.core.database import engine, get_session
 from app.models.contribution import (
     Contribution,
@@ -29,6 +30,20 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/api/contributions", tags=["contributions"])
 
 
+def _utc_aware(value: datetime | None) -> datetime | None:
+    """Stamp UTC on a timestamp SQLite handed back naive.
+
+    Without this the JSON carries "2026-09-07T04:00:00" with no zone, and every
+    client reads it as LOCAL time — the consultant would tell the client his
+    aporte runs at 4am when it runs at 1am. Only ``scheduled_for`` goes through
+    here: it is new, so making it correct breaks nobody, while re-stamping the
+    older fields would move dates the front end already renders.
+    """
+    if value is None:
+        return None
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
 def _to_read(contribution: Contribution, prompts: list[ContributionPrompt]) -> ContributionRead:
     return ContributionRead(
         id=contribution.id,
@@ -40,6 +55,7 @@ def _to_read(contribution: Contribution, prompts: list[ContributionPrompt]) -> C
         notes=contribution.notes,
         created_at=contribution.created_at,
         completed_at=contribution.completed_at,
+        scheduled_for=_utc_aware(contribution.scheduled_for),
         prompts=[
             PromptRead.model_validate(p, from_attributes=True)
             for p in sorted(prompts, key=lambda x: x.prompt_order)
@@ -96,13 +112,33 @@ async def create_contribution(
     payload: ContributionCreate,
     background_tasks: BackgroundTasks,
     run: bool = False,
+    now: bool = False,
     session: Session = Depends(get_session),
 ) -> ContributionRead:
+    """Create the contribution and its prompts.
+
+    ``run=true`` asks for the committee. By default that SCHEDULES it for the
+    next night slot instead of starting it here: the run is ~90 minutes of the
+    plan's usage window, and burning that window in the middle of the client's
+    day is what made the consultant answer "bati no limite" when he needed it.
+    ``now=true`` (or CONTRIBUTION_NIGHT_RUN=false) runs immediately.
+    The response carries ``scheduled_for`` so the caller can say when.
+    """
     contribution, prompt_rows = await contribution_service.create_contribution_with_prompts(
         session, amount_brl=payload.amount_brl, notes=payload.notes
     )
 
-    if run:
+    if run and settings.contribution_night_run and not now:
+        contribution.scheduled_for = contribution_service.next_night_run()
+        session.add(contribution)
+        session.commit()
+        session.refresh(contribution)
+        logger.info(
+            "contribution_scheduled",
+            contribution_id=str(contribution.id),
+            scheduled_for=contribution.scheduled_for.isoformat(),
+        )
+    elif run:
         background_tasks.add_task(_run_analysis_bg, contribution.id)
 
     return _to_read(contribution, prompt_rows)

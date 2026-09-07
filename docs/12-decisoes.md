@@ -603,3 +603,42 @@ encadeada (a etapa 5 custa $3,63 justamente porque herda o contexto — refazer
 sem encadeamento sairia mais caro e pior); a cadência da revisão semanal, que é
 o melhor custo-benefício do sistema e é o que viabiliza o modo delta; e não
 existe `--max-turns`, que limitaria a cauda mas truncaria um memo no meio.
+
+### D38 · O aporte deixa de ser sob demanda e passa a rodar de madrugada
+O motor roda pelo **CLI autenticado na assinatura Max** (`CLAUDE_CODE_OAUTH_TOKEN`;
+não existe `ANTHROPIC_API_KEY` em lugar nenhum). Isso muda o que significa
+"caro": o `total_cost_usd` que o app grava é o valor EQUIVALENTE em API, um
+medidor, não uma fatura. O que se gasta de verdade é o **limite de uso do
+plano**, uma janela rotativa — e ela é COMPARTILHADA com o chat do consultor.
+
+Daí o problema real: um aporte pedido às 14h rodava às 14h, comia ~90 min de
+janela, e o cliente batia no limite justamente no consultor que usa durante o
+dia. Não era desperdício de dinheiro, era contenção de recurso.
+
+`POST /api/contributions?run=true` agora grava `scheduled_for` na próxima
+janela da madrugada em vez de disparar `BackgroundTasks`. O timer
+`investimentos-scheduled` (01:00) chama `scripts/run_scheduled.py`, que executa
+e **desarma o agendamento ao iniciar** — um crash no meio não pode fazer o
+comitê rodar de novo na noite seguinte; esse caso é do `resume_pending`, que
+retoma a MESMA sessão encadeada. Escapes: `&now=true` e
+`CONTRIBUTION_NIGHT_RUN=false`; a CLI (`run_analysis.py`) segue rodando na hora,
+que é o esperado de uma ferramenta de terminal.
+
+Três detalhes que só aparecem quando se implementa:
+
+- **O push foi silenciado no fim do run agendado** (`push_on_finish=False`):
+  terminar às 2h30 e tocar o celular do cliente anularia o ponto de rodar de
+  madrugada. Vai para o inbox; falha ainda dá push, porque falha precisa de
+  gente.
+- **`scheduled_for` sai da API com fuso explícito.** O SQLite devolve datetime
+  naive, e a convenção do projeto é "naive = UTC" (`_local_date`). Serializado
+  cru, o JSON dizia `04:00:00` sem zona e o consultor anunciaria "seu aporte
+  roda às 4h" quando roda à 1h. `_utc_aware` carimba UTC só nesse campo — os
+  antigos ficam como estão porque o front já os renderiza.
+- **A noite foi ordenada por peso**: aporte 01:00 (pode levar 90 min e segura a
+  trava global), maturidade 03:00, revisão semanal 04:30. Antes, maturidade e
+  semanal rodavam 09:00/09:30, em plena hora de trabalho.
+
+E o que NÃO funciona, para não tentarem de novo: mandar uma mensagem qualquer
+de madrugada "para adiantar consumo". Não há nada a reservar — a janela enche
+sozinha com o tempo, e gastar às 2h não guarda nada para as 14h.

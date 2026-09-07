@@ -1445,6 +1445,7 @@ def run_analysis(
     effort: str = DEFAULT_EFFORT,
     step_timeout: int = DEFAULT_STEP_TIMEOUT,
     notify: bool = True,
+    push_on_finish: bool = True,
     on_event: EventCallback | None = None,
     fail_fast_on_limit: bool = False,
 ) -> RunSummary:
@@ -1476,6 +1477,7 @@ def run_analysis(
             effort=effort,
             step_timeout=step_timeout,
             notify=notify,
+            push_on_finish=push_on_finish,
             on_event=on_event,
             limit_backoff=[120] if fail_fast_on_limit else None,
         )
@@ -1491,6 +1493,7 @@ def _run_analysis_locked(
     effort: str,
     step_timeout: int,
     notify: bool,
+    push_on_finish: bool,
     on_event: EventCallback | None,
     limit_backoff: list[int] | None = None,
 ) -> RunSummary:
@@ -1760,6 +1763,7 @@ def _run_analysis_locked(
                 header + order_service.strip_machine_block(summary.final_summary),
                 kind=NotificationKind.ORDERS,
                 level=NotificationLevel.SUCCESS,
+                push=push_on_finish,
             )
         except Exception as notify_exc:  # noqa: BLE001 — never fail the run for this
             logger.error("final_notify_failed", error=str(notify_exc))

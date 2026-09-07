@@ -71,6 +71,8 @@ validadores em `Settings` derrubam o boot com mensagem explícita se não somare
 | `CHAT_FAST_MODEL` / `_EFFORT` | `haiku` / `low` | Saudação e lançamento no ledger |
 | `CHAT_LOOKUP_MODEL` / `_EFFORT` | `sonnet` / `low` | Consulta factual: saldo, preço, ordens pendentes, extrato (D37) |
 | `CHAT_DEEP_MODEL` / `_EFFORT` | `opus` / `high` | Decisão de investimento, análise de ativo, macro, risco, tributação — e tudo o que não for provadamente os dois de cima |
+| `CONTRIBUTION_NIGHT_RUN` | `true` | `false` faz `run=true` executar na hora, como antes de D38 |
+| `CONTRIBUTION_NIGHT_HOUR` | `1` | Hora LOCAL em que os aportes agendados rodam. O timer `investimentos-scheduled` precisa apontar para a mesma hora |
 | `MACRO_DELTA_ENABLED` | `true` | `false` faz a Reunião nº 1 rodar sempre o macro completo (11 rodadas) |
 | `MACRO_DELTA_MAX_AGE_DAYS` | `7` | Idade máxima da revisão semanal para a Reunião nº 1 rodar em modo delta (D37) |
 

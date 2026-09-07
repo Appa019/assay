@@ -47,6 +47,11 @@ class Contribution(SQLModel, table=True):
     # Consecutive failed automatic runs; caps the auto-resume retry loop so a
     # permanently broken analysis stops burning money. Reset to 0 on success.
     run_attempts: int = Field(default=0)
+    # When the committee should start. Set when the client asks for an aporte
+    # and the run is deferred to the small hours; cleared once it starts, so a
+    # started-then-interrupted run belongs to resume_pending, not to the
+    # scheduler. NULL means "not scheduled" (manual flow, or already running).
+    scheduled_for: datetime | None = Field(default=None, index=True)
 
     created_at: datetime = Field(default_factory=_now_utc, index=True)
     completed_at: datetime | None = Field(default=None)

@@ -37,6 +37,9 @@ class ContributionRead(BaseModel):
     notes: str | None
     created_at: datetime
     completed_at: datetime | None
+    # UTC-aware (unlike created_at/completed_at, which SQLite returns naive).
+    # Clients must convert to local before showing the hour to the client.
+    scheduled_for: datetime | None = None
     prompts: list[PromptRead] = []
 
 

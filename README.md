@@ -149,6 +149,9 @@ Com o `./start.sh` rodando, o bot sobe junto e responde **só ao seu chat**:
 | **Revisão semanal** | A cada 7 dias (cron) | Macro + desempenho das posições + rotação de CDB para oportunidades |
 | **Maturidade** | Quando um lote cruza a trava da classe (ação 30d · cripto 7d) | Comitê reavalia manter / vender / aumentar |
 
+- **Aporte roda de madrugada:** pedir um aporte agenda o comitê para 1h da
+  manhã (timer `investimentos-scheduled`), em vez de rodar na hora. A folha de
+  ordens está pronta quando você acorda.
 - **Trava de venda por lote e por classe:** cada compra matura na sua própria
   data — **ação 30 dias** (exigência de compliance do cliente) e **cripto 7
   dias**. **CDB tem liquidez diária** (vende quando quiser).
