@@ -97,8 +97,13 @@ long_service bot "Investimentos Manual — bot do Telegram" \
 long_service frontend "Investimentos Manual — frontend Next.js" \
   "/usr/bin/env sh -c 'cd ${PROJECT_ROOT}/frontend && exec node_modules/.bin/next start --hostname 127.0.0.1 --port ${FRONTEND_PORT}'"
 
-oneshot_pair cadence  "maturidade dos lotes"        "${PY} ${PROJECT_ROOT}/scripts/check_cadence.py"  "*-*-* 09:00"
-oneshot_pair weekly   "revisão semanal do comitê"    "${PY} ${PROJECT_ROOT}/scripts/weekly_review.py"  "*-*-* 09:30"
+# The two jobs below are the only scheduled ones that spend Claude usage, and
+# the plan's limit is a rolling window shared with the consultant chat. Running
+# them in the small hours keeps a committee run from eating the window the
+# client wants during the day. It does not reduce consumption, it removes
+# contention. Spaced apart because both take the global heavy-run lock.
+oneshot_pair cadence  "maturidade dos lotes"        "${PY} ${PROJECT_ROOT}/scripts/check_cadence.py"  "*-*-* 02:00"
+oneshot_pair weekly   "revisão semanal do comitê"    "${PY} ${PROJECT_ROOT}/scripts/weekly_review.py"  "*-*-* 04:00"
 oneshot_pair resume   "retomada de análises"         "${PY} ${PROJECT_ROOT}/scripts/resume_pending.py" "*:0/15"
 oneshot_pair prices   "marcação a mercado"           "${PY} ${PROJECT_ROOT}/scripts/refresh_prices.py" "*-*-* 00/6:15"
 oneshot_pair snapshot "snapshot diário da carteira"  "${PY} ${PROJECT_ROOT}/scripts/daily_snapshot.py" "*-*-* 18:45"
