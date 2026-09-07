@@ -97,14 +97,21 @@ long_service bot "Investimentos Manual — bot do Telegram" \
 long_service frontend "Investimentos Manual — frontend Next.js" \
   "/usr/bin/env sh -c 'cd ${PROJECT_ROOT}/frontend && exec node_modules/.bin/next start --hostname 127.0.0.1 --port ${FRONTEND_PORT}'"
 
-# The two jobs below are the only scheduled ones that spend Claude usage, and
-# the plan's limit is a rolling window shared with the consultant chat. Running
-# them in the small hours keeps a committee run from eating the window the
-# client wants during the day. It does not reduce consumption, it removes
-# contention. Spaced apart because both take the global heavy-run lock.
+# The three jobs below are the only scheduled ones that spend Claude usage, and
+# the plan's limit is a window (~5h) shared with the consultant chat.
+#
+# THE RULE: nothing may START later than (client's work start) minus 5 hours.
+# He starts at 08:00, so nothing after 03:00 — a job begun at 04:30 leaves its
+# window open past 09:30, and he would sit down inside a window the committee
+# already drained. Times below leave ~50 min of slack on top of that.
+#
+# Ordered longest-first: the aporte can run 90 min and holds the global heavy
+# lock, so the two short jobs follow it. On a night when all three land (rare —
+# the aporte is ad-hoc and the weekly is 7-day gated), the short ones defer to
+# the next night, which is harmless and already handled.
 oneshot_pair scheduled "aportes agendados"          "${PY} ${PROJECT_ROOT}/scripts/run_scheduled.py"  "*-*-* 01:00"
-oneshot_pair cadence  "maturidade dos lotes"        "${PY} ${PROJECT_ROOT}/scripts/check_cadence.py"  "*-*-* 03:00"
-oneshot_pair weekly   "revisão semanal do comitê"    "${PY} ${PROJECT_ROOT}/scripts/weekly_review.py"  "*-*-* 04:30"
+oneshot_pair cadence  "maturidade dos lotes"        "${PY} ${PROJECT_ROOT}/scripts/check_cadence.py"  "*-*-* 01:45"
+oneshot_pair weekly   "revisão semanal do comitê"    "${PY} ${PROJECT_ROOT}/scripts/weekly_review.py"  "*-*-* 02:10"
 oneshot_pair resume   "retomada de análises"         "${PY} ${PROJECT_ROOT}/scripts/resume_pending.py" "*:0/15"
 oneshot_pair prices   "marcação a mercado"           "${PY} ${PROJECT_ROOT}/scripts/refresh_prices.py" "*-*-* 00/6:15"
 oneshot_pair snapshot "snapshot diário da carteira"  "${PY} ${PROJECT_ROOT}/scripts/daily_snapshot.py" "*-*-* 18:45"
