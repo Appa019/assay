@@ -63,6 +63,13 @@ _ADDED_COLUMNS: dict[str, dict[str, str]] = {
     },
     "cashflow_entry": {
         "wallet": "TEXT NOT NULL DEFAULT 'conta'",
+        # Credit card + installments (2026-09-12). CHAR(32) is what SQLModel's
+        # GUID type uses on SQLite; SQLite only lets ALTER TABLE add a
+        # REFERENCES column when its default is NULL, which these are.
+        "card_id": "CHAR(32) REFERENCES credit_card(id)",
+        "installment_no": "INTEGER",
+        "installment_count": "INTEGER",
+        "installment_group": "CHAR(32)",
     },
     "order": {
         "suggested_quantity": "NUMERIC",

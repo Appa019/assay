@@ -67,4 +67,11 @@ class CashflowEntry(SQLModel, table=True):
             index=True,
         ),
     )
+    # Credit card the purchase went on; NULL = pix/debit/cash/benefit card.
+    card_id: UUID | None = Field(default=None, foreign_key="credit_card.id", index=True)
+    # Installment bookkeeping: one row per installment, all sharing a group.
+    # All three stay NULL on a single-payment purchase.
+    installment_no: int | None = Field(default=None)
+    installment_count: int | None = Field(default=None)
+    installment_group: UUID | None = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=_now_utc)
