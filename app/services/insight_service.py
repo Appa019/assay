@@ -1,6 +1,6 @@
 """Deterministic insights over the personal cashflow ledger — zero LLM.
 
-Two rules, evaluated once a day by ``scripts/daily_insights.py`` and pushed
+Three rules, evaluated once a day by ``scripts/daily_insights.py`` and pushed
 over Telegram. Both the decision AND the copy are plain arithmetic and
 f-strings; no model is ever consulted.
 
@@ -17,6 +17,12 @@ f-strings; no model is ever consulted.
    R$ 100. A category only arms once at least 6 of the baseline weeks contain
    entries — the ledger is young, and with less history than that the rule
    would only produce false positives. One alert per category per month.
+
+3. **Card invoice closed** — the morning AFTER a card's closing day (the
+   closing day itself still takes purchases), one notice per card per
+   closing date with the total and the due date. It is a bill, not an
+   insight, so it bypasses the weekly push budget; an empty invoice is
+   silent. State: ``"card_closing_fired": {"<card id>": "<closes_on ISO>"}``.
 
 State lives in ``storage/insights_state.json`` and is parsed tolerantly: a
 malformed file is logged, discarded and rebuilt — it never crashes the cron.
@@ -50,7 +56,7 @@ from sqlmodel import Session, select
 from app.models.asset import Asset
 from app.models.cashflow import CashflowKind
 from app.models.notification import NotificationKind
-from app.services import cashflow_service, notification_center
+from app.services import card_service, cashflow_service, notification_center
 
 logger = structlog.get_logger()
 
@@ -240,6 +246,37 @@ def _evaluate_anomalies(session: Session, today: date) -> list[Insight]:
     return [insight for _delta, insight in flagged]
 
 
+# --- rule 3: card invoice closed ---------------------------------------------------
+
+
+def _evaluate_card_closings(session: Session, today: date) -> list[tuple[str, date, Insight]]:
+    """Cards whose invoice closed YESTERDAY → (card id, closing date, notice).
+
+    Evaluated the morning after, not on the closing day: purchases made on
+    the closing day still enter that invoice. Empty invoices are skipped —
+    there is nothing to pay.
+    """
+    yesterday = today - timedelta(days=1)
+    out: list[tuple[str, date, Insight]] = []
+    for card in card_service.list_cards(session):
+        window = card_service.invoice_window(card, yesterday.year, yesterday.month)
+        if window.closes_on != yesterday:
+            continue
+        invoice = card_service.build_invoice(
+            session, card, yesterday.year, yesterday.month, today=today
+        )
+        if invoice.entries == 0:
+            continue
+        plural = "s" if invoice.entries != 1 else ""
+        text = (
+            f"💳 Fatura do {card.name} fechou: {_fmt(invoice.total_brl)} · "
+            f"vence {invoice.due_on.strftime('%d/%m')}. "
+            f"{invoice.entries} lançamento{plural}."
+        )
+        out.append((str(card.id), window.closes_on, Insight(kind="card_closing", text=text)))
+    return out
+
+
 # --- daily entrypoint ----------------------------------------------------------
 
 
@@ -278,6 +315,19 @@ def run_daily(session: Session, *, today: date | None = None) -> dict[str, Any]:
         fired_categories.append(insight.category)
     anomaly_fired[month_key] = sorted(str(c) for c in fired_categories)
 
+    # Rule 3 — a closed invoice is a bill, not an insight: it goes out
+    # regardless of the weekly budget, once per card per closing date.
+    closing_fired = state.get("card_closing_fired")
+    if not isinstance(closing_fired, dict):
+        closing_fired = {}
+    bills: list[Insight] = []
+    for card_id, closes_on, notice in _evaluate_card_closings(session, today):
+        if closing_fired.get(card_id) == closes_on.isoformat():
+            continue
+        closing_fired[card_id] = closes_on.isoformat()
+        bills.append(notice)
+    state["card_closing_fired"] = closing_fired
+
     # Weekly push budget: the overflow waits for the Sunday digest.
     week_key = _week_key(today)
     week = state.get("week")
@@ -304,13 +354,18 @@ def run_daily(session: Session, *, today: date | None = None) -> dict[str, Any]:
                     "queued_at": datetime.now(UTC).isoformat(),
                 }
             )
+    to_send = bills + to_send
     state["week"] = {"key": week_key, "sent": sent_this_week}
     _save_state(state)
 
     # Success side-effect strictly AFTER the state is persisted; notify() never
     # raises, so a failed send cannot roll anything back.
     for insight in to_send:
-        notification_center.notify(insight.text, kind=NotificationKind.LEDGER)
+        notification_center.notify(
+            insight.text,
+            kind=NotificationKind.LEDGER,
+            url="/extrato" if insight.kind == "card_closing" else None,
+        )
 
     result = {
         "date": today.isoformat(),

@@ -287,3 +287,59 @@ def test_malformed_state_file_never_crashes_the_run(
     # The state file was rebuilt from scratch and is valid JSON again.
     state = json.loads(state_path.read_text(encoding="utf-8"))
     assert state["projection_fired"]["2026-08"] is True
+
+
+# --- rule 3: card invoice closed -----------------------------------------------
+
+from app.schemas.card import CardCreate  # noqa: E402
+from app.services import card_service  # noqa: E402
+
+
+def _card_with_spend(session: Session) -> None:
+    card = card_service.create_card(session, CardCreate(name="Nubank", closing_day=25, due_day=3))
+    session.add(
+        CashflowEntry(
+            kind=CashflowKind.EXPENSE,
+            amount_brl=Decimal("3412.90"),
+            category="mercado",
+            occurred_on=date(2026, 9, 10),
+            card_id=card.id,
+        )
+    )
+    session.commit()
+
+
+def test_invoice_closing_notice_fires_the_morning_after_once(
+    session: Session, state_path: Path, notified: list[str]
+) -> None:
+    _card_with_spend(session)
+    # Closing day itself: purchases can still land, so nothing yet.
+    insight_service.run_daily(session, today=date(2026, 9, 25))
+    assert notified == []
+    result = insight_service.run_daily(session, today=date(2026, 9, 26))
+    assert len(notified) == 1
+    assert notified[0].startswith("💳 Fatura do Nubank fechou: R$ 3.412,90 · vence 03/10.")
+    assert "1 lançamento." in notified[0]
+    assert result["sent"][0]["kind"] == "card_closing"
+    # Same day again (or later): no repeat for the same closing date.
+    insight_service.run_daily(session, today=date(2026, 9, 26))
+    insight_service.run_daily(session, today=date(2026, 9, 27))
+    assert len(notified) == 1
+    assert json.loads(state_path.read_text())["card_closing_fired"] != {}
+
+
+def test_empty_invoice_does_not_notify(
+    session: Session, state_path: Path, notified: list[str]
+) -> None:
+    card_service.create_card(session, CardCreate(name="Nubank", closing_day=25, due_day=3))
+    insight_service.run_daily(session, today=date(2026, 9, 26))
+    assert notified == []
+
+
+def test_closing_notice_ignores_the_weekly_budget(
+    session: Session, state_path: Path, notified: list[str]
+) -> None:
+    _card_with_spend(session)
+    state_path.write_text(json.dumps({"week": {"key": "2026-W39", "sent": 2}}))
+    insight_service.run_daily(session, today=date(2026, 9, 26))  # ISO week 39
+    assert len(notified) == 1

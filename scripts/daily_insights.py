@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Daily deterministic ledger insights — cheap cron, no Claude involved.
 
-Runs the two insight rules (run-rate balance projection + per-category
-anomaly) via ``insight_service.run_daily``: at most the weekly budget of
+Runs the three insight rules (run-rate balance projection, per-category
+anomaly, card-invoice-closed notice) via ``insight_service.run_daily``: at most the weekly budget of
 pushes goes straight to Telegram, the overflow queues up for the Sunday
 digest. Scheduled at 09:07 local on purpose — insights never ping at night.
 
