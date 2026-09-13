@@ -591,6 +591,13 @@ export type CashflowEntry = {
   occurred_on: string;
   source: CashflowSource;
   wallet: CashflowWallet;
+  /** Card the purchase went on; null = pix/debit/cash/benefit card. */
+  card_id: string | null;
+  card_name: string | null;
+  /** 1-based installment number and total; null on a single payment. */
+  installment_no: number | null;
+  installment_count: number | null;
+  installment_group: string | null;
   created_at: string;
 };
 
@@ -601,6 +608,10 @@ export type CashflowCreate = {
   description?: string | null;
   occurred_on?: string;
   wallet?: CashflowWallet;
+  /** "none" for pix/debit/cash, a card name, or omitted for the default card. */
+  card?: string | null;
+  /** Monthly installments (1–48); amount_brl is then the TOTAL. */
+  installments?: number;
 };
 
 export type CategoryTotal = {
@@ -624,6 +635,7 @@ export type CashflowSummary = {
   expense_brl: number;
   net_brl: number;
   entries: number;
+  card_expense_brl: number;
   by_category: CategoryTotal[];
   by_wallet: WalletTotal[];
 };
@@ -668,6 +680,78 @@ export const deleteCashflowEntry = async (
 ): Promise<CashflowEntry> =>
   json<CashflowEntry>(
     await fetch(`${API_BASE}/api/cashflow/${id}`, { method: "DELETE" }),
+  );
+
+/** Delete every monthly row of one installment purchase. */
+export const deleteCashflowGroup = async (
+  groupId: string,
+): Promise<{ deleted: number }> =>
+  json<{ deleted: number }>(
+    await fetch(`${API_BASE}/api/cashflow/groups/${groupId}`, { method: "DELETE" }),
+  );
+
+// ── Credit cards (invoices are computed by the backend, never stored) ───────
+
+export type InvoiceStatus = "open" | "closed" | "past";
+
+export type CardInvoice = {
+  card_id: string;
+  period_start: string;
+  period_end: string;
+  closes_on: string;
+  due_on: string;
+  status: InvoiceStatus;
+  total_brl: number;
+  entries: number;
+};
+
+export type CreditCard = {
+  id: string;
+  name: string;
+  closing_day: number;
+  due_day: number;
+  is_default: boolean;
+  created_at: string;
+  open_invoice: CardInvoice;
+  last_closed_invoice: CardInvoice | null;
+};
+
+export type CardCreate = {
+  name: string;
+  closing_day: number;
+  due_day: number;
+  is_default?: boolean;
+};
+
+export type CardUpdate = Partial<CardCreate>;
+
+export const fetchCards = async (): Promise<CreditCard[]> =>
+  json<CreditCard[]>(await fetch(`${API_BASE}/api/cards`));
+
+export const createCard = async (payload: CardCreate): Promise<CreditCard> =>
+  json<CreditCard>(
+    await fetch(`${API_BASE}/api/cards`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+
+export const updateCard = async (
+  id: string,
+  payload: CardUpdate,
+): Promise<CreditCard> =>
+  json<CreditCard>(
+    await fetch(`${API_BASE}/api/cards/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  );
+
+export const deleteCard = async (id: string): Promise<CreditCard> =>
+  json<CreditCard>(
+    await fetch(`${API_BASE}/api/cards/${id}`, { method: "DELETE" }),
   );
 
 // ── Consultant chat (same conversation the Telegram bot talks to) ─────────
