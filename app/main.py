@@ -8,6 +8,7 @@ from app.config import settings
 from app.core.database import init_db
 from app.routers import (
     cadence,
+    cards,
     cashflow,
     chat,
     contributions,
@@ -67,6 +68,7 @@ app.include_router(reports.router)
 app.include_router(orders.router)
 app.include_router(tax.router)
 app.include_router(cashflow.router)
+app.include_router(cards.router)
 app.include_router(chat.router)
 app.include_router(push.router)
 app.include_router(notifications.router)

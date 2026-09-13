@@ -4,6 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
 from app import models  # noqa: F401 — register all tables on the metadata
@@ -12,7 +13,14 @@ from app.models.asset import Asset, AssetClass
 
 @pytest.fixture()
 def session() -> Iterator[Session]:
-    engine = create_engine("sqlite://", connect_args={"check_same_thread": False})
+    # StaticPool: an in-memory SQLite DB is scoped to a single connection, and
+    # SQLAlchemy's default pool for it (SingletonThreadPool) hands out a
+    # separate, empty connection per OS thread. TestClient runs each request
+    # on its own background thread, so without StaticPool the API would see
+    # "no such table" the moment it queried anything.
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
 
     # Mirror production PRAGMAs: FK enforcement changes delete semantics, and a
     # test engine without it would hide ordering bugs (it did, once).
