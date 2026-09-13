@@ -103,13 +103,15 @@ _HAS_AMOUNT_RE = re.compile(
 
 # Anything that ASKS instead of stating. "gastei 300 no mercado, quanto me
 # sobrou?" books a line AND wants advice — that is a doubt, so it is opus.
+# "fatura" is here on purpose: paying the invoice is NOT an expense (every
+# purchase is already booked), and only opus carries that rule.
 _ASKS_RE = re.compile(
     r"\?|\b(quanto|quanta|quantos|quantas|qual|quais|como|onde|quando|"
     r"por que|porqu[êe]|pq|"
     r"devo|deveria|posso|poderia|consigo|vale a pena|compensa|"
     r"recomenda|recomendas|recomendaria|sugere|sugest[ãa]o|acha|achas|"
     r"melhor|pior|ajuda|explica|explique|dica|opini[ãa]o|"
-    r"parcel\w*|financi\w*|juros|d[íi]vida|empr[ée]stimo)\b",
+    r"parcel\w*|financi\w*|juros|d[íi]vida|empr[ée]stimo|fatura)\b",
     re.IGNORECASE,
 )
 
@@ -134,7 +136,7 @@ _ADVICE_RE = re.compile(
     r"estrat[ée]gi\w*|tese|valuation|analis\w*|avali\w*|"
     r"compr\w*|vend\w*|aport\w*|investi\w*|invist\w*|aplic\w*|"
     r"rebalanc\w*|risco|arrisc\w*|proje[çc]\w*|previs\w*|futuro|"
-    r"tend[êe]ncia|parcel\w*|financi\w*|juros|d[íi]vida|empr[ée]stimo)\b",
+    r"tend[êe]ncia|parcel\w*|financi\w*|juros|d[íi]vida|empr[ée]stimo|fatura)\b",
     re.IGNORECASE,
 )
 

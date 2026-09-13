@@ -172,3 +172,24 @@ def test_an_attachment_never_takes_the_lookup_tier() -> None:
     assert _tier("📎 IMG_1365.png\nEssa é minha carteira completa de cripto") is (
         model_router.Tier.DEEP
     )
+
+
+# --- credit card ---------------------------------------------------------------
+
+
+def test_card_purchase_still_books_fast() -> None:
+    assert _tier("gastei 42 no cartão") is model_router.Tier.FAST
+    assert _tier("comprei a tv em 10x de 200 no cartão") is model_router.Tier.FAST
+
+
+def test_paying_the_invoice_is_never_a_booking() -> None:
+    """ "paguei a fatura 3200" has a past-tense verb and an amount — the fast
+    path would book a R$ 3.200 expense that double-counts every purchase
+    already in the ledger. Anything about the invoice goes to opus."""
+    assert _tier("paguei a fatura 3200") is model_router.Tier.DEEP
+    assert _tier("paguei a fatura do nubank, 3.412,90") is model_router.Tier.DEEP
+
+
+def test_invoice_questions_skip_the_lookup_tier() -> None:
+    assert _tier("quanto tá minha fatura?") is model_router.Tier.DEEP
+    assert _tier("qual o valor da fatura") is model_router.Tier.DEEP
