@@ -17,7 +17,8 @@ import { usePortfolio } from "@/hooks/use-portfolio";
 import { useCadence } from "@/hooks/use-cadence";
 import { useMacro } from "@/hooks/use-macro";
 import { usePortfolioHistory } from "@/hooks/use-portfolio-history";
-import { formatBRLCompact, parseLocalDate } from "@/lib/format";
+import { useCards } from "@/hooks/use-cards";
+import { formatBRL, formatBRLCompact, parseLocalDate } from "@/lib/format";
 import { OrdersPanel } from "@/components/orders-panel";
 import {
   AllocationDonut,
@@ -175,6 +176,22 @@ const DashboardPage = () => {
       : cashflow.net_brl > 0
         ? "var(--success)"
         : "var(--danger)";
+
+  const { cards } = useCards();
+  // The soonest bill: a closed invoice waiting for its due date, else the
+  // open one. ISO dates sort chronologically as strings.
+  const nextDue = useMemo(() => {
+    if (!cards || cards.length === 0) return null;
+    const dues = cards.map((card) => {
+      const closed = card.last_closed_invoice;
+      return closed && closed.status === "closed" ? closed.due_on : card.open_invoice.due_on;
+    });
+    return [...dues].sort()[0] ?? null;
+  }, [cards]);
+  const nextDueLabel =
+    nextDue === null
+      ? null
+      : parseLocalDate(nextDue).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 
   return (
     <div className="max-w-6xl">
@@ -369,6 +386,11 @@ const DashboardPage = () => {
                   income={cashflow.income_brl}
                   expense={cashflow.expense_brl}
                 />
+                {cashflow.card_expense_brl > 0 && nextDueLabel && (
+                  <p className="tabular mt-4 text-[12px]" style={{ color: "var(--text-muted)" }}>
+                    No cartão {formatBRL(cashflow.card_expense_brl)} · fatura vence {nextDueLabel}
+                  </p>
+                )}
               </div>
               <div>
                 <p
