@@ -356,3 +356,70 @@ def test_list_entries_filters_by_card(session: Session) -> None:
     )
     assert len(cashflow_service.list_entries(session, card_id=card.id)) == 1
     assert len(cashflow_service.list_entries(session, card_id=UUID(int=0))) == 0
+
+
+# --- installments ------------------------------------------------------------------
+
+
+def _tv(session: Session, total: str = "100.00", count: int = 3, on: date = date(2026, 1, 31)):  # noqa: ANN202
+    return cashflow_service.add_entry(
+        session,
+        CashflowCreate(
+            kind=CashflowKind.EXPENSE,
+            amount_brl=Decimal(total),
+            category="lazer",
+            description="tv",
+            occurred_on=on,
+            installments=count,
+        ),
+    )
+
+
+def test_installments_expand_into_one_row_per_month(session: Session) -> None:
+    _nubank(session)
+    first = _tv(session)
+    rows = sorted(cashflow_service.list_entries(session), key=lambda r: r.occurred_on)
+    assert first.id == rows[0].id
+    assert [float(r.amount_brl) for r in rows] == [33.34, 33.33, 33.33]
+    # Clamped from the ORIGINAL day: Jan 31 → Feb 28 → Mar 31 (never Mar 28).
+    assert [r.occurred_on for r in rows] == [
+        date(2026, 1, 31),
+        date(2026, 2, 28),
+        date(2026, 3, 31),
+    ]
+    assert [r.installment_no for r in rows] == [1, 2, 3]
+    assert {r.installment_count for r in rows} == {3}
+    assert len({r.installment_group for r in rows}) == 1
+    assert all(r.card_id is not None and r.description == "tv" for r in rows)
+
+
+def test_installments_require_a_card(session: Session) -> None:
+    with pytest.raises(card_service.CardRuleError):
+        _tv(session)  # no card registered → auto resolves to none
+
+
+def test_repeated_installment_post_does_not_duplicate_the_group(session: Session) -> None:
+    _nubank(session)
+    first = _tv(session)
+    again = _tv(session)
+    assert again.id == first.id
+    assert len(cashflow_service.list_entries(session)) == 3
+
+
+def test_delete_group_removes_every_installment(session: Session) -> None:
+    _nubank(session)
+    first = _tv(session)
+    assert first.installment_group is not None
+    assert cashflow_service.delete_group(session, first.installment_group) == 3
+    assert cashflow_service.list_entries(session) == []
+    with pytest.raises(cashflow_service.CashflowNotFoundError):
+        cashflow_service.delete_group(session, first.installment_group)
+
+
+def test_single_payment_has_no_installment_fields(session: Session) -> None:
+    _nubank(session)
+    entry = _tv(session, count=1)
+    assert entry.installment_no is None
+    assert entry.installment_count is None
+    assert entry.installment_group is None
+    assert float(entry.amount_brl) == 100.0

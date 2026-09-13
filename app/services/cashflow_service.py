@@ -10,7 +10,8 @@ real-world category can never split into two buckets depending on which door
 import unicodedata
 from calendar import monthrange
 from datetime import UTC, date, datetime, timedelta
-from uuid import UUID
+from decimal import ROUND_DOWN, Decimal
+from uuid import UUID, uuid4
 
 import structlog
 from sqlalchemy import func
@@ -171,37 +172,67 @@ def _recent_duplicate(session: Session, entry: CashflowEntry) -> CashflowEntry |
     ).first()
 
 
-def add_entry(session: Session, data: CashflowCreate) -> CashflowEntry:
-    """Book one expense or income line.
+def _add_months(day: date, months: int) -> date:
+    """Same day-of-month ``months`` later, clamped to that month's length —
+    always from the ORIGINAL day (Jan 31 → Feb 28 → Mar 31, never Mar 28)."""
+    index = day.year * 12 + (day.month - 1) + months
+    year, month0 = divmod(index, 12)
+    return date(year, month0 + 1, min(day.day, monthrange(year, month0 + 1)[1]))
 
-    Raises ``card_service.UnknownCardError`` / ``CardRuleError`` when the
-    ``card`` field cannot be honoured — the API turns both into 422.
+
+def _split_installments(total: Decimal, count: int) -> list[Decimal]:
+    """``count`` cent-exact parts of ``total``; the rounding remainder goes to
+    the first installment (100 in 3 → 33.34, 33.33, 33.33)."""
+    base = (total / count).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+    return [base + (total - base * count)] + [base] * (count - 1)
+
+
+def add_entry(session: Session, data: CashflowCreate) -> CashflowEntry:
+    """Book one purchase or income line.
+
+    A purchase in N installments becomes N rows, one per month, sharing an
+    ``installment_group``; the FIRST row is returned. Raises
+    ``card_service.UnknownCardError`` / ``CardRuleError`` when the ``card``
+    field cannot be honoured — the API turns both into 422.
     """
     wallet = normalize_wallet(data.wallet)
     card = card_service.resolve_card(session, data.card, kind=data.kind, wallet=wallet)
-    entry = CashflowEntry(
-        kind=data.kind,
-        amount_brl=data.amount_brl,
-        category=normalize_category(data.category),
-        description=(data.description or "").strip() or None,
-        occurred_on=data.occurred_on or date.today(),
-        source=data.source,
-        wallet=wallet,
-        card_id=card.id if card is not None else None,
-    )
-    existing = _recent_duplicate(session, entry)
+    count = data.installments
+    if count > 1 and card is None:
+        raise card_service.CardRuleError("Parcelamento exige um cartão cadastrado")
+
+    amounts = _split_installments(Decimal(data.amount_brl).quantize(Decimal("0.01")), count)
+    first_day = data.occurred_on or date.today()
+    group = uuid4() if count > 1 else None
+    rows = [
+        CashflowEntry(
+            kind=data.kind,
+            amount_brl=amounts[index],
+            category=normalize_category(data.category),
+            description=(data.description or "").strip() or None,
+            occurred_on=_add_months(first_day, index),
+            source=data.source,
+            wallet=wallet,
+            card_id=card.id if card is not None else None,
+            installment_no=index + 1 if count > 1 else None,
+            installment_count=count if count > 1 else None,
+            installment_group=group,
+        )
+        for index in range(count)
+    ]
+    existing = _recent_duplicate(session, rows[0])
     if existing is not None:
         logger.info(
             "cashflow_duplicate_ignored",
-            amount=float(entry.amount_brl),
-            category=entry.category,
-            source=str(entry.source),
+            amount=float(rows[0].amount_brl),
+            category=rows[0].category,
+            source=str(rows[0].source),
         )
         return existing
-    session.add(entry)
+    session.add_all(rows)
     session.commit()
-    session.refresh(entry)
-    return entry
+    session.refresh(rows[0])
+    return rows[0]
 
 
 def list_entries(
@@ -234,6 +265,19 @@ def delete_entry(session: Session, entry_id: UUID) -> CashflowEntry:
     session.delete(entry)
     session.commit()
     return entry
+
+
+def delete_group(session: Session, group_id: UUID) -> int:
+    """Delete every installment of one purchase. Returns how many rows went."""
+    rows = list(
+        session.exec(select(CashflowEntry).where(CashflowEntry.installment_group == group_id)).all()
+    )
+    if not rows:
+        raise CashflowNotFoundError(f"Compra parcelada {group_id} não encontrada")
+    for row in rows:
+        session.delete(row)
+    session.commit()
+    return len(rows)
 
 
 def month_summary(session: Session, month: str | None = None) -> CashflowSummary:
