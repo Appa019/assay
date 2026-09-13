@@ -1,7 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { API_BASE, sendPushTest } from "@/lib/api";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  API_BASE,
+  createCard,
+  deleteCard,
+  sendPushTest,
+  updateCard,
+  type CreditCard,
+} from "@/lib/api";
+import { useCards } from "@/hooks/use-cards";
 import {
   currentSubscription,
   disablePush,
@@ -65,6 +73,8 @@ const ConfiguracoesPage = () => {
       </section>
 
       <NotificationsCard />
+
+      <CardsCard />
 
       <section
         className="p-5 md:p-6 rounded-md space-y-3"
@@ -262,6 +272,204 @@ const NotificationsCard = () => {
         </div>
       )}
 
+      {note && (
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          {note}
+        </p>
+      )}
+    </section>
+  );
+};
+
+const inputStyle = {
+  borderColor: "var(--border)",
+  background: "var(--bg-card)",
+  color: "var(--text-primary)",
+} as const;
+
+/**
+ * The client's credit cards. Closing and due days are what turn ledger rows
+ * into invoices; the default card is where an account expense lands when
+ * the sentence does not say how it was paid.
+ */
+const CardsCard = () => {
+  const { cards, error, refresh } = useCards();
+  const [name, setName] = useState("");
+  const [closingDay, setClosingDay] = useState("");
+  const [dueDay, setDueDay] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setNote(null);
+    setBusy(true);
+    try {
+      await createCard({
+        name: name.trim(),
+        closing_day: Number(closingDay),
+        due_day: Number(dueDay),
+      });
+      setName("");
+      setClosingDay("");
+      setDueDay("");
+      refresh();
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : "Não foi possível cadastrar o cartão.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const makeDefault = async (card: CreditCard) => {
+    setNote(null);
+    try {
+      await updateCard(card.id, { is_default: true });
+      refresh();
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : "Não foi possível alterar o padrão.");
+    }
+  };
+
+  const remove = async (card: CreditCard) => {
+    setNote(null);
+    try {
+      await deleteCard(card.id);
+      refresh();
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : "Não foi possível remover o cartão.");
+    }
+  };
+
+  return (
+    <section
+      className="p-5 md:p-6 rounded-md space-y-4"
+      style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
+    >
+      <h3
+        className="text-xl tracking-tight"
+        style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
+      >
+        Cartões
+      </h3>
+      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+        Tudo que você compra vai no cartão padrão, salvo quando disser pix,
+        débito ou dinheiro. Fechamento e vencimento definem a fatura.
+      </p>
+
+      {cards && cards.length === 0 && (
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+          Nenhum cartão ainda. Cadastre o primeiro abaixo.
+        </p>
+      )}
+
+      {cards && cards.length > 0 && (
+        <ul className="divide-y" style={{ borderColor: "var(--border)" }}>
+          {cards.map((card) => (
+            <li
+              key={card.id}
+              className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {card.name}
+                  {card.is_default && (
+                    <span
+                      className="ml-2 text-[10px] uppercase tracking-[0.14em]"
+                      style={{ color: "var(--accent)" }}
+                    >
+                      padrão
+                    </span>
+                  )}
+                </p>
+                <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+                  fecha dia {card.closing_day} · vence dia {card.due_day}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                {!card.is_default && (
+                  <button
+                    type="button"
+                    onClick={() => void makeDefault(card)}
+                    className="min-h-[2.75rem] rounded-md border px-3 text-[13px] font-medium"
+                    style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                  >
+                    Tornar padrão
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void remove(card)}
+                  className="min-h-[2.75rem] rounded-md border px-3 text-[13px] font-medium"
+                  style={{ borderColor: "var(--border)", color: "var(--danger)" }}
+                >
+                  Remover
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form
+        onSubmit={(event) => void submit(event)}
+        className="grid gap-3 sm:grid-cols-[1fr_6rem_6rem_auto] sm:items-end"
+      >
+        <label className="flex flex-col gap-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
+          Nome
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            required
+            maxLength={40}
+            placeholder="Nubank"
+            className="min-h-[2.75rem] rounded-md border px-3 text-base"
+            style={inputStyle}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
+          Fecha dia
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={31}
+            required
+            value={closingDay}
+            onChange={(event) => setClosingDay(event.target.value)}
+            className="min-h-[2.75rem] rounded-md border px-3 text-base"
+            style={inputStyle}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
+          Vence dia
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={31}
+            required
+            value={dueDay}
+            onChange={(event) => setDueDay(event.target.value)}
+            className="min-h-[2.75rem] rounded-md border px-3 text-base"
+            style={inputStyle}
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={busy}
+          className="min-h-[2.75rem] rounded-md px-5 text-sm font-semibold disabled:opacity-40"
+          style={{ background: "var(--accent)", color: "white" }}
+        >
+          Cadastrar
+        </button>
+      </form>
+
+      {error && (
+        <p className="text-sm" style={{ color: "var(--danger)" }}>
+          {error}
+        </p>
+      )}
       {note && (
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           {note}
