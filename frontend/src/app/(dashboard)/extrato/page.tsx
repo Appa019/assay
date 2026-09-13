@@ -15,9 +15,12 @@ import { useCashflow } from "@/hooks/use-cashflow";
 import {
   currentMonth,
   deleteCashflowEntry,
+  deleteCashflowGroup,
   type CashflowEntry,
   type CategoryTotal,
+  type CreditCard,
 } from "@/lib/api";
+import { useCards } from "@/hooks/use-cards";
 import { formatAmount, formatBRL, parseLocalDate } from "@/lib/format";
 
 const MONTH_NAMES = [
@@ -44,6 +47,15 @@ const dayLabel = (iso: string): string => {
   if (diff === 0) return "hoje";
   if (diff === 1) return "ontem";
   return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+};
+
+const shortDate = (iso: string): string =>
+  parseLocalDate(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+
+const daysUntil = (iso: string): number => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.round((parseLocalDate(iso).getTime() - today.getTime()) / 86_400_000));
 };
 
 const sourceLabel = (source: CashflowEntry["source"]): string =>
@@ -98,14 +110,77 @@ const CategoryBars = ({
   );
 };
 
+/** The open invoice per card, plus the last closed one while it waits to be paid. */
+const InvoiceBlock = ({ cards }: { cards: CreditCard[] }) => (
+  <section className="mt-9">
+    <h3
+      className="text-[11px] uppercase tracking-[0.18em]"
+      style={{ color: "var(--text-muted)" }}
+    >
+      Cartão
+    </h3>
+    <div className="mt-3.5 flex flex-col gap-3">
+      {cards.map((card) => {
+        const open = card.open_invoice;
+        const closed = card.last_closed_invoice;
+        const days = daysUntil(open.closes_on);
+        return (
+          <div
+            key={card.id}
+            className="rounded-lg border px-4 py-4"
+            style={{ borderColor: "var(--border)", background: "var(--bg-card)" }}
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <p
+                className="text-[12px] font-semibold uppercase tracking-[0.1em]"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {card.name}
+              </p>
+              <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+                fatura aberta
+              </p>
+            </div>
+            <p
+              className="tabular mt-1 text-[1.75rem] leading-none"
+              style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
+            >
+              {formatBRL(open.total_brl)}
+            </p>
+            <p className="mt-2 text-[12px]" style={{ color: "var(--text-muted)" }}>
+              fecha {shortDate(open.closes_on)} ({days === 0 ? "hoje" : `${days} dias`}) · vence{" "}
+              {shortDate(open.due_on)}
+            </p>
+            {closed && (
+              <p
+                className="mt-3 border-t pt-3 text-[13px]"
+                style={{
+                  borderColor: "var(--border)",
+                  color: closed.status === "past" ? "var(--text-muted)" : "var(--text-primary)",
+                }}
+              >
+                {closed.status === "past"
+                  ? `Última fatura ${formatBRL(closed.total_brl)}, venceu ${shortDate(closed.due_on)}`
+                  : `Fatura fechada · ${formatBRL(closed.total_brl)} · vence ${shortDate(closed.due_on)}`}
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  </section>
+);
+
 /**
  * Read-only statement. Entries are created by talking to the consultant, so
- * this screen never asks for input — only deletion survives, because a
- * misclassified line needs a one-tap correction, not a round trip.
+ * this screen never asks for input — only deletion survives (one row, or a
+ * whole installment purchase), because a misclassified line needs a one-tap
+ * correction, not a round trip.
  */
 const ExtratoPage = () => {
   const [month, setMonth] = useState(currentMonth());
   const { entries, summary, loading, error, refresh } = useCashflow(month);
+  const { cards } = useCards();
   const [openId, setOpenId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -150,6 +225,19 @@ const ExtratoPage = () => {
       setDeleteError("Não foi possível excluir o lançamento.");
     }
   };
+
+  const removeGroup = async (groupId: string) => {
+    setOpenId(null);
+    setDeleteError(null);
+    try {
+      await deleteCashflowGroup(groupId);
+      refresh();
+    } catch {
+      setDeleteError("Não foi possível excluir a compra parcelada.");
+    }
+  };
+
+  const cardExpense = summary?.card_expense_brl ?? 0;
 
   const net = summary?.net_brl ?? 0;
   const netColor =
@@ -265,7 +353,23 @@ const ExtratoPage = () => {
             ))}
           </div>
         )}
+
+        {cardExpense > 0 && (
+          <p className="tabular mt-2 text-[12px]" style={{ color: "var(--text-muted)" }}>
+            no cartão {formatBRL(cardExpense)}
+          </p>
+        )}
       </section>
+
+      {cards && cards.length > 0 && <InvoiceBlock cards={cards} />}
+      {cards && cards.length === 0 && (
+        <p className="mt-6 text-[13px]" style={{ color: "var(--text-muted)" }}>
+          <Link href="/configuracoes" className="underline underline-offset-4">
+            Cadastre seu cartão em Ajustes
+          </Link>{" "}
+          para acompanhar a fatura aqui.
+        </p>
+      )}
 
       {expenses.length > 0 && (
         <CategoryBars title="Para onde foi" rows={expenses} tint="var(--accent)" />
@@ -336,6 +440,7 @@ const ExtratoPage = () => {
               {dayEntries.map((entry, index) => {
                 const income = entry.kind === "income";
                 const open = openId === entry.id;
+                const group = entry.installment_group;
                 return (
                   <li
                     key={entry.id}
@@ -362,6 +467,10 @@ const ExtratoPage = () => {
                           style={{ color: "var(--text-muted)" }}
                         >
                           {entry.category}
+                          {entry.card_name && ` · ${entry.card_name}`}
+                          {entry.installment_no !== null &&
+                            entry.installment_count !== null &&
+                            ` · ${entry.installment_no}/${entry.installment_count}`}
                           {entry.wallet !== "conta" && ` · ${entry.wallet.toUpperCase()}`}
                         </span>
                       </span>
@@ -394,19 +503,32 @@ const ExtratoPage = () => {
                           className="overflow-hidden"
                         >
                           <div
-                            className="flex items-center justify-between gap-3 px-4 pb-3 text-[12px]"
+                            className="flex flex-wrap items-center justify-between gap-3 px-4 pb-3 text-[12px]"
                             style={{ color: "var(--text-muted)" }}
                           >
                             <span>Registrado pelo {sourceLabel(entry.source)}</span>
-                            <button
-                              type="button"
-                              onClick={() => void remove(entry.id)}
-                              className="flex min-h-[2.25rem] items-center gap-1.5 rounded-md border px-3 font-medium"
-                              style={{ borderColor: "var(--border)", color: "var(--danger)" }}
-                            >
-                              <Trash2 size={14} strokeWidth={1.9} />
-                              Excluir
-                            </button>
+                            <span className="flex gap-2">
+                              {group && (
+                                <button
+                                  type="button"
+                                  onClick={() => void removeGroup(group)}
+                                  className="flex min-h-[2.25rem] items-center gap-1.5 rounded-md border px-3 font-medium"
+                                  style={{ borderColor: "var(--border)", color: "var(--danger)" }}
+                                >
+                                  <Trash2 size={14} strokeWidth={1.9} />
+                                  Excluir compra ({entry.installment_count} parcelas)
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => void remove(entry.id)}
+                                className="flex min-h-[2.25rem] items-center gap-1.5 rounded-md border px-3 font-medium"
+                                style={{ borderColor: "var(--border)", color: "var(--danger)" }}
+                              >
+                                <Trash2 size={14} strokeWidth={1.9} />
+                                {group ? "Excluir parcela" : "Excluir"}
+                              </button>
+                            </span>
                           </div>
                         </motion.div>
                       )}
