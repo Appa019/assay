@@ -458,7 +458,19 @@ def test_attachment_group_becomes_one_turn(
     prompt = str(captured["prompt"])
     assert str(front) in prompt and str(back) in prompt
     assert "CONJUNTO" in prompt
+    assert "resuma e registre" not in prompt
+    assert "concilie" in prompt
     assert str(captured["display"]).startswith("📎 frente.jpg · verso.jpg")
 
     with pytest.raises(chat_service.ChatUnavailableError):
         chat_service.start_attachments_turn([front] * 4, "", ChatChannel.WEB)
+
+
+def test_media_turn_text_tells_model_to_reconcile_invoices(tmp_path: Path) -> None:
+    """A single-file attachment turn must never ask the model to book the
+    invoice: it must reconcile against cashflow and skip the invoice payment."""
+    prompt = chat_service.media_turn_text(
+        "arquivo", tmp_path / "fatura.pdf", "fatura do cartão", "pelo site"
+    )
+    assert "resuma e registre" not in prompt
+    assert "concilie" in prompt

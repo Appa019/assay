@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class CardCreate(BaseModel):
@@ -11,12 +11,26 @@ class CardCreate(BaseModel):
     due_day: int = Field(..., ge=1, le=31)
     is_default: bool = False
 
+    @field_validator("name")
+    @classmethod
+    def _name_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Nome do cartão não pode ser vazio")
+        return value
+
 
 class CardUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=40)
     closing_day: int | None = Field(default=None, ge=1, le=31)
     due_day: int | None = Field(default=None, ge=1, le=31)
     is_default: bool | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _name_not_blank(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("Nome do cartão não pode ser vazio")
+        return value
 
 
 # open: still accumulating · closed: waiting for the due date · past: due

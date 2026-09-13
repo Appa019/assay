@@ -42,6 +42,11 @@ class CardInUseError(RuntimeError):
 # Words meaning "this purchase did NOT go on a card" (post accent-fold).
 _NO_CARD_WORDS = frozenset({"none", "nenhum", "pix", "debito", "dinheiro", "conta"})
 
+# Generic card words (post accent-fold) that name "a card" without naming ONE
+# — nobody actually registers a card called "cartão", so these mean the
+# client's default card, same as "auto".
+_AUTO_WORDS = frozenset({"auto", "cartao", "credito", "cartao de credito", "no cartao", "padrao"})
+
 
 def _fold(text: str | None) -> str:
     stripped = "".join(
@@ -158,15 +163,18 @@ def resolve_card(
     """Which card (if any) a ledger entry goes on.
 
     ``raw`` is the API's free-form ``card`` field:
-    - ``None``/blank/``auto`` → the default card, but only for an expense paid
-      from ``conta`` (income and benefit cards never sit on a credit card);
+    - ``None``/blank/``auto``/a generic card word (cartão, crédito, cartão de
+      crédito, no cartão, padrão) → the default card, but only for an expense
+      paid from ``conta`` (income and benefit cards never sit on a credit
+      card). These words name "a card" without naming ONE, so they resolve
+      like "auto" instead of raising as an unknown card named "cartão";
     - an off-card word (none, nenhum, pix, debito, dinheiro, conta) → no card;
     - anything else → a registered card by name. Unknown names raise instead
       of silently falling back, so a typo comes back to the caller.
     """
     folded = _fold(raw)
     on_card_allowed = kind == CashflowKind.EXPENSE and wallet == CashflowWallet.CONTA
-    if not folded or folded == "auto":
+    if not folded or folded in _AUTO_WORDS:
         return default_card(session) if on_card_allowed else None
     if folded in _NO_CARD_WORDS:
         return None

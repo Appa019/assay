@@ -1123,8 +1123,12 @@ def media_turn_text(kind: str, path: Path, caption: str, origin: str) -> str:
         f"salvo em: {path}\n{caption_line}\n"
         "Leia o arquivo (imagem pela visão; PDF/CSV/planilha pelas ferramentas de "
         "leitura) e siga suas ordens permanentes: cupom/nota → registre o gasto; "
-        "extrato/fatura → resuma e registre os lançamentos; senão, responda ao "
-        "que o cliente pediu."
+        'extrato bancário → registre o que saiu da conta com "card": "none", '
+        "pulando o pagamento da fatura do cartão; fatura do cartão → NUNCA "
+        "registre a fatura nem o pagamento dela: concilie linha a linha com "
+        "GET /api/cashflow?card_id=<id>&month=<mês> no período da fatura e lance "
+        "SÓ o que falta (linha parcelada → a compra inteira, retroativa, com "
+        "installments); senão, responda ao que o cliente pediu."
     )
 
 
@@ -1137,9 +1141,14 @@ def _media_group_turn_text(paths: list[Path], caption: str, origin: str) -> str:
         "Leia TODOS (imagem pela visão; PDF/CSV/planilha pelas ferramentas de "
         "leitura) e trate como um CONJUNTO — podem ser páginas ou fotos do mesmo "
         "cupom/extrato. Siga suas ordens permanentes: cupom/nota → registre o "
-        "gasto; extrato/fatura → resuma e registre os lançamentos; senão, "
-        "responda ao que o cliente pediu. Não registre o mesmo valor duas vezes "
-        "se dois arquivos mostrarem a mesma compra."
+        'gasto; extrato bancário → registre o que saiu da conta com "card": '
+        '"none", pulando o pagamento da fatura do cartão; fatura do cartão → '
+        "NUNCA registre a fatura nem o pagamento dela: concilie linha a linha "
+        "com GET /api/cashflow?card_id=<id>&month=<mês> no período da fatura e "
+        "lance SÓ o que falta (linha parcelada → a compra inteira, retroativa, "
+        "com installments); senão, responda ao que o cliente pediu. Não "
+        "registre o mesmo valor duas vezes se dois arquivos mostrarem a mesma "
+        "compra."
     )
 
 

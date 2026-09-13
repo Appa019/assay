@@ -111,7 +111,7 @@ _ASKS_RE = re.compile(
     r"devo|deveria|posso|poderia|consigo|vale a pena|compensa|"
     r"recomenda|recomendas|recomendaria|sugere|sugest[ãa]o|acha|achas|"
     r"melhor|pior|ajuda|explica|explique|dica|opini[ãa]o|"
-    r"parcel\w*|financi\w*|juros|d[íi]vida|empr[ée]stimo|fatura)\b",
+    r"parcel\w*|financi\w*|juros|d[íi]vida|empr[ée]stimo|fatura\w*)\b",
     re.IGNORECASE,
 )
 
@@ -136,7 +136,7 @@ _ADVICE_RE = re.compile(
     r"estrat[ée]gi\w*|tese|valuation|analis\w*|avali\w*|"
     r"compr\w*|vend\w*|aport\w*|investi\w*|invist\w*|aplic\w*|"
     r"rebalanc\w*|risco|arrisc\w*|proje[çc]\w*|previs\w*|futuro|"
-    r"tend[êe]ncia|parcel\w*|financi\w*|juros|d[íi]vida|empr[ée]stimo|fatura)\b",
+    r"tend[êe]ncia|parcel\w*|financi\w*|juros|d[íi]vida|empr[ée]stimo|fatura\w*)\b",
     re.IGNORECASE,
 )
 

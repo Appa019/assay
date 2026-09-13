@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlmodel import Session
 
 from app.core.database import get_session
-from app.models.cashflow import CashflowKind, CashflowWallet
+from app.models.cashflow import CashflowEntry, CashflowKind, CashflowWallet
 from app.schemas.cashflow import (
     CashflowCreate,
     CashflowRead,
@@ -30,7 +30,7 @@ class CashflowClassify(BaseModel):
     text: str = Field(..., min_length=1, max_length=500)
 
 
-def _reads(session: Session, entries: list) -> list[CashflowRead]:  # noqa: ANN001
+def _reads(session: Session, entries: list[CashflowEntry]) -> list[CashflowRead]:
     """CashflowRead rows with the card name attached — ONE card lookup for
     the whole page instead of a query per row."""
     names = {card.id: card.name for card in card_service.list_cards(session)}

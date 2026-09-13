@@ -51,6 +51,11 @@ def test_day_out_of_range_is_422(client: TestClient) -> None:
     assert response.status_code == 422
 
 
+def test_blank_name_is_422(client: TestClient) -> None:
+    response = client.post("/api/cards", json={"name": "   ", "closing_day": 1, "due_day": 3})
+    assert response.status_code == 422
+
+
 def test_patch_default_and_refuse_unsetting_it(client: TestClient) -> None:
     first = _create(client, "Nubank")
     second = _create(client, "Itaú")

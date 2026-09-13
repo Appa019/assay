@@ -29,11 +29,12 @@ malformed file is logged, discarded and rebuilt — it never crashes the cron.
 Shape:
 
     {
-      "projection_fired": {"2026-08": true},        // false = re-armed
-      "anomaly_fired":    {"2026-08": ["mercado"]},
-      "week":             {"key": "2026-W34", "sent": 2},
-      "queue":            [{"kind": "...", "text": "...", "queued_at": "..."}],
-      "last_digest_week": "2026-W33"
+      "projection_fired":   {"2026-08": true},        // false = re-armed
+      "anomaly_fired":      {"2026-08": ["mercado"]},
+      "card_closing_fired": {"<card id>": "2026-09-25"},
+      "week":               {"key": "2026-W34", "sent": 2},
+      "queue":              [{"kind": "...", "text": "...", "queued_at": "..."}],
+      "last_digest_week":   "2026-W33"
     }
 
 A weekly budget caps pushes at ``_MAX_PUSHES_PER_WEEK``; the overflow is
@@ -93,7 +94,7 @@ _MONTH_NAMES = (
 class Insight:
     """One triggered insight, ready to push (or queue for the digest)."""
 
-    kind: str  # "projection" | "anomaly"
+    kind: str  # "projection" | "anomaly" | "card_closing"
     text: str
     category: str | None = None
 

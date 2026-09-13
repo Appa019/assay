@@ -193,3 +193,7 @@ def test_paying_the_invoice_is_never_a_booking() -> None:
 def test_invoice_questions_skip_the_lookup_tier() -> None:
     assert _tier("quanto tá minha fatura?") is model_router.Tier.DEEP
     assert _tier("qual o valor da fatura") is model_router.Tier.DEEP
+
+
+def test_invoice_plural_also_stays_deep() -> None:
+    assert _tier("paguei as faturas 3200") is model_router.Tier.DEEP

@@ -5,6 +5,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from pydantic import ValidationError
 from sqlmodel import Session
 
 from app.models.cashflow import CashflowEntry, CashflowKind, CashflowWallet
@@ -33,6 +34,11 @@ def test_second_default_demotes_the_first(session: Session) -> None:
     assert first.is_default is False
     assert second.is_default is True
     assert card_service.default_card(session).id == second.id
+
+
+def test_blank_name_is_rejected_by_the_schema() -> None:
+    with pytest.raises(ValidationError):
+        CardCreate(name="   ", closing_day=1, due_day=2)
 
 
 def test_duplicate_name_is_rejected_after_fold(session: Session) -> None:
@@ -101,6 +107,29 @@ def test_resolve_auto_uses_default_for_expense_from_conta(session: Session) -> N
         session, None, kind=CashflowKind.EXPENSE, wallet=CashflowWallet.CONTA
     )
     assert resolved is not None and resolved.id == card.id
+
+
+@pytest.mark.parametrize("raw", ["cartão", "crédito", "cartão de crédito", "padrão"])
+def test_resolve_generic_card_word_uses_default_for_expense_from_conta(
+    session: Session, raw: str
+) -> None:
+    """A generic card word names "a card" without naming ONE — it must resolve
+    to the default card like "auto", never raise as an unknown card."""
+    card = card_service.create_card(session, _card())
+    resolved = card_service.resolve_card(
+        session, raw, kind=CashflowKind.EXPENSE, wallet=CashflowWallet.CONTA
+    )
+    assert resolved is not None and resolved.id == card.id
+
+
+def test_resolve_generic_card_word_never_puts_income_on_a_card(session: Session) -> None:
+    card_service.create_card(session, _card())
+    assert (
+        card_service.resolve_card(
+            session, "cartão", kind=CashflowKind.INCOME, wallet=CashflowWallet.CONTA
+        )
+        is None
+    )
 
 
 @pytest.mark.parametrize("raw", [None, "", "auto"])

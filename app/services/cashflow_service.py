@@ -95,9 +95,9 @@ def normalize_category(raw: str | None) -> str:
 # Unlike categories, wallets are a CLOSED vocabulary: money either sits in the
 # account or on a benefit card, and an invented wallet name would silently
 # split the balances the consultant reasons about.
-# "cartao"/"credito" left on purpose: a card is modelled by card_id now, and a
-# caller still sending it as a wallet should show up in the log (unknown →
-# conta).
+# "cartao"/"credito" left OUT on purpose: a card is modelled by card_id now,
+# and a caller still sending it as a wallet should show up in the log (unknown
+# → conta).
 _WALLET_ALIASES: dict[str, str] = {
     "banco": "conta",
     "dinheiro": "conta",

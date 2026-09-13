@@ -70,6 +70,23 @@ def test_unknown_card_and_installments_without_card_are_422(client: TestClient) 
     assert parcelled.status_code == 422
 
 
+def test_named_card_on_income_is_422(client: TestClient) -> None:
+    _card(client)
+    response = client.post(
+        "/api/cashflow", json={"kind": "income", "amount_brl": 10, "card": "nubank"}
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize("installments", [0, 49])
+def test_installments_out_of_bounds_is_422(client: TestClient, installments: int) -> None:
+    response = client.post(
+        "/api/cashflow",
+        json={"kind": "expense", "amount_brl": 10, "installments": installments},
+    )
+    assert response.status_code == 422
+
+
 def test_installment_group_delete(client: TestClient) -> None:
     _card(client)
     first = _post(client, installments=3)
