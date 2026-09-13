@@ -25,6 +25,7 @@ from app.schemas.cashflow import (
     WalletBalance,
     WalletTotal,
 )
+from app.services import card_service
 
 logger = structlog.get_logger()
 
@@ -93,12 +94,13 @@ def normalize_category(raw: str | None) -> str:
 # Unlike categories, wallets are a CLOSED vocabulary: money either sits in the
 # account or on a benefit card, and an invented wallet name would silently
 # split the balances the consultant reasons about.
+# "cartao"/"credito" left on purpose: a card is modelled by card_id now, and a
+# caller still sending it as a wallet should show up in the log (unknown →
+# conta).
 _WALLET_ALIASES: dict[str, str] = {
     "banco": "conta",
     "dinheiro": "conta",
     "pix": "conta",
-    "cartao": "conta",
-    "credito": "conta",
     "debito": "conta",
     "salario": "conta",
     "vale refeicao": "vr",
@@ -160,6 +162,9 @@ def _recent_duplicate(session: Session, entry: CashflowEntry) -> CashflowEntry |
             CashflowEntry.occurred_on == entry.occurred_on,
             CashflowEntry.description == entry.description,
             CashflowEntry.wallet == entry.wallet,
+            CashflowEntry.card_id == entry.card_id,
+            CashflowEntry.installment_no == entry.installment_no,
+            CashflowEntry.installment_count == entry.installment_count,
             CashflowEntry.created_at >= cutoff,
         )
         .order_by(CashflowEntry.created_at.desc())
@@ -167,6 +172,13 @@ def _recent_duplicate(session: Session, entry: CashflowEntry) -> CashflowEntry |
 
 
 def add_entry(session: Session, data: CashflowCreate) -> CashflowEntry:
+    """Book one expense or income line.
+
+    Raises ``card_service.UnknownCardError`` / ``CardRuleError`` when the
+    ``card`` field cannot be honoured — the API turns both into 422.
+    """
+    wallet = normalize_wallet(data.wallet)
+    card = card_service.resolve_card(session, data.card, kind=data.kind, wallet=wallet)
     entry = CashflowEntry(
         kind=data.kind,
         amount_brl=data.amount_brl,
@@ -174,7 +186,8 @@ def add_entry(session: Session, data: CashflowCreate) -> CashflowEntry:
         description=(data.description or "").strip() or None,
         occurred_on=data.occurred_on or date.today(),
         source=data.source,
-        wallet=normalize_wallet(data.wallet),
+        wallet=wallet,
+        card_id=card.id if card is not None else None,
     )
     existing = _recent_duplicate(session, entry)
     if existing is not None:
@@ -197,6 +210,7 @@ def list_entries(
     month: str | None = None,
     kind: CashflowKind | None = None,
     wallet: CashflowWallet | None = None,
+    card_id: UUID | None = None,
     limit: int = 100,
 ) -> list[CashflowEntry]:
     stmt = select(CashflowEntry)
@@ -207,6 +221,8 @@ def list_entries(
         stmt = stmt.where(CashflowEntry.kind == kind)
     if wallet is not None:
         stmt = stmt.where(CashflowEntry.wallet == wallet)
+    if card_id is not None:
+        stmt = stmt.where(CashflowEntry.card_id == card_id)
     stmt = stmt.order_by(CashflowEntry.occurred_on.desc(), CashflowEntry.created_at.desc())
     return list(session.exec(stmt.limit(limit)).all())
 
@@ -226,6 +242,11 @@ def month_summary(session: Session, month: str | None = None) -> CashflowSummary
 
     income = sum(float(e.amount_brl) for e in entries if e.kind == CashflowKind.INCOME)
     expense = sum(float(e.amount_brl) for e in entries if e.kind == CashflowKind.EXPENSE)
+    card_expense = sum(
+        float(e.amount_brl)
+        for e in entries
+        if e.kind == CashflowKind.EXPENSE and e.card_id is not None
+    )
 
     buckets: dict[tuple[CashflowKind, str], list[float]] = {}
     for e in entries:
@@ -264,6 +285,7 @@ def month_summary(session: Session, month: str | None = None) -> CashflowSummary
         expense_brl=round(expense, 2),
         net_brl=round(income - expense, 2),
         entries=len(entries),
+        card_expense_brl=round(card_expense, 2),
         by_category=by_category,
         by_wallet=by_wallet,
     )

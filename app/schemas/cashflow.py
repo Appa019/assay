@@ -17,6 +17,13 @@ class CashflowCreate(BaseModel):
     # Free-form on purpose: the consultant and the classifier may send "VR" or
     # "vale refeição" — the service folds it onto the closed vocabulary.
     wallet: str = Field(default="conta", max_length=32)
+    # Card the purchase went on. Free-form: None/"auto" = the default card
+    # (for an expense from conta), "none"/"pix"/"debito"/"dinheiro" =
+    # explicitly off-card, anything else = a registered card's name.
+    card: str | None = Field(default=None, max_length=40)
+    # Monthly installments; >1 expands into one ledger row per month and
+    # amount_brl is then the TOTAL of the purchase.
+    installments: int = Field(default=1, ge=1, le=48)
 
 
 class CashflowRead(BaseModel):
@@ -28,6 +35,11 @@ class CashflowRead(BaseModel):
     occurred_on: date
     source: CashflowSource
     wallet: CashflowWallet
+    card_id: UUID | None = None
+    card_name: str | None = None  # filled by the router (one lookup, no N+1)
+    installment_no: int | None = None
+    installment_count: int | None = None
+    installment_group: UUID | None = None
     created_at: datetime
 
 
@@ -65,6 +77,7 @@ class CashflowSummary(BaseModel):
     expense_brl: float
     net_brl: float
     entries: int
+    card_expense_brl: float = 0.0
     by_category: list[CategoryTotal]
     by_wallet: list[WalletTotal] = Field(default_factory=list)
 

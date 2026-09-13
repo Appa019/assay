@@ -154,6 +154,7 @@ def test_a_different_amount_still_creates_a_second_entry(session: Session) -> No
         ("Salário", CashflowWallet.CONTA),
         ("", CashflowWallet.CONTA),
         (None, CashflowWallet.CONTA),
+        ("cartao", CashflowWallet.CONTA),  # no longer an alias: a card is a card, not a wallet
         ("cartao misterioso", CashflowWallet.CONTA),  # unknown degrades to conta
     ],
 )
@@ -280,3 +281,78 @@ def test_wallet_balances_accumulate_across_months(session: Session) -> None:
     assert [b.wallet for b in balances] == [CashflowWallet.VR]
     assert balances[0].balance_brl == pytest.approx(500.0)
     assert balances[0].entries == 2
+
+
+# --- credit card on an entry ----------------------------------------------------
+
+from uuid import UUID  # noqa: E402
+
+from app.schemas.card import CardCreate  # noqa: E402
+from app.services import card_service  # noqa: E402
+
+
+def _nubank(session: Session, closing: int = 25, due: int = 3):  # noqa: ANN202
+    return card_service.create_card(
+        session, CardCreate(name="Nubank", closing_day=closing, due_day=due)
+    )
+
+
+def test_expense_from_conta_lands_on_the_default_card(session: Session) -> None:
+    card = _nubank(session)
+    entry = cashflow_service.add_entry(session, _entry())
+    assert entry.card_id == card.id
+    assert entry.wallet == CashflowWallet.CONTA  # the money still leaves the account
+    assert entry.installment_no is None and entry.installment_group is None
+
+
+def test_explicit_pix_stays_off_the_card(session: Session) -> None:
+    _nubank(session)
+    entry = cashflow_service.add_entry(
+        session, CashflowCreate(kind=CashflowKind.EXPENSE, amount_brl=Decimal("10"), card="pix")
+    )
+    assert entry.card_id is None
+
+
+def test_benefit_and_income_never_get_a_card(session: Session) -> None:
+    _nubank(session)
+    vr = cashflow_service.add_entry(
+        session, CashflowCreate(kind=CashflowKind.EXPENSE, amount_brl=Decimal("35"), wallet="vr")
+    )
+    salary = cashflow_service.add_entry(
+        session, CashflowCreate(kind=CashflowKind.INCOME, amount_brl=Decimal("8400"))
+    )
+    assert vr.card_id is None and salary.card_id is None
+
+
+def test_unknown_card_name_is_refused(session: Session) -> None:
+    _nubank(session)
+    with pytest.raises(card_service.UnknownCardError):
+        cashflow_service.add_entry(
+            session,
+            CashflowCreate(kind=CashflowKind.EXPENSE, amount_brl=Decimal("10"), card="itau"),
+        )
+
+
+def test_summary_reports_card_spend_separately(session: Session) -> None:
+    _nubank(session)
+    on = date(2026, 9, 10)
+    cashflow_service.add_entry(session, _entry(amount="100.00", occurred_on=on))
+    cashflow_service.add_entry(
+        session,
+        CashflowCreate(
+            kind=CashflowKind.EXPENSE, amount_brl=Decimal("40"), card="pix", occurred_on=on
+        ),
+    )
+    summary = cashflow_service.month_summary(session, "2026-09")
+    assert summary.expense_brl == 140.0
+    assert summary.card_expense_brl == 100.0
+
+
+def test_list_entries_filters_by_card(session: Session) -> None:
+    card = _nubank(session)
+    cashflow_service.add_entry(session, _entry(amount="100.00"))
+    cashflow_service.add_entry(
+        session, CashflowCreate(kind=CashflowKind.EXPENSE, amount_brl=Decimal("40"), card="pix")
+    )
+    assert len(cashflow_service.list_entries(session, card_id=card.id)) == 1
+    assert len(cashflow_service.list_entries(session, card_id=UUID(int=0))) == 0
