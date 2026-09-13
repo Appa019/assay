@@ -61,3 +61,47 @@ def test_prompt_teaches_the_wallet_field() -> None:
     prompt = classifier_service._prompt("gastei 42 no mercado")
     assert '"wallet"' in prompt
     assert "vale-refeição" in prompt
+
+
+def test_classify_carries_card_and_installments(monkeypatch: pytest.MonkeyPatch) -> None:
+    _stub_step(
+        monkeypatch,
+        {
+            "kind": "expense",
+            "amount_brl": 2000.0,
+            "category": "lazer",
+            "description": "tv",
+            "occurred_on": "2026-09-10",
+            "wallet": "conta",
+            "card": "nubank",
+            "installments": 10,
+        },
+    )
+    draft = classifier_service.classify("comprei uma tv em 10x de 200 no nubank")
+    assert draft.card == "nubank"
+    assert draft.installments == 10
+
+
+def test_classify_auto_card_becomes_none_and_bad_installments_fall_to_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stub_step(
+        monkeypatch,
+        {
+            "kind": "expense",
+            "amount_brl": 10.0,
+            "category": "mercado",
+            "card": "auto",
+            "installments": "99",
+        },
+    )
+    draft = classifier_service.classify("gastei 10 no mercado")
+    assert draft.card is None
+    assert draft.installments == 1
+
+
+def test_classify_old_shape_defaults_card_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    _stub_step(monkeypatch, {"kind": "expense", "amount_brl": 10.0, "category": "mercado"})
+    draft = classifier_service.classify("gastei 10 no mercado")
+    assert draft.card is None
+    assert draft.installments == 1

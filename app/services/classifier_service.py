@@ -57,7 +57,7 @@ Frase do usuário: "{text}"
 Responda APENAS com um bloco JSON, sem nenhum texto antes ou depois:
 
 ```json
-{{"kind": "expense|income", "amount_brl": 0.00, "category": "...", "description": "...", "occurred_on": "AAAA-MM-DD", "wallet": "conta|vr|va"}}
+{{"kind": "expense|income", "amount_brl": 0.00, "category": "...", "description": "...", "occurred_on": "AAAA-MM-DD", "wallet": "conta|vr|va", "card": "auto|none|<nome do cartão>", "installments": 1}}
 ```
 
 Regras:
@@ -77,6 +77,13 @@ Regras:
   vale-refeição; "va" se citar VA ou vale-alimentação. "no vale", sem
   especificar qual: "vr" para restaurante/lanche, "va" para mercado. Sem
   menção a benefício, use "conta" (banco, pix, cartão, dinheiro).
+- `card`: como pagou. "auto" quando a frase não diz (o cartão de crédito
+  padrão do cliente é aplicado). "none" se citar pix, débito, dinheiro ou
+  transferência. Se citar um cartão pelo nome ("no nubank", "no cartão itaú"),
+  só o nome ("nubank", "itaú"). Gasto em VR/VA: sempre "none".
+- `installments`: número de parcelas. "em 10x", "10 vezes", "parcelado em 10"
+  → 10. Sem parcelamento, 1. Com parcelas, `amount_brl` é o TOTAL da compra
+  (10x de 200 → 2000.00).
 - Hoje é {date.today().isoformat()} ({_WEEKDAYS[date.today().weekday()]}).
 """
 
@@ -147,8 +154,25 @@ def classify(text: str) -> CashflowCreate:
 
     wallet = normalize_wallet(str(data.get("wallet") or "conta")).value
 
+    card_raw = str(data.get("card") or "").strip()
+    card = None if card_raw.lower() in ("", "auto") else card_raw[:40]
+
+    try:
+        installments = int(data.get("installments") or 1)
+    except (TypeError, ValueError):
+        installments = 1
+    if not 1 <= installments <= 48:
+        logger.warning("cashflow_classify_bad_installments", raw=str(data.get("installments"))[:8])
+        installments = 1
+
     logger.info(
-        "cashflow_classified", kind=kind, amount=float(amount), category=category, wallet=wallet
+        "cashflow_classified",
+        kind=kind,
+        amount=float(amount),
+        category=category,
+        wallet=wallet,
+        card=card,
+        installments=installments,
     )
     return CashflowCreate(
         kind=kind,
@@ -157,4 +181,6 @@ def classify(text: str) -> CashflowCreate:
         description=description,
         occurred_on=occurred_on,
         wallet=wallet,
+        card=card,
+        installments=installments,
     )
