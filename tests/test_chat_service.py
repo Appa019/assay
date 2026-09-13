@@ -39,6 +39,9 @@ def test_ensure_workspace_seeds_and_preserves_memory(chat_dirs: Path) -> None:
     orders = (ws / "CLAUDE.md").read_text(encoding="utf-8")
     assert str(settings.min_holding_days) in orders
     assert "/api/cashflow" in orders
+    assert "/api/cards" in orders
+    assert "PAGAMENTO DE FATURA NÃO É GASTO" in orders
+    assert '"installments"' in orders
 
 
 def test_chat_mcp_profile_is_lean(chat_dirs: Path) -> None:
