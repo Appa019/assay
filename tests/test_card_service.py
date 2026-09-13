@@ -166,3 +166,98 @@ def test_resolve_named_card_on_income_or_benefit_is_a_rule_error(session: Sessio
         card_service.resolve_card(
             session, "nubank", kind=CashflowKind.EXPENSE, wallet=CashflowWallet.VR
         )
+
+
+# --- invoices --------------------------------------------------------------------
+
+
+def _spend(session: Session, card_id, amount: str, on: date) -> None:  # noqa: ANN001
+    session.add(
+        CashflowEntry(
+            kind=CashflowKind.EXPENSE, amount_brl=Decimal(amount), occurred_on=on, card_id=card_id
+        )
+    )
+    session.commit()
+
+
+def test_open_invoice_window_and_due_date(session: Session) -> None:
+    card = card_service.create_card(session, _card(closing=25, due=3))
+    window = card_service.invoice_window(card, 2026, 9)
+    assert window.period_start == date(2026, 8, 26)
+    assert window.period_end == date(2026, 9, 25)
+    assert window.closes_on == date(2026, 9, 25)
+    assert window.due_on == date(2026, 10, 3)
+
+
+def test_due_day_after_closing_day_stays_in_the_same_month(session: Session) -> None:
+    card = card_service.create_card(session, _card(closing=5, due=15))
+    assert card_service.invoice_window(card, 2026, 9).due_on == date(2026, 9, 15)
+
+
+def test_closing_day_31_clamps_to_short_months(session: Session) -> None:
+    card = card_service.create_card(session, _card(closing=31, due=10))
+    window = card_service.invoice_window(card, 2026, 2)
+    assert window.closes_on == date(2026, 2, 28)
+    assert window.period_start == date(2026, 2, 1)  # Jan 31 + 1 day
+    assert window.due_on == date(2026, 3, 10)
+
+
+def test_open_invoice_rolls_over_the_year(session: Session) -> None:
+    card = card_service.create_card(session, _card(closing=25, due=3))
+    assert card_service.open_invoice_month(card, date(2026, 12, 28)) == (2027, 1)
+    window = card_service.invoice_window(card, 2027, 1)
+    assert window.period_start == date(2026, 12, 26)
+    assert window.due_on == date(2027, 2, 3)
+
+
+def test_invoice_status_by_date(session: Session) -> None:
+    card = card_service.create_card(session, _card(closing=25, due=3))
+    build = lambda today: card_service.build_invoice(session, card, 2026, 9, today=today)  # noqa: E731
+    assert build(date(2026, 9, 25)).status == "open"  # closing day itself still open
+    assert build(date(2026, 9, 26)).status == "closed"
+    assert build(date(2026, 10, 3)).status == "closed"
+    assert build(date(2026, 10, 4)).status == "past"
+
+
+def test_invoice_totals_only_count_this_card_inside_the_window(session: Session) -> None:
+    card = card_service.create_card(session, _card(closing=25, due=3))
+    other = card_service.create_card(session, _card("Itaú", closing=25, due=3))
+    _spend(session, card.id, "100.00", date(2026, 8, 26))  # first day of the window
+    _spend(session, card.id, "50.50", date(2026, 9, 25))  # last day
+    _spend(session, card.id, "999.00", date(2026, 8, 25))  # previous invoice
+    _spend(session, other.id, "10.00", date(2026, 9, 10))  # other card
+    _spend(session, None, "20.00", date(2026, 9, 10))  # pix
+    invoice = card_service.build_invoice(session, card, 2026, 9, today=date(2026, 9, 12))
+    assert invoice.total_brl == 150.5
+    assert invoice.entries == 2
+
+
+def test_invoices_end_on_the_open_one_oldest_first(session: Session) -> None:
+    card = card_service.create_card(session, _card(closing=25, due=3))
+    history = card_service.invoices(session, card, today=date(2026, 9, 12), months=3)
+    assert [i.closes_on for i in history] == [
+        date(2026, 7, 25),
+        date(2026, 8, 25),
+        date(2026, 9, 25),
+    ]
+    assert [i.status for i in history] == ["past", "past", "open"]
+
+
+def test_card_summaries_pair_open_with_last_closed(session: Session) -> None:
+    card = card_service.create_card(session, _card(closing=25, due=3))
+    _spend(session, card.id, "80.00", date(2026, 9, 1))  # September invoice
+    summaries = card_service.card_summaries(session, today=date(2026, 9, 26))
+    assert len(summaries) == 1
+    summary = summaries[0]
+    assert summary.open_invoice.closes_on == date(2026, 10, 25)
+    assert summary.open_invoice.total_brl == 0.0
+    assert summary.last_closed_invoice is not None
+    assert summary.last_closed_invoice.closes_on == date(2026, 9, 25)
+    assert summary.last_closed_invoice.total_brl == 80.0
+    assert summary.last_closed_invoice.status == "closed"
+
+
+def test_card_summaries_hide_an_empty_previous_invoice(session: Session) -> None:
+    card_service.create_card(session, _card(closing=25, due=3))
+    summary = card_service.card_summaries(session, today=date(2026, 9, 12))[0]
+    assert summary.last_closed_invoice is None

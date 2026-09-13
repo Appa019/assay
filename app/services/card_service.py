@@ -6,6 +6,9 @@ entries that reference it, so editing a closing day regroups history at once.
 """
 
 import unicodedata
+from calendar import monthrange
+from dataclasses import dataclass
+from datetime import date, timedelta
 from uuid import UUID
 
 from sqlalchemy import func
@@ -13,7 +16,7 @@ from sqlmodel import Session, select
 
 from app.models.cashflow import CashflowEntry, CashflowKind, CashflowWallet
 from app.models.credit_card import CreditCard
-from app.schemas.card import CardCreate, CardUpdate
+from app.schemas.card import CardCreate, CardRead, CardUpdate, InvoiceRead, InvoiceStatus
 
 
 class CardNotFoundError(LookupError):
@@ -173,3 +176,129 @@ def resolve_card(
     if not on_card_allowed:
         raise CardRuleError("Cartão só vale para gasto pago da conta (não em ganho, VR ou VA)")
     return card
+
+
+# --- invoices (computed, never stored) --------------------------------------------
+
+
+def shift_month(year: int, month: int, delta: int) -> tuple[int, int]:
+    """(year, month) moved by ``delta`` months; month is 1-12."""
+    index = year * 12 + (month - 1) + delta
+    return index // 12, index % 12 + 1
+
+
+def _clamp_day(year: int, month: int, day: int) -> date:
+    return date(year, month, min(day, monthrange(year, month)[1]))
+
+
+def closes_on(card: CreditCard, year: int, month: int) -> date:
+    """Closing date of the invoice that closes in (year, month)."""
+    return _clamp_day(year, month, card.closing_day)
+
+
+def due_on(card: CreditCard, closing: date) -> date:
+    """First occurrence of ``due_day`` strictly after the closing date."""
+    candidate = _clamp_day(closing.year, closing.month, card.due_day)
+    if candidate > closing:
+        return candidate
+    year, month = shift_month(closing.year, closing.month, 1)
+    return _clamp_day(year, month, card.due_day)
+
+
+@dataclass(frozen=True)
+class InvoiceWindow:
+    closes_on: date
+    period_start: date
+    period_end: date
+    due_on: date
+
+
+def invoice_window(card: CreditCard, year: int, month: int) -> InvoiceWindow:
+    """The cycle that closes in (year, month): (previous closing, closing]."""
+    closing = closes_on(card, year, month)
+    prev_year, prev_month = shift_month(year, month, -1)
+    start = closes_on(card, prev_year, prev_month) + timedelta(days=1)
+    return InvoiceWindow(
+        closes_on=closing, period_start=start, period_end=closing, due_on=due_on(card, closing)
+    )
+
+
+def open_invoice_month(card: CreditCard, today: date) -> tuple[int, int]:
+    """(year, month) of the invoice still open on ``today`` — the earliest
+    closing date on or after today (the closing day itself is still open)."""
+    if closes_on(card, today.year, today.month) >= today:
+        return today.year, today.month
+    return shift_month(today.year, today.month, 1)
+
+
+def _status(window: InvoiceWindow, today: date) -> InvoiceStatus:
+    if today <= window.closes_on:
+        return "open"
+    if today <= window.due_on:
+        return "closed"
+    return "past"
+
+
+def _window_totals(session: Session, card_id: UUID, start: date, end: date) -> tuple[float, int]:
+    total, count = session.exec(
+        select(func.coalesce(func.sum(CashflowEntry.amount_brl), 0), func.count())
+        .where(CashflowEntry.card_id == card_id)
+        .where(CashflowEntry.occurred_on >= start, CashflowEntry.occurred_on <= end)
+    ).one()
+    return round(float(total), 2), int(count)
+
+
+def build_invoice(
+    session: Session, card: CreditCard, year: int, month: int, *, today: date
+) -> InvoiceRead:
+    window = invoice_window(card, year, month)
+    total, count = _window_totals(session, card.id, window.period_start, window.period_end)
+    return InvoiceRead(
+        card_id=card.id,
+        period_start=window.period_start,
+        period_end=window.period_end,
+        closes_on=window.closes_on,
+        due_on=window.due_on,
+        status=_status(window, today),
+        total_brl=total,
+        entries=count,
+    )
+
+
+def invoices(
+    session: Session, card: CreditCard, *, today: date | None = None, months: int = 6
+) -> list[InvoiceRead]:
+    """The last ``months`` invoices, oldest first, ending on the open one."""
+    today = today or date.today()
+    months = max(1, min(months, 24))
+    year, month = open_invoice_month(card, today)
+    out: list[InvoiceRead] = []
+    for offset in range(months - 1, -1, -1):
+        y, m = shift_month(year, month, -offset)
+        out.append(build_invoice(session, card, y, m, today=today))
+    return out
+
+
+def card_summaries(session: Session, *, today: date | None = None) -> list[CardRead]:
+    """Every card with its open invoice and the previous one (when it has
+    anything in it) — the single call the screens need."""
+    today = today or date.today()
+    out: list[CardRead] = []
+    for card in list_cards(session):
+        year, month = open_invoice_month(card, today)
+        current = build_invoice(session, card, year, month, today=today)
+        prev_year, prev_month = shift_month(year, month, -1)
+        previous = build_invoice(session, card, prev_year, prev_month, today=today)
+        out.append(
+            CardRead(
+                id=card.id,
+                name=card.name,
+                closing_day=card.closing_day,
+                due_day=card.due_day,
+                is_default=card.is_default,
+                created_at=card.created_at,
+                open_invoice=current,
+                last_closed_invoice=previous if previous.entries else None,
+            )
+        )
+    return out
