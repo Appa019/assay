@@ -1,3 +1,9 @@
+import { valuesHidden } from "@/lib/privacy";
+
+/** What money becomes while the eye is closed. Percentages and quantities
+ *  stay visible: they do not give the absolute amounts away. */
+const MASK = "••••";
+
 export type BRLOptions = {
   minimumFractionDigits?: number;
   maximumFractionDigits?: number;
@@ -8,6 +14,7 @@ export const formatBRL = (
   options?: BRLOptions,
 ): string => {
   if (value === null || value === undefined) return "–";
+  if (valuesHidden()) return `R$ ${MASK}`;
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
@@ -26,6 +33,7 @@ export const formatBRLCompact = (value: number | null | undefined): string =>
  */
 export const formatAmount = (value: number | null | undefined): string => {
   if (value === null || value === undefined) return "–";
+  if (valuesHidden()) return MASK;
   return new Intl.NumberFormat("pt-BR", {
     style: "decimal",
     minimumFractionDigits: 2,
