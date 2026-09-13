@@ -1,8 +1,19 @@
 # 13 · Estado atual
 
-> **Fotografia de 2026-09-06.** Este é o documento que envelhece —
+> **Fotografia de 2026-09-12.** Este é o documento que envelhece —
 > atualize-o quando mudar algo estrutural. Os outros 12 descrevem como o
 > sistema funciona; este descreve como ele está **agora**.
+
+## 2026-09-12 — cartão de crédito e olhinho
+
+Tabela `credit_card` + 4 colunas em `cashflow_entry` (migração automática no
+boot). Cartão padrão para gasto da conta, parcelas expandidas em linhas,
+fatura calculada (`/api/cards`), aviso no dia seguinte ao fechamento,
+consultor/classificador/roteador com as regras (D39). No front: bloco de
+fatura no extrato, cadastro em Ajustes, linha na visão geral e o **olhinho**
+que mascara os formatadores de moeda (`lib/privacy.ts`). Sem variável de
+ambiente nova. Depois do deploy no Pi: cadastrar o cartão em `/configuracoes`
+(ou dizer ao consultor "meu cartão fecha dia X e vence dia Y").
 
 ## 2026-09-06 — corte de custo do motor (D37)
 
@@ -74,7 +85,7 @@ workspaces efêmeros, chaves VAPID (é preciso reassinar o push em
 | Branch | `feat/consultor-upgrade` (sobre `feat/state-of-art-overhaul`; `main` é a principal) |
 | Versão backend | `0.4.0` (`app/main.py`, `pyproject.toml`) |
 | Versão frontend | `0.3.0` (`frontend/package.json`) — desalinhada, cosmético |
-| Testes | **252 passando** (191 → 193 auth/entitlement → 204 sizing de ordem → 221 roteador + inbox → 227 mandato do CDB → 231 trava por classe → 252 corte de custo) |
+| Testes | **325 passando** (191 → 193 auth/entitlement → 204 sizing de ordem → 221 roteador + inbox → 227 mandato do CDB → 231 trava por classe → 252 corte de custo → 325 cartão de crédito) |
 | Tamanho | ~10.700 linhas de Python · ~8.400 de TS/CSS |
 
 ## O que aconteceu na madrugada de 2026-08-06 (upgrade do consultor)

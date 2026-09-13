@@ -24,18 +24,18 @@ src/
 │       ├── layout.tsx        <Sidebar> + <main> + <MobileNav>
 │       ├── page.tsx          / — Visão geral (727 linhas)
 │       ├── consultor/        chat
-│       ├── extrato/          ledger pessoal, somente leitura
+│       ├── extrato/          ledger pessoal + fatura do cartão, somente leitura
 │       ├── investimentos/    casca com 4 sub-abas na URL
 │       ├── ativos/           AtivosView (1423 linhas — o maior arquivo)
 │       ├── aporte/           AporteView + [id]/ (acompanhamento)
 │       ├── relatorios/       RelatoriosView
 │       ├── ir/               IrView
-│       ├── configuracoes/    diagnóstico (/api/health)
+│       ├── configuracoes/    diagnóstico, push, cadastro de cartões
 │       └── error.tsx         boundary de erro
-├── components/               8 componentes
+├── components/               10 componentes (+ privacy-toggle, values-shell)
 ├── hooks/                    use-portfolio · use-cashflow · use-macro ·
-│                             use-portfolio-history · use-cadence
-└── lib/                      api.ts · nav.ts · format.ts
+│                             use-portfolio-history · use-cadence · use-cards
+└── lib/                      api.ts · nav.ts · format.ts · privacy.ts
 ```
 
 ## Navegação — `lib/nav.ts` é a fonte única
@@ -138,6 +138,19 @@ cabeçalho nunca discordarem depois de uma escrita.
 
 **Estados honestos:** se o backend caiu, mostre `<WifiOff>` e diga isso — nunca
 renderize um zero que parece saldo real.
+
+## Olhinho (ocultar valores)
+
+`lib/privacy.ts` é um store mínimo (`useSyncExternalStore`) persistido em
+`localStorage` (`assay.values-hidden`). Os três formatadores de moeda de
+`lib/format.ts` (`formatBRL`, `formatBRLCompact`, `formatAmount`) leem o flag
+e devolvem `••••` quando oculto — percentuais e quantidades continuam
+visíveis. Como são funções puras chamadas no render, `ValuesShell` (no
+layout) remonta a página ao alternar (`key` no wrapper): estado local da
+tela reseta, o que é aceitável para uma ação rara. O botão (`PrivacyToggle`,
+Lucide `Eye`/`EyeOff`) vive na sidebar e flutua ao lado do sino no celular.
+Ao abrir o app com o flag salvo há um frame com valores visíveis antes da
+remontagem — trade-off documentado, não bug.
 
 ## Componentes
 

@@ -642,3 +642,21 @@ Três detalhes que só aparecem quando se implementa:
 E o que NÃO funciona, para não tentarem de novo: mandar uma mensagem qualquer
 de madrugada "para adiantar consumo". Não há nada a reservar — a janela enche
 sozinha com o tempo, e gastar às 2h não guarda nada para as 14h.
+
+### D39 · Cartão de crédito: competência, cartão padrão e fatura que não é gasto
+O cliente passa tudo no cartão. Três decisões: **(1) competência** — a compra
+conta no mês em que foi feita (`occurred_on`), e pagar a fatura não gera
+lançamento nenhum (seria contar cada compra duas vezes); a fatura é uma
+visão calculada (`card_service`), nunca uma tabela. **(2) cartão é o
+padrão** — gasto em `conta` sem meio de pagamento vai para o cartão padrão;
+a regra mora em `resolve_card`, não em prompt, para valer em toda porta
+(consultor, classificador, bot, API). Nome de cartão desconhecido é 422, não
+fallback: um erro de digitação tem que voltar para quem lançou. **(3)
+parcelas são linhas** — N linhas, uma por mês, no mesmo ledger, para que
+resumo mensal, insights e histórico continuem corretos sem saber o que é
+parcela. Efeitos colaterais: `cartao`/`credito` deixaram de ser apelidos de
+carteira (cartão não é pote de dinheiro), e o roteador manda toda frase com
+"fatura" para opus, porque "paguei a fatura 3200" tinha o formato exato de
+um lançamento rápido. O aviso de fechamento sai no dia SEGUINTE (compra no
+dia do fechamento ainda entra) e fora do orçamento semanal de insights (é
+conta a pagar).

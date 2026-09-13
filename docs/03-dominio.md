@@ -12,6 +12,7 @@ Contribution ──1:N──▶ ContributionPrompt        (aporte → 5 prompts 
                                       └── é fotografado em ──▶ PortfolioSnapshot
 Report          (weekly · maturity · monthly)
 CashflowEntry   (ledger pessoal: gasto/ganho)
+CreditCard      (cartão de crédito: fechamento, vencimento, padrão)
 ChatMessage     (transcrição do consultor, telegram + web)
 ```
 
@@ -110,6 +111,34 @@ entrada existente (`cashflow_service._recent_duplicate`). Motivo: o consultor
 às vezes posta, não lê a resposta, e posta de novo — o que dobrava o gasto
 silenciosamente.
 
+**Cartão de crédito (`card_id`, 2026-09-12):** compra no cartão é gasto em
+`conta` (o dinheiro sai da conta no vencimento) com `card_id` apontando para
+um `CreditCard`. **Regime de competência**: conta no mês da compra
+(`occurred_on`); pagar a fatura NUNCA vira lançamento. Regra do padrão em
+`card_service.resolve_card`: `card` ausente → cartão padrão se `kind=expense`
+e `wallet=conta`; `none`/`pix`/`debito`/`dinheiro` → sem cartão; nome
+desconhecido → 422 (nunca cai no padrão em silêncio). Cartão em `income` ou
+em VR/VA → 422. Os apelidos `cartao`/`credito` saíram de `_WALLET_ALIASES`:
+cartão não é carteira.
+
+**Parcelas:** `installments` (1–48) expande em N linhas, uma por mês
+(`_add_months` clampa o dia a partir da data ORIGINAL: 31/jan → 28/fev →
+31/mar), `amount_brl` do payload é o TOTAL, centavos sobrando na parcela 1
+(`_split_installments`). As N linhas compartilham `installment_group` e
+levam `installment_no`/`installment_count`; `delete_group` apaga a compra
+inteira. Parcelamento exige cartão.
+
+### `CreditCard` — cartão de crédito
+
+`name` (único após fold), `closing_day`, `due_day` (1–31, clampados ao fim do
+mês curto), `is_default` (exatamente um enquanto houver cartões: o primeiro
+vira padrão, promover outro rebaixa o anterior, remover o padrão promove o
+mais antigo). **Faturas nunca são persistidas**: `card_service.invoice_window`
+calcula `(fechamento anterior, fechamento]`, `due_on` = primeira ocorrência
+de `due_day` estritamente após o fechamento, status `open` (`hoje ≤
+fechamento`) · `closed` (até o vencimento) · `past`. Sem controle de
+pagamento. `DELETE` só sem lançamentos (409).
+
 ### `ChatMessage` — transcrição compartilhada
 
 Toda mensagem, dos dois lados e das **duas portas** (Telegram e site). Guarda
@@ -207,8 +236,12 @@ _ADDED_COLUMNS = {
     "contribution": {"claude_session_id": "TEXT", "run_attempts": "INTEGER NOT NULL DEFAULT 0"},
     "contribution_prompt": {"cost_usd": "REAL", "duration_s": "REAL", "num_turns": "INTEGER"},
     "asset": {"thesis": "TEXT", "target_price": "NUMERIC", "stop_price": "NUMERIC"},
+    "cashflow_entry": {"wallet": "TEXT NOT NULL DEFAULT 'conta'", "card_id": "CHAR(32) REFERENCES credit_card(id)", ...},
 }
 ```
+
+UUID no SQLite é `CHAR(32)`; coluna com `REFERENCES` só entra por `ALTER TABLE`
+com default NULL (e `create_all` já criou a tabela pai antes).
 
 **Ao adicionar um campo a uma tabela existente:** declare no modelo **e**
 registre aqui com o DDL SQLite. `_ensure_sqlite_columns()` roda no boot, checa

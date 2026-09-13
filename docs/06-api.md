@@ -55,13 +55,26 @@ Base: `http://127.0.0.1:8000` (o navegador nunca fala direto — o Next reescrev
 
 | Método | Rota | O que faz |
 |---|---|---|
-| `POST` | `` | Registra gasto/ganho. Body: `kind` (`expense`\|`income`), `amount_brl>0`, `category` (min., default `outros`), `description?`, `occurred_on?` (default hoje), `source` (`chat`\|`bot`\|`api`), `wallet?` (`conta`\|`vr`\|`va`, default `conta`; apelidos como "Vale Refeição" são dobrados). **Idêntico em 120s → devolve o existente** |
+| `POST` | `` | Registra gasto/ganho. Body: `kind` (`expense`\|`income`), `amount_brl>0`, `category` (min., default `outros`), `description?`, `occurred_on?` (default hoje), `source` (`chat`\|`bot`\|`api`), `wallet?` (`conta`\|`vr`\|`va`, default `conta`; apelidos como "Vale Refeição" são dobrados). **Idêntico em 120s → devolve o existente**, `card?` (omitido = cartão padrão p/ gasto em conta; `none`/`pix`/`debito`/`dinheiro` = sem cartão; nome = cartão cadastrado, desconhecido → **422**), `installments?` (1–48; N linhas, `amount_brl` = total, devolve a parcela 1). Resposta traz `card_id`, `card_name`, `installment_no/count/group` |
 | `POST` | `/classify` | Texto livre → **rascunho** `CashflowCreate` (com `wallet`). **Não grava.** 422 se não achou valor |
-| `GET` | `?month=YYYY-MM&kind=&wallet=&limit=100` | Lançamentos. `month` malformado → 422 |
-| `GET` | `/summary?month=YYYY-MM` | `income_brl`, `expense_brl`, `net_brl`, `entries`, `by_category[]`, `by_wallet[]` |
+| `GET` | `?month=YYYY-MM&kind=&wallet=&card_id=&limit=100` | Lançamentos. `month` malformado → 422 |
+| `GET` | `/summary?month=YYYY-MM` | `income_brl`, `expense_brl`, `net_brl`, `entries`, `card_expense_brl`, `by_category[]`, `by_wallet[]` |
 | `GET` | `/wallets` | Saldo **acumulado** por carteira (entrou − saiu desde sempre) — responde "quanto ainda tenho de VR?" |
 | `GET` | `/history?months=6` | Totais por mês, **mais antigo primeiro** (a tendência) |
+| `DELETE` | `/groups/{installment_group}` | Apaga a compra parcelada inteira → `{deleted}`. 404 se nenhuma linha |
 | `DELETE` | `/{id}` | Apaga um lançamento |
+
+---
+
+## Cartões de crédito — `/api/cards`
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `GET` | `` | Todos os cartões, cada um com `open_invoice` e `last_closed_invoice` (calculadas: `period_start/end`, `closes_on`, `due_on`, `status` open\|closed\|past, `total_brl`, `entries`) |
+| `POST` | `` | Body `{name, closing_day 1–31, due_day 1–31, is_default?}`. **201.** O primeiro cartão vira padrão. 409 nome repetido |
+| `PATCH` | `/{id}` | Campos opcionais. `is_default: true` rebaixa o anterior; `false` no único padrão → 422. 409 nome repetido |
+| `DELETE` | `/{id}` | 409 se há lançamentos no cartão. Remover o padrão promove o mais antigo |
+| `GET` | `/{id}/invoices?months=6` | Histórico de faturas (1–24), mais antiga primeiro, termina na aberta |
 
 ---
 

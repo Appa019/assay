@@ -303,6 +303,13 @@ memória fixa, regra de recorrente ("lembrar não basta, tem que lançar"),
 anti-duplicação, MCPs disponíveis, anti-manipulação e formato de resposta
 (≤12 linhas, celular).
 
+Ordens de cartão (2026-09-12): gasto da conta sem meio explícito vai sem
+`card` (a API aplica o padrão); pix/débito/dinheiro → `"card": "none"`;
+parcelas → `installments` + total; **pagamento de fatura NUNCA é lançado** —
+o consultor lê `GET /api/cards` e concilia; fatura em PDF é conciliada linha a
+linha contra `GET /api/cashflow?card_id=`. Cartões ficam no banco, não no
+MEMORY.md.
+
 ## Roteador de modelo
 
 `model_router.py`. Antes, todo turno era opus/high — correto para "devo trocar
@@ -330,14 +337,18 @@ julgamento (`_ADVICE_RE`: devo, vale a pena, recomenda, comprar, vender, tese,
 risco…). "quanto tenho em cripto, devo aumentar?" carrega uma decisão e vai
 para opus. **Na dúvida, opus** continua valendo.
 
+**"fatura" vai sempre para opus** (2026-09-12): "paguei a fatura 3200" tem
+verbo no passado + valor e cairia no haiku, que lançaria um gasto fantasma de
+R$ 3.200 — cada compra já está no ledger. A palavra está em `_ASKS_RE` e em
+`_ADVICE_RE`, então sai do caminho rápido e do lookup.
+
 O roteamento acontece ANTES de o turno adquirir o `_chat_turn.lock`. O modelo e
 o tier usados ficam gravados na `ChatMessage`.
 
 ## Classificador de gasto
 
 `classifier_service.py`. "gastei 42,90 no mercado ontem" → JSON estruturado
-(`kind`, `amount_brl`, `category`, `description`, `occurred_on` com data
-relativa resolvida). haiku, workspace sem MCP, ~5s.
+(`kind`, `amount_brl`, `category`, `description`, `occurred_on` com data relativa resolvida, `card` auto|none|nome, `installments`). haiku, workspace sem MCP, ~5s.
 
 **Devolve RASCUNHO e não grava** (`POST /api/cashflow/classify` → `CashflowCreate`).
 O usuário confirma no formulário — senão um erro de leitura entra calado no

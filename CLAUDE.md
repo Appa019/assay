@@ -248,6 +248,12 @@ sem Playwright.
   fontes: chat | bot | api. **Carteiras (D28)**: `wallet` = conta | vr | va
   (vocabulário FECHADO, `normalize_wallet` dobra apelidos, desconhecido →
   conta). VR/VA = benefício, só comida — NUNCA contam como sobra investível.
+  **Cartão de crédito (D39)**: `CreditCard` (fechamento/vencimento/padrão) +
+  `card_id` no lançamento. Competência: conta no mês da compra; **pagar a
+  fatura NUNCA é gasto**. Gasto em `conta` sem meio explícito → cartão padrão
+  (`card_service.resolve_card`, única fonte da regra); `installments` expande
+  em N linhas; faturas são calculadas (`/api/cards`), nunca gravadas; aviso
+  no dia seguinte ao fechamento. Roteador: "fatura" → opus sempre.
 
 ### Chat no site + roteador de modelo (2026-07-28)
 O consultor mora na página `/consultor`. **É UMA conversa só**: se o espelho do
