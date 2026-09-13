@@ -245,7 +245,10 @@ const ExtratoPage = () => {
 
   return (
     <div className="max-w-3xl pb-4">
-      <header className="flex items-center justify-between gap-3">
+      {/* pr reserves room for the floating eye + bell on mobile (~6.75rem
+          from the right edge) so the month arrows wrap left of them instead
+          of sitting underneath. */}
+      <header className="flex items-center justify-between gap-3 pr-[6.75rem] md:pr-0">
         <div className="min-w-0">
           <p
             className="text-[11px] uppercase tracking-[0.18em]"
@@ -512,7 +515,7 @@ const ExtratoPage = () => {
                                 <button
                                   type="button"
                                   onClick={() => void removeGroup(group)}
-                                  className="flex min-h-[2.25rem] items-center gap-1.5 rounded-md border px-3 font-medium"
+                                  className="flex min-h-[2.75rem] items-center gap-1.5 rounded-md border px-3 font-medium"
                                   style={{ borderColor: "var(--border)", color: "var(--danger)" }}
                                 >
                                   <Trash2 size={14} strokeWidth={1.9} />
@@ -522,7 +525,7 @@ const ExtratoPage = () => {
                               <button
                                 type="button"
                                 onClick={() => void remove(entry.id)}
-                                className="flex min-h-[2.25rem] items-center gap-1.5 rounded-md border px-3 font-medium"
+                                className="flex min-h-[2.75rem] items-center gap-1.5 rounded-md border px-3 font-medium"
                                 style={{ borderColor: "var(--border)", color: "var(--danger)" }}
                               >
                                 <Trash2 size={14} strokeWidth={1.9} />

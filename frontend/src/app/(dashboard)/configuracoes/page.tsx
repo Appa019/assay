@@ -374,12 +374,15 @@ const CardsCard = () => {
                 <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
                   {card.name}
                   {card.is_default && (
-                    <span
-                      className="ml-2 text-[10px] uppercase tracking-[0.14em]"
-                      style={{ color: "var(--accent)" }}
-                    >
-                      padrão
-                    </span>
+                    <>
+                      {" "}
+                      <span
+                        className="ml-2 text-[10px] uppercase tracking-[0.14em]"
+                        style={{ color: "var(--accent)" }}
+                      >
+                        padrão
+                      </span>
+                    </>
                   )}
                 </p>
                 <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>

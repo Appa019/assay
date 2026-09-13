@@ -150,7 +150,9 @@ layout) remonta a página ao alternar (`key` no wrapper): estado local da
 tela reseta, o que é aceitável para uma ação rara. O botão (`PrivacyToggle`,
 Lucide `Eye`/`EyeOff`) vive na sidebar e flutua ao lado do sino no celular.
 Ao abrir o app com o flag salvo há um frame com valores visíveis antes da
-remontagem — trade-off documentado, não bug.
+remontagem — trade-off documentado, não bug. `/consultor` é isento dessa
+remontagem: a tela não formata dinheiro nenhum, e remontar apagaria o
+rascunho digitado e os anexos selecionados que ficam no estado do chat.
 
 ## Componentes
 

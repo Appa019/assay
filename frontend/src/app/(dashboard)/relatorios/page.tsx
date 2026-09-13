@@ -200,11 +200,7 @@ export const RelatoriosView = () => {
                         className="text-2xl tracking-tight mt-1 tabular"
                         style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
                       >
-                        R${" "}
-                        {item.amount_brl.toLocaleString("pt-BR", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                        {formatBRL(item.amount_brl)}
                       </p>
                     </div>
                     <span

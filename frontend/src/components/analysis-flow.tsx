@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import type { Contribution, Prompt } from "@/lib/api";
 import { MarkdownViewer } from "@/components/markdown-viewer";
-import { formatDateLong, stripMachineBlocks } from "@/lib/format";
+import { formatBRL, formatDateLong, stripMachineBlocks } from "@/lib/format";
 
 const POLL_INTERVAL_MS = 4000;
 
@@ -96,11 +96,7 @@ export const AnalysisFlow = ({
           className="text-3xl md:text-4xl tracking-tight leading-tight"
           style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
         >
-          R${" "}
-          {contribution.amount_brl.toLocaleString("pt-BR", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}
+          {formatBRL(contribution.amount_brl)}
         </h2>
         {/* Wraps below md: the bar takes its own line, meta + badge the next. */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3">

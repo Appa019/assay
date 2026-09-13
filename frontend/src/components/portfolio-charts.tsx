@@ -23,6 +23,7 @@ import type {
   PortfolioSummary,
 } from "@/lib/api";
 import { formatBRL, formatDate, parseLocalDate } from "@/lib/format";
+import { valuesHidden } from "@/lib/privacy";
 
 /**
  * Categorical palette for the three mandate classes. Validated with the
@@ -83,6 +84,7 @@ const useIsMobile = (): boolean =>
 /* ── Formatters ────────────────────────────────────────────────────── */
 
 const compactBRL = (value: number): string => {
+  if (valuesHidden()) return "R$ ••••";
   const compact = new Intl.NumberFormat("pt-BR", {
     notation: "compact",
     maximumFractionDigits: 1,

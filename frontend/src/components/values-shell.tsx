@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { hydrateValuesHidden, useValuesHidden } from "@/lib/privacy";
 
@@ -11,9 +12,14 @@ import { hydrateValuesHidden, useValuesHidden } from "@/lib/privacy";
  * way to repaint every figure (charts included) is a new `key`. Local UI
  * state resets on toggle; it is a rare action, and nothing is lost that a
  * tap cannot bring back.
+ *
+ * `/consultor` is exempt: it renders no money formatter, and remounting it
+ * would drop the typed draft and any selected attachments sitting in the
+ * chat page's state.
  */
 export const ValuesShell = ({ children }: { children: ReactNode }) => {
   const hidden = useValuesHidden();
+  const pathname = usePathname();
 
   // Deferred a tick, like the bell's first load: the saved choice is applied
   // after hydration so server and client HTML agree.
@@ -23,7 +29,10 @@ export const ValuesShell = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <div key={hidden ? "hidden" : "shown"} className="max-w-[1400px]">
+    <div
+      key={pathname === "/consultor" ? "chat" : hidden ? "hidden" : "shown"}
+      className="max-w-[1400px]"
+    >
       {children}
     </div>
   );

@@ -195,7 +195,10 @@ const DashboardPage = () => {
 
   return (
     <div className="max-w-6xl">
-      <header className="flex items-center justify-between gap-4">
+      {/* pr reserves room for the floating eye + bell on mobile (~6.75rem
+          from the right edge) so "Atualizar" wraps left of them instead of
+          sitting underneath. */}
+      <header className="flex items-center justify-between gap-4 pr-[6.75rem] md:pr-0">
         <div className="min-w-0">
           <h1 className="sr-only">Visão geral</h1>
           <p
