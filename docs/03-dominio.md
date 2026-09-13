@@ -1,6 +1,6 @@
 # 03 · Domínio, dados e regras de negócio
 
-## As 9 tabelas
+## As 10 tabelas
 
 Todas em `app/models/`, SQLModel, PK `UUID`, timestamps em UTC.
 

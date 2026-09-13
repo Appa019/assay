@@ -55,7 +55,7 @@ Base: `http://127.0.0.1:8000` (o navegador nunca fala direto — o Next reescrev
 
 | Método | Rota | O que faz |
 |---|---|---|
-| `POST` | `` | Registra gasto/ganho. Body: `kind` (`expense`\|`income`), `amount_brl>0`, `category` (min., default `outros`), `description?`, `occurred_on?` (default hoje), `source` (`chat`\|`bot`\|`api`), `wallet?` (`conta`\|`vr`\|`va`, default `conta`; apelidos como "Vale Refeição" são dobrados). **Idêntico em 120s → devolve o existente**, `card?` (omitido = cartão padrão p/ gasto em conta; `none`/`pix`/`debito`/`dinheiro` = sem cartão; nome = cartão cadastrado, desconhecido → **422**), `installments?` (1–48; N linhas, `amount_brl` = total, devolve a parcela 1). Resposta traz `card_id`, `card_name`, `installment_no/count/group` |
+| `POST` | `` | Registra gasto/ganho. Body: `kind` (`expense`\|`income`), `amount_brl>0`, `category` (min., default `outros`), `description?`, `occurred_on?` (default hoje), `source` (`chat`\|`bot`\|`api`), `wallet?` (`conta`\|`vr`\|`va`, default `conta`; apelidos como "Vale Refeição" são dobrados), `card?` (omitido = cartão padrão p/ gasto em conta; `none`/`pix`/`debito`/`dinheiro` = sem cartão; nome = cartão cadastrado, desconhecido → **422**), `installments?` (1–48; N linhas, `amount_brl` = total, devolve a parcela 1). Resposta traz `card_id`, `card_name`, `installment_no/count/group`. **Idêntico em 120s → devolve o existente** |
 | `POST` | `/classify` | Texto livre → **rascunho** `CashflowCreate` (com `wallet`). **Não grava.** 422 se não achou valor |
 | `GET` | `?month=YYYY-MM&kind=&wallet=&card_id=&limit=100` | Lançamentos. `month` malformado → 422 |
 | `GET` | `/summary?month=YYYY-MM` | `income_brl`, `expense_brl`, `net_brl`, `entries`, `card_expense_brl`, `by_category[]`, `by_wallet[]` |

@@ -339,8 +339,9 @@ para opus. **Na dúvida, opus** continua valendo.
 
 **"fatura" vai sempre para opus** (2026-09-12): "paguei a fatura 3200" tem
 verbo no passado + valor e cairia no haiku, que lançaria um gasto fantasma de
-R$ 3.200 — cada compra já está no ledger. A palavra está em `_ASKS_RE` e em
-`_ADVICE_RE`, então sai do caminho rápido e do lookup.
+R$ 3.200 — cada compra já está no ledger. O match é `fatura\w*` (pega o plural
+"faturas" e derivados como "faturamento") em `_ASKS_RE` e em `_ADVICE_RE`,
+então sai do caminho rápido e do lookup.
 
 O roteamento acontece ANTES de o turno adquirir o `_chat_turn.lock`. O modelo e
 o tier usados ficam gravados na `ChatMessage`.

@@ -21,7 +21,8 @@ src/
 │   ├── layout.tsx            fontes (next/font), metadata, viewport, PWA
 │   ├── globals.css           TOKENS (oklch) + regras de iOS + reset
 │   └── (dashboard)/
-│       ├── layout.tsx        <Sidebar> + <main> + <MobileNav>
+│       ├── layout.tsx        <ValuesShell> + <PrivacyToggle> + <Sidebar> +
+│       │                     <main> + <MobileNav>
 │       ├── page.tsx          / — Visão geral (727 linhas)
 │       ├── consultor/        chat
 │       ├── extrato/          ledger pessoal + fatura do cartão, somente leitura
@@ -32,7 +33,7 @@ src/
 │       ├── ir/               IrView
 │       ├── configuracoes/    diagnóstico, push, cadastro de cartões
 │       └── error.tsx         boundary de erro
-├── components/               10 componentes (+ privacy-toggle, values-shell)
+├── components/               11 componentes (+ privacy-toggle, values-shell)
 ├── hooks/                    use-portfolio · use-cashflow · use-macro ·
 │                             use-portfolio-history · use-cadence · use-cards
 └── lib/                      api.ts · nav.ts · format.ts · privacy.ts
