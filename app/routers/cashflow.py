@@ -14,7 +14,7 @@ from app.schemas.cashflow import (
     MonthTotals,
     WalletBalance,
 )
-from app.services import cashflow_service, classifier_service
+from app.services import card_service, cashflow_service, classifier_service
 
 router = APIRouter(prefix="/api/cashflow", tags=["cashflow"])
 
@@ -30,13 +30,33 @@ class CashflowClassify(BaseModel):
     text: str = Field(..., min_length=1, max_length=500)
 
 
+def _reads(session: Session, entries: list) -> list[CashflowRead]:  # noqa: ANN001
+    """CashflowRead rows with the card name attached — ONE card lookup for
+    the whole page instead of a query per row."""
+    names = {card.id: card.name for card in card_service.list_cards(session)}
+    out: list[CashflowRead] = []
+    for entry in entries:
+        read = CashflowRead.model_validate(entry, from_attributes=True)
+        read.card_name = names.get(entry.card_id) if entry.card_id is not None else None
+        out.append(read)
+    return out
+
+
+class GroupDeleted(BaseModel):
+    deleted: int
+
+
 @router.post("", response_model=CashflowRead, status_code=status.HTTP_201_CREATED)
 async def create_entry(
     data: CashflowCreate, session: Session = Depends(get_session)
 ) -> CashflowRead:
-    """Register one expense or income line in the personal ledger."""
-    entry = cashflow_service.add_entry(session, data)
-    return CashflowRead.model_validate(entry, from_attributes=True)
+    """Register one expense or income line. A purchase in N installments
+    creates N rows and returns the first; `card` unknown or misused → 422."""
+    try:
+        entry = cashflow_service.add_entry(session, data)
+    except (card_service.UnknownCardError, card_service.CardRuleError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _reads(session, [entry])[0]
 
 
 @router.post("/classify", response_model=CashflowCreate)
@@ -63,14 +83,20 @@ async def list_entries(
     month: str | None = None,
     kind: CashflowKind | None = None,
     wallet: CashflowWallet | None = None,
+    card_id: UUID | None = None,
     limit: int = 100,
     session: Session = Depends(get_session),
 ) -> list[CashflowRead]:
     _validate_month(month)
     entries = cashflow_service.list_entries(
-        session, month=month, kind=kind, wallet=wallet, limit=max(1, min(limit, 1000))
+        session,
+        month=month,
+        kind=kind,
+        wallet=wallet,
+        card_id=card_id,
+        limit=max(1, min(limit, 1000)),
     )
-    return [CashflowRead.model_validate(e, from_attributes=True) for e in entries]
+    return _reads(session, entries)
 
 
 @router.get("/summary", response_model=CashflowSummary)
@@ -94,10 +120,19 @@ async def history(months: int = 6, session: Session = Depends(get_session)) -> l
     return cashflow_service.month_history(session, months)
 
 
+@router.delete("/groups/{group_id}", response_model=GroupDeleted)
+async def delete_group(group_id: UUID, session: Session = Depends(get_session)) -> GroupDeleted:
+    """Delete a whole installment purchase (every monthly row of the group)."""
+    try:
+        return GroupDeleted(deleted=cashflow_service.delete_group(session, group_id))
+    except cashflow_service.CashflowNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.delete("/{entry_id}", response_model=CashflowRead)
 async def delete_entry(entry_id: UUID, session: Session = Depends(get_session)) -> CashflowRead:
     try:
         entry = cashflow_service.delete_entry(session, entry_id)
     except cashflow_service.CashflowNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return CashflowRead.model_validate(entry, from_attributes=True)
+    return _reads(session, [entry])[0]
