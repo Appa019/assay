@@ -14,7 +14,13 @@ from app.schemas.cashflow import (
     MonthTotals,
     WalletBalance,
 )
-from app.services import card_service, cashflow_service, classifier_service
+from app.schemas.forecast import Forecast
+from app.services import (
+    card_service,
+    cashflow_service,
+    classifier_service,
+    forecast_service,
+)
 
 router = APIRouter(prefix="/api/cashflow", tags=["cashflow"])
 
@@ -118,6 +124,17 @@ async def wallets(session: Session = Depends(get_session)) -> list[WalletBalance
 async def history(months: int = 6, session: Session = Depends(get_session)) -> list[MonthTotals]:
     """Totals per month, oldest first — the trend behind the current month."""
     return cashflow_service.month_history(session, months)
+
+
+@router.get("/forecast", response_model=Forecast)
+async def forecast(months: int = 6, session: Session = Depends(get_session)) -> Forecast:
+    """Committed money in and out, month by month (1-24 months ahead).
+
+    Only registered commitments count — ledger rows (future installments
+    included) plus monthly recurrences. No historical average is mixed in, so
+    the projected leftover is a ceiling rather than an expectation.
+    """
+    return forecast_service.build_forecast(session, months=months)
 
 
 @router.delete("/groups/{group_id}", response_model=GroupDeleted)
