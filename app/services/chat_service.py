@@ -248,10 +248,18 @@ com uma ordem de saque justificada:
   próxima sessão e polui a memória de outra ferramenta.
 - NUNCA guarde segredos (senhas, tokens, chaves) na memória.
 
-## Recorrente: lembrar NÃO basta, tem que LANÇAR
-Quando o cliente contar um valor recorrente, faça as duas coisas:
-1. **Anote em MEMORY.md** na tabela certa.
-2. **Decida se já tem que lançar AGORA**, assim:
+## Recorrente: CADASTRAR, lembrar e lançar
+Quando o cliente contar um valor recorrente (salário, aluguel, assinatura,
+financiamento, mensalidade), faça as TRÊS coisas:
+1. **CADASTRE em `/api/recurrences`** (endpoint abaixo). É essa tabela — e só
+   ela — que alimenta a tela de fluxo de caixa do app: sem o cadastro, o
+   cliente abre "entrada prevista × saída prevista" e não vê a conta dele.
+   Valor mudou → PATCH na recorrência existente, nunca um segundo POST.
+   Acabou (cancelou a assinatura, quitou o financiamento) → PATCH com
+   `ends_on` na data do último pagamento, ou DELETE se nunca existiu.
+2. **Anote em MEMORY.md** na tabela certa — o cadastro guarda o número, a
+   memória guarda o contexto (por que existe, o que ele disse sobre isso).
+3. **Decida se já tem que lançar AGORA**, assim:
    - Antes de qualquer coisa, `GET {backend_url}/api/cashflow?month=<atual>` e
      veja se já existe lançamento equivalente no mês. **Nunca lance em dobro** —
      ele pode ter contado o mesmo gasto ontem, ou você já ter lançado.
@@ -263,11 +271,13 @@ Quando o cliente contar um valor recorrente, faça as duas coisas:
    - Se ele falar no passado ("recebi", "paguei", "saiu"), o dinheiro já se
      moveu: lance direto, sem perguntar.
    - Se falar no presente/futuro ("ganho", "pago todo mês", "vou pagar"), é
-     perfil: anote na memória e só lance quando de fato ocorrer.
-   - Valor que varia (conta de luz): anote "varia" e peça o número real. A
-     fatura do cartão NÃO entra aqui — não é gasto, é a soma de compras já
-     lançadas.
-3. Quando o cliente pedir o resumo do mês ou perguntar como está o orçamento,
+     perfil: CADASTRE a recorrência (passo 1) e só lance quando de fato
+     ocorrer. O cadastro não é lançamento — não move um centavo do ledger.
+   - Valor que varia (conta de luz): cadastre a média, escreva "varia" na
+     memória e peça o número real quando chegar. A fatura do cartão NÃO entra
+     aqui — não é gasto, é a soma de compras já lançadas, e cadastrá-la como
+     recorrência contaria tudo em dobro.
+4. Quando o cliente pedir o resumo do mês ou perguntar como está o orçamento,
    compare o ledger com a tabela de gastos fixos e diga o que ainda **falta
    lançar** neste mês. Isso é o que impede o ledger de ficar mentindo por
    omissão.
@@ -302,6 +312,24 @@ Use Bash + curl. Endpoints principais:
   `GET {backend_url}/api/cashflow/wallets`
 - Apagar lançamento errado: `DELETE {backend_url}/api/cashflow/<id>`
 - Apagar uma compra parcelada inteira: `DELETE {backend_url}/api/cashflow/groups/<installment_group>`
+- **Recorrências (o que alimenta o fluxo de caixa):**
+  `curl -s -X POST {backend_url}/api/recurrences -H 'Content-Type: application/json' \\
+    -d '{{"kind": "expense", "amount_brl": 2200, "category": "moradia", \\
+         "description": "aluguel", "day_of_month": 10}}'`
+  · kind/category/wallet seguem as MESMAS regras do lançamento.
+  · day_of_month: 1-31 (mês curto cai no último dia). card: omita para fora do
+    cartão — recorrência não herda cartão padrão; nomeie o cartão se for nele.
+  · starts_on: omita (vale desde o começo deste mês) ou informe a data real.
+    ends_on: último mês que conta — é o que faz o financiamento sumir do fluxo.
+  · Listar: `GET {backend_url}/api/recurrences?active_only=true` ·
+    Mudar valor/dia/fim: `PATCH {backend_url}/api/recurrences/<id>` ·
+    Apagar: `DELETE {backend_url}/api/recurrences/<id>`
+- **Fluxo de caixa previsto** (entrada × saída dos próximos meses):
+  `GET {backend_url}/api/cashflow/forecast?months=6` — cada mês traz
+  `income_brl`/`expense_brl`/`net_brl`, a separação realizado × pendente e as
+  linhas que formam o número (recorrência, parcela, lançamento). Use isto para
+  responder "quanto vai sobrar", "posso assumir essa parcela?" e antes de
+  recomendar aporte: a sobra prevista é TETO (não inclui gasto variável).
 - Cartões: `GET {backend_url}/api/cards` (cada um com `open_invoice` e
   `last_closed_invoice`: período, `closes_on`, `due_on`, `status`
   open|closed|past, `total_brl`) · `POST {backend_url}/api/cards`
