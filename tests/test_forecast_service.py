@@ -80,6 +80,30 @@ def test_empty_ledger_reports_no_commitments(session: Session) -> None:
     assert forecast.total_net_brl == 0.0
 
 
+def test_past_expenses_alone_are_not_a_forecast(session: Session) -> None:
+    # Two groceries and nothing registered must not headline as a projection.
+    _entry(session, amount="288", category="saude", occurred_on=date(2026, 9, 7))
+    _entry(session, amount="25", category="transporte", occurred_on=date(2026, 9, 9))
+    forecast = forecast_service.build_forecast(session, months=6, today=TODAY)
+    assert forecast.has_commitments is False
+    assert forecast.months[0].expense_brl == 313.0  # still counted, just not a forecast
+
+
+def test_a_future_installment_alone_is_a_forecast(session: Session) -> None:
+    from app.services import card_service
+
+    card_service.create_card(session, CardCreate(name="Nubank", closing_day=25, due_day=5))
+    _entry(
+        session,
+        amount="600",
+        category="outros",
+        occurred_on=date(2026, 9, 20),
+        card="Nubank",
+        installments=3,
+    )
+    assert forecast_service.build_forecast(session, months=6, today=TODAY).has_commitments
+
+
 def test_recurrences_fill_every_month_of_the_horizon(session: Session) -> None:
     _salary(session)
     _rent(session)

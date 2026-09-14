@@ -180,5 +180,19 @@ def build_forecast(session: Session, *, months: int = 6, today: date | None = No
         total_income_brl=income,
         total_expense_brl=expense,
         total_net_brl=round(income - expense, 2),
-        has_commitments=any(item.lines for item in out),
+        has_commitments=_has_commitments(out),
     )
+
+
+def _has_commitments(months: list[ForecastMonth]) -> bool:
+    """Is there anything here that makes this a FORECAST?
+
+    Past expenses in the current month are not: a ledger with two groceries
+    and nothing registered would headline "-R$ 313 in 6 months", which is a
+    restatement of last week dressed as a projection. It takes a recurrence,
+    or money dated beyond the current month, to be worth a ruler — otherwise
+    the screen should say how to get started.
+    """
+    if any(line.origin == "recurring" for month in months for line in month.lines):
+        return True
+    return any(month.lines for month in months[1:])
