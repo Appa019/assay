@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, Paperclip, RotateCcw, Send, WifiOff, X } from "lucide-react";
+import { Clock, Loader2, Paperclip, RotateCcw, Send, WifiOff, X } from "lucide-react";
 import {
   ApiError,
   fetchChat,
@@ -23,6 +23,7 @@ const timeLabel = (iso: string): string =>
 const ConsultorPage = () => {
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [queued, setQueued] = useState(0);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
@@ -56,6 +57,7 @@ const ConsultorPage = () => {
         return current !== null && currentPrint === fingerprint ? current : state.messages;
       });
       setBusy(state.busy || state.messages.some((m) => m.status === "running"));
+      setQueued(state.queued);
       setOffline(false);
     } catch {
       setOffline(true);
@@ -69,10 +71,17 @@ const ConsultorPage = () => {
     return () => clearTimeout(timer);
   }, [load]);
 
+  // A queued message with text on it is one waiting out a usage limit — that
+  // can take hours, and polling every 2.5s through it would drain the phone
+  // for nothing. An empty queued row is about to be picked up: watch closely.
+  const waitingForCredit =
+    !busy && (messages ?? []).some((m) => m.status === "queued" && m.content.length > 0);
+  const working = busy || (queued > 0 && !waitingForCredit);
+
   useEffect(() => {
-    const interval = setInterval(() => void load(), busy ? POLL_BUSY_MS : POLL_IDLE_MS);
+    const interval = setInterval(() => void load(), working ? POLL_BUSY_MS : POLL_IDLE_MS);
     return () => clearInterval(interval);
-  }, [busy, load]);
+  }, [working, load]);
 
   useEffect(() => {
     const last = messages?.[messages.length - 1];
@@ -86,7 +95,10 @@ const ConsultorPage = () => {
 
   const send = async () => {
     const text = draft.trim();
-    if (busy || uploading) return;
+    // Deliberately not gated on `busy`: messages sent while he is answering go
+    // to the back of the queue and are read in order, so the box clears and
+    // the next thought can be typed straight away.
+    if (uploading) return;
     if (!text && attachments.length === 0) return;
     setError(null);
 
@@ -101,7 +113,7 @@ const ConsultorPage = () => {
         const state = await uploadChatAttachments(files, text);
         stickRef.current = true;
         setMessages(state.messages);
-        setBusy(true);
+        setQueued(state.queued);
       } catch (err) {
         setAttachments(files);
         setDraft(text);
@@ -123,19 +135,16 @@ const ConsultorPage = () => {
       const state = await sendChatMessage(text);
       stickRef.current = true;
       setMessages(state.messages);
-      setBusy(true);
+      setQueued(state.queued);
     } catch (err) {
+      // The message never left, so hand the text back rather than lose it.
       setDraft(text);
-      if (err instanceof ApiError && err.status === 409) {
-        setError("Ainda estou respondendo a anterior.");
-      } else {
-        setError(err instanceof Error ? err.message : "Não foi possível enviar.");
-      }
+      setError(err instanceof Error ? err.message : "Não foi possível enviar.");
     }
   };
 
   const reset = async () => {
-    if (busy) return;
+    if (busy || queued > 0) return;
     try {
       await resetChatSession();
       setError(null);
@@ -161,7 +170,7 @@ const ConsultorPage = () => {
         <button
           type="button"
           onClick={() => void reset()}
-          disabled={busy}
+          disabled={busy || queued > 0}
           title="Começa uma sessão nova. A memória sobre você continua."
           className="flex min-h-[2.75rem] shrink-0 items-center gap-2 rounded-md border px-3.5 text-[13px] font-medium disabled:opacity-40"
           style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
@@ -282,7 +291,7 @@ const ConsultorPage = () => {
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            disabled={busy || uploading || attachments.length >= MAX_CHAT_ATTACHMENTS}
+            disabled={uploading || attachments.length >= MAX_CHAT_ATTACHMENTS}
             aria-label="Anexar fotos ou arquivos (até 3)"
             className="grid h-11 w-11 shrink-0 place-items-center rounded-md border disabled:opacity-40"
             style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
@@ -315,16 +324,12 @@ const ConsultorPage = () => {
           <button
             type="button"
             onClick={() => void send()}
-            disabled={busy || uploading || (draft.trim().length === 0 && attachments.length === 0)}
+            disabled={uploading || (draft.trim().length === 0 && attachments.length === 0)}
             aria-label="Enviar"
             className="grid h-11 w-11 shrink-0 place-items-center rounded-md disabled:opacity-40"
             style={{ background: "var(--accent)", color: "white" }}
           >
-            {busy || uploading ? (
-              <Loader2 size={17} className="animate-spin" />
-            ) : (
-              <Send size={17} />
-            )}
+            {uploading ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
           </button>
         </div>
       </div>
@@ -336,6 +341,7 @@ const ConsultorPage = () => {
 const Turn = ({ message }: { message: ChatMessage }) => {
   const isUser = message.role === "user";
   const running = message.status === "running";
+  const queued = message.status === "queued";
   const failed = message.status === "failed";
 
   if (isUser) {
@@ -354,6 +360,20 @@ const Turn = ({ message }: { message: ChatMessage }) => {
           </p>
         </div>
       </div>
+    );
+  }
+
+  if (queued) {
+    return (
+      <p
+        className="flex items-start gap-2 text-sm leading-relaxed"
+        style={{ color: "var(--text-muted)" }}
+      >
+        <Clock size={14} strokeWidth={1.9} className="mt-0.5 shrink-0" />
+        {/* Empty while simply waiting its turn; a line of text when it is
+            holding for the usage window to reopen. */}
+        {message.content || "Na fila…"}
+      </p>
     );
   }
 

@@ -814,7 +814,7 @@ export const deleteCard = async (id: string): Promise<CreditCard> =>
 
 export type ChatRole = "user" | "assistant";
 export type ChatChannel = "telegram" | "web";
-export type ChatTurnStatus = "running" | "done" | "failed";
+export type ChatTurnStatus = "queued" | "running" | "done" | "failed";
 
 export type ChatMessage = {
   id: string;
@@ -830,6 +830,8 @@ export type ChatMessage = {
 
 export type ChatState = {
   busy: boolean;
+  /** Messages waiting behind the one being answered. */
+  queued: number;
   messages: ChatMessage[];
 };
 
