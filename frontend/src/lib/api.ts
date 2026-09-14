@@ -640,6 +640,62 @@ export type CashflowSummary = {
   by_wallet: WalletTotal[];
 };
 
+/** Where a forecast number came from — the screen renders the three
+ *  differently: committed money reads as fact, a recurrence as expectation. */
+export type ForecastOrigin = "realized" | "installment" | "recurring";
+
+export type ForecastLine = {
+  origin: ForecastOrigin;
+  kind: CashflowKind;
+  label: string;
+  category: string;
+  amount_brl: number;
+  /** Day of the month the money moves. */
+  day: number;
+  card_name: string | null;
+  installment_no: number | null;
+  installment_count: number | null;
+  recurrence_id: string | null;
+};
+
+/** A card invoice falling due in the month. Legend only: its purchases
+ *  already count on the day they happened, so it is never an outflow. */
+export type ForecastInvoice = {
+  card_id: string;
+  card_name: string;
+  closes_on: string;
+  due_on: string;
+  total_brl: number;
+};
+
+export type ForecastMonth = {
+  month: string;
+  is_current: boolean;
+  income_brl: number;
+  expense_brl: number;
+  net_brl: number;
+  realized_income_brl: number;
+  realized_expense_brl: number;
+  pending_income_brl: number;
+  pending_expense_brl: number;
+  lines: ForecastLine[];
+  invoices: ForecastInvoice[];
+};
+
+export type Forecast = {
+  generated_on: string;
+  months: ForecastMonth[];
+  total_income_brl: number;
+  total_expense_brl: number;
+  total_net_brl: number;
+  /** False while nothing is registered — the screen shows how to start
+   *  instead of a wall of zeros. */
+  has_commitments: boolean;
+};
+
+export const fetchForecast = async (months = 6): Promise<Forecast> =>
+  json<Forecast>(await fetch(`${API_BASE}/api/cashflow/forecast?months=${months}`));
+
 /** Current month as YYYY-MM in local time, the format the API expects. */
 export const currentMonth = (): string => {
   const now = new Date();

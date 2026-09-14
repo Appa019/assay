@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
@@ -22,6 +23,7 @@ import {
 } from "@/lib/api";
 import { useCards } from "@/hooks/use-cards";
 import { formatAmount, formatBRL, parseLocalDate } from "@/lib/format";
+import { FluxoView } from "./fluxo-view";
 
 const MONTH_NAMES = [
   "janeiro", "fevereiro", "março", "abril", "maio", "junho",
@@ -177,7 +179,7 @@ const InvoiceBlock = ({ cards }: { cards: CreditCard[] }) => (
  * whole installment purchase), because a misclassified line needs a one-tap
  * correction, not a round trip.
  */
-const ExtratoPage = () => {
+const MesView = () => {
   const [month, setMonth] = useState(currentMonth());
   const { entries, summary, loading, error, refresh } = useCashflow(month);
   const { cards } = useCards();
@@ -244,18 +246,11 @@ const ExtratoPage = () => {
     net > 0 ? "var(--success)" : net < 0 ? "var(--danger)" : "var(--text-secondary)";
 
   return (
-    <div className="max-w-3xl pb-4">
-      {/* pr reserves room for the floating eye + bell on mobile (~6.75rem
-          from the right edge) so the month arrows wrap left of them instead
-          of sitting underneath. */}
-      <header className="flex items-center justify-between gap-3 pr-[6.75rem] md:pr-0">
+    <div>
+      {/* The tab rail above already clears the floating eye + bell, so this
+          row spans the full width. */}
+      <header className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p
-            className="text-[11px] uppercase tracking-[0.18em]"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Extrato
-          </p>
           <h2
             className="truncate text-[1.7rem] leading-tight first-letter:uppercase md:text-3xl"
             style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
@@ -546,5 +541,107 @@ const ExtratoPage = () => {
     </div>
   );
 };
+
+type TabKey = "mes" | "fluxo";
+
+const TABS: readonly { key: TabKey; label: string; hint: string }[] = [
+  { key: "mes", label: "Mês", hint: "o que já aconteceu" },
+  { key: "fluxo", label: "Fluxo", hint: "entrada e saída previstas" },
+] as const;
+
+const isTabKey = (value: string | null): value is TabKey =>
+  TABS.some((tab) => tab.key === value);
+
+/** Two segments, left-aligned on a rule — the same ink bar the Investimentos
+ *  shell uses, so the gesture means the same thing in both places. */
+const TabRail = ({
+  active,
+  onSelect,
+}: {
+  active: TabKey;
+  onSelect: (key: TabKey) => void;
+}) => (
+  <nav
+    aria-label="Seções do extrato"
+    className="flex gap-7"
+    style={{ borderBottom: "1px solid var(--border)" }}
+  >
+    {TABS.map((tab) => {
+      const selected = tab.key === active;
+      return (
+        <button
+          key={tab.key}
+          type="button"
+          onClick={() => onSelect(tab.key)}
+          aria-current={selected ? "page" : undefined}
+          className="relative flex min-h-12 items-center text-[13px] font-semibold transition-colors md:text-sm"
+          style={{ color: selected ? "var(--text-primary)" : "var(--text-muted)" }}
+        >
+          {tab.label}
+          <span className="sr-only">: {tab.hint}</span>
+          {selected && (
+            <motion.span
+              layoutId="extrato-aba-ativa"
+              aria-hidden
+              className="absolute inset-x-0 -bottom-px h-[2px]"
+              style={{ background: "var(--accent)" }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+            />
+          )}
+        </button>
+      );
+    })}
+  </nav>
+);
+
+const ExtratoShell = () => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // The URL is the single source of truth, so a reload or a shared link lands
+  // on the same section.
+  const requested = searchParams.get("aba");
+  const active: TabKey = isTabKey(requested) ? requested : "mes";
+
+  return (
+    <div className="max-w-3xl pb-4">
+      {/* pr reserves room for the floating eye + bell on mobile. */}
+      <div className="pr-[6.75rem] md:pr-0">
+        <TabRail
+          active={active}
+          onSelect={(key) => {
+            if (key !== active) router.replace(`/extrato?aba=${key}`, { scroll: false });
+          }}
+        />
+      </div>
+      <motion.div
+        key={active}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.18, ease: "easeOut" }}
+        className="mt-7"
+      >
+        {active === "fluxo" ? <FluxoView /> : <MesView />}
+      </motion.div>
+    </div>
+  );
+};
+
+/** Rendered while the router resolves the query string on first paint. */
+const ShellSkeleton = () => (
+  <div className="max-w-3xl">
+    <div className="h-12" style={{ borderBottom: "1px solid var(--border)" }} />
+    <div
+      className="mt-7 h-64 animate-pulse rounded-lg"
+      style={{ background: "var(--bg-secondary)" }}
+    />
+  </div>
+);
+
+// `useSearchParams` forces a Suspense boundary in Next 16 or the build fails.
+const ExtratoPage = () => (
+  <Suspense fallback={<ShellSkeleton />}>
+    <ExtratoShell />
+  </Suspense>
+);
 
 export default ExtratoPage;
