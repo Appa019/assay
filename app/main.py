@@ -31,8 +31,12 @@ async def lifespan(app: FastAPI):
     init_db()
     try:
         chat_service.reconcile_orphan_turns()
+        # Drains whatever the last process left queued — a message waiting for
+        # the usage window to reopen outlives the restart and is answered
+        # without the client resending it.
+        chat_service.start_queue_worker()
     except Exception:  # noqa: BLE001 — cleanup must never block startup
-        logger.warning("chat_orphan_reconcile_failed", exc_info=True)
+        logger.warning("chat_queue_startup_failed", exc_info=True)
     logger.info("app_started", db=settings.sqlite_path)
     yield
     logger.info("app_stopped")

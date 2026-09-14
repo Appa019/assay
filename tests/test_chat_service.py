@@ -474,3 +474,222 @@ def test_media_turn_text_tells_model_to_reconcile_invoices(tmp_path: Path) -> No
     )
     assert "resuma e registre" not in prompt
     assert "concilie" in prompt
+
+
+# ── Durable queue: several messages in a row, and coming back after a limit ───
+
+
+def test_enqueue_records_the_job_without_running_it(
+    chat_dirs: Path, monkeypatch: pytest.MonkeyPatch, session
+) -> None:
+    from sqlmodel import select
+
+    from app.models.chat import ChatChannel, ChatMessage, ChatRole, ChatTurnStatus
+
+    monkeypatch.setattr(chat_service, "engine", session.get_bind())
+    monkeypatch.setattr(chat_service, "start_queue_worker", lambda: None)
+
+    chat_service.enqueue("gastei 42 no mercado", ChatChannel.WEB)
+
+    rows = list(session.exec(select(ChatMessage).order_by(ChatMessage.created_at)).all())
+    assert [r.role for r in rows] == [ChatRole.USER, ChatRole.ASSISTANT]
+    assert rows[1].status == ChatTurnStatus.QUEUED
+    # What the model receives is stored apart from what the client reads.
+    assert rows[1].prompt == "gastei 42 no mercado"
+    assert chat_service.queued_count() == 1
+
+
+def test_queue_answers_messages_in_the_order_they_were_sent(
+    chat_dirs: Path, monkeypatch: pytest.MonkeyPatch, session
+) -> None:
+    """The client may fire three messages without waiting; the consultant
+    reads them one at a time, in order, on the same chained session."""
+    from sqlmodel import select
+
+    from app.models.chat import ChatChannel, ChatMessage, ChatRole, ChatTurnStatus
+
+    monkeypatch.setattr(chat_service, "engine", session.get_bind())
+    monkeypatch.setattr(chat_service, "start_queue_worker", lambda: None)
+    seen: list[str] = []
+
+    def fake_step(prompt: str, *_a: object, **_k: object) -> StepResult:
+        # Chained turns carry a date stamp before the text; keep just the message.
+        seen.append(prompt.rsplit("Mensagem do cliente: ", 1)[-1].split("] ")[-1])
+        return _step(f"ok {len(seen)}")
+
+    monkeypatch.setattr(analysis_runner, "_run_claude_step", fake_step)
+
+    for text in ("gastei 42 no mercado", "e 15 no uber", "quanto sobrou?"):
+        chat_service.enqueue(text, ChatChannel.WEB)
+    for _ in range(3):
+        chat_service._drain_once()
+
+    assert seen == ["gastei 42 no mercado", "e 15 no uber", "quanto sobrou?"]
+    replies = [
+        r.content
+        for r in session.exec(select(ChatMessage).order_by(ChatMessage.created_at)).all()
+        if r.role == ChatRole.ASSISTANT
+    ]
+    assert replies == ["ok 1", "ok 2", "ok 3"]
+    assert chat_service.queued_count() == 0
+    assert all(
+        r.status == ChatTurnStatus.DONE
+        for r in session.exec(select(ChatMessage)).all()
+        if r.role == ChatRole.ASSISTANT
+    )
+
+
+def test_usage_limit_keeps_the_job_and_reschedules_it(
+    chat_dirs: Path, monkeypatch: pytest.MonkeyPatch, session
+) -> None:
+    """The whole point: a limit must not throw the message away."""
+    from sqlmodel import select
+
+    from app.models.chat import ChatChannel, ChatMessage, ChatRole, ChatTurnStatus
+
+    monkeypatch.setattr(chat_service, "engine", session.get_bind())
+    monkeypatch.setattr(chat_service, "start_queue_worker", lambda: None)
+    monkeypatch.setattr(
+        analysis_runner,
+        "_run_claude_step",
+        lambda *a, **k: (_ for _ in ()).throw(LimitError("usage limit reached, resets 4am")),
+    )
+
+    chat_service.enqueue("registra 42 no mercado", ChatChannel.WEB)
+    chat_service._drain_once()
+
+    job = [
+        r
+        for r in session.exec(select(ChatMessage).order_by(ChatMessage.created_at)).all()
+        if r.role == ChatRole.ASSISTANT
+    ][-1]
+    session.refresh(job)
+    assert job.status == ChatTurnStatus.QUEUED  # still ours, not discarded
+    assert job.attempts == 1
+    assert job.retry_kind == "limit"
+    assert job.run_after is not None
+    assert job.prompt == "registra 42 no mercado"  # the message survived intact
+    assert "não precisa reenviar" in job.content
+
+
+def test_the_consultant_comes_back_by_himself_when_credit_returns(
+    chat_dirs: Path, monkeypatch: pytest.MonkeyPatch, session
+) -> None:
+    from datetime import UTC, datetime
+
+    from sqlmodel import select
+
+    from app.models.chat import ChatChannel, ChatMessage, ChatRole, ChatTurnStatus
+
+    monkeypatch.setattr(chat_service, "engine", session.get_bind())
+    monkeypatch.setattr(chat_service, "start_queue_worker", lambda: None)
+    calls = {"n": 0}
+
+    def flaky(prompt: str, *_a: object, **_k: object) -> StepResult:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise LimitError("usage limit reached, resets 4am")
+        assert "[RETOMADA AUTOMÁTICA]" in prompt  # guards against a double write
+        return _step("registrado!")
+
+    monkeypatch.setattr(analysis_runner, "_run_claude_step", flaky)
+
+    chat_service.enqueue("registra 42 no mercado", ChatChannel.WEB)
+    chat_service._drain_once()  # hits the limit, defers
+
+    job = [
+        r
+        for r in session.exec(select(ChatMessage).order_by(ChatMessage.created_at)).all()
+        if r.role == ChatRole.ASSISTANT
+    ][-1]
+    # The window reopened: nothing else needed to happen, no resend.
+    job.run_after = datetime.now(UTC)
+    session.add(job)
+    session.commit()
+
+    chat_service._drain_once()
+    session.refresh(job)
+    assert job.status == ChatTurnStatus.DONE
+    assert job.content == "registrado!"
+    assert calls["n"] == 2
+
+
+def test_queue_does_not_jump_ahead_of_a_waiting_message(
+    chat_dirs: Path, monkeypatch: pytest.MonkeyPatch, session
+) -> None:
+    """Strict FIFO: answering the second message while the first waits out the
+    limit would reorder the conversation, and it would hit the same wall."""
+    from app.models.chat import ChatChannel, ChatTurnStatus
+
+    monkeypatch.setattr(chat_service, "engine", session.get_bind())
+    monkeypatch.setattr(chat_service, "start_queue_worker", lambda: None)
+    monkeypatch.setattr(
+        analysis_runner,
+        "_run_claude_step",
+        lambda *a, **k: (_ for _ in ()).throw(LimitError("usage limit reached, resets 4am")),
+    )
+
+    chat_service.enqueue("primeira", ChatChannel.WEB)
+    chat_service.enqueue("segunda", ChatChannel.WEB)
+    chat_service._drain_once()  # first one defers
+
+    assert chat_service._claim_next_job() is None  # the second one waits its turn
+    assert chat_service._seconds_until_due() > 1
+    assert chat_service.queued_count() == 2
+    assert chat_service.has_pending_turns() is True
+    del ChatTurnStatus
+
+
+def test_auth_failure_is_not_retried(
+    chat_dirs: Path, monkeypatch: pytest.MonkeyPatch, session
+) -> None:
+    """Renewing the login is a human's job — queueing it forever would hide it."""
+    from sqlmodel import select
+
+    from app.models.chat import ChatChannel, ChatMessage, ChatRole, ChatTurnStatus
+
+    monkeypatch.setattr(chat_service, "engine", session.get_bind())
+    monkeypatch.setattr(chat_service, "start_queue_worker", lambda: None)
+    monkeypatch.setattr(
+        analysis_runner,
+        "_run_claude_step",
+        lambda *a, **k: (_ for _ in ()).throw(AuthError("OAuth token expired")),
+    )
+
+    chat_service.enqueue("oi", ChatChannel.WEB)
+    chat_service._drain_once()
+
+    job = [
+        r
+        for r in session.exec(select(ChatMessage).order_by(ChatMessage.created_at)).all()
+        if r.role == ChatRole.ASSISTANT
+    ][-1]
+    assert job.status == ChatTurnStatus.FAILED
+    assert chat_service.queued_count() == 0
+
+
+def test_restart_puts_the_interrupted_turn_back_in_the_queue(
+    chat_dirs: Path, monkeypatch: pytest.MonkeyPatch, session
+) -> None:
+    from sqlmodel import select
+
+    from app.models.chat import ChatChannel, ChatMessage, ChatRole, ChatTurnStatus
+
+    monkeypatch.setattr(chat_service, "engine", session.get_bind())
+    monkeypatch.setattr(chat_service, "start_queue_worker", lambda: None)
+
+    chat_service.enqueue("registra 42 no mercado", ChatChannel.WEB)
+    claimed = chat_service._claim_next_job()
+    assert claimed is not None  # now RUNNING, and the process "dies" here
+
+    assert chat_service.reconcile_orphan_turns() == 1
+
+    job = [
+        r
+        for r in session.exec(select(ChatMessage).order_by(ChatMessage.created_at)).all()
+        if r.role == ChatRole.ASSISTANT
+    ][-1]
+    session.refresh(job)
+    assert job.status == ChatTurnStatus.QUEUED
+    assert job.prompt == "registra 42 no mercado"
+    assert job.attempts == 1

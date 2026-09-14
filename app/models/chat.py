@@ -18,6 +18,10 @@ class ChatChannel(StrEnum):
 
 
 class ChatTurnStatus(StrEnum):
+    # Waiting its turn: the client may send while the consultant is still
+    # answering, and a turn the usage limit knocked down goes back to QUEUED
+    # instead of dying, so it resumes by itself once credit returns.
+    QUEUED = "queued"
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
@@ -42,9 +46,22 @@ class ChatMessage(SQLModel, table=True):
     role: ChatRole = Field(index=True)
     content: str
     channel: ChatChannel = Field(default=ChatChannel.WEB)
-    # RUNNING on the assistant row while the turn is in flight, so the web UI
-    # can render a pending bubble instead of guessing from a separate endpoint.
+    # QUEUED then RUNNING on the assistant row while the turn is pending, so
+    # the web UI renders the queue instead of guessing from another endpoint.
     status: ChatTurnStatus = Field(default=ChatTurnStatus.DONE, index=True)
+    # The queue lives in this table: a pending assistant row IS the job. The
+    # prompt is kept apart from `content` because what the model receives is
+    # not what the client reads — an attachment turn shows "📎 cupom.jpg" and
+    # sends a paragraph of instructions naming the file on disk.
+    prompt: str | None = Field(default=None)
+    attempts: int = Field(default=0)
+    # Set while a retry waits for the usage window to reopen; the worker will
+    # not touch the job before this instant.
+    run_after: datetime | None = Field(default=None)
+    # Why it is waiting ("limit" or "transient") — the two get very different
+    # patience, and mixing their budgets would either give up on a limit after
+    # three tries or hammer a broken CLI for a day.
+    retry_kind: str | None = Field(default=None)
     # Which model actually answered, and which tier the router picked. Kept on
     # the row so the choice is visible and auditable after the fact.
     model: str | None = Field(default=None)

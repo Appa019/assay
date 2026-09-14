@@ -21,7 +21,7 @@ bounded. A cross-process file lock serializes turns; the caller queues.
 import json
 import re
 import threading
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -61,7 +61,24 @@ class ChatBusyError(RuntimeError):
 
 
 class ChatUnavailableError(RuntimeError):
-    """The turn failed in a way the user should hear about (limit, outage)."""
+    """The turn failed in a way the user should hear about (limit, outage).
+
+    ``kind`` is what the queue reads to decide whether patience pays off:
+    ``limit`` comes back by itself when the usage window reopens, ``transient``
+    deserves a couple of quick retries, and ``auth``/``error`` never fix
+    themselves — retrying those only buries the real message under noise.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        kind: str = "error",
+        retry_after: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.kind = kind
+        self.retry_after = retry_after
 
 
 # Standing orders for the consultant — rewritten every turn so edits propagate.
@@ -890,8 +907,9 @@ def run_chat_turn(text: str) -> tuple[str, model_router.Route, StepResult]:
             wait_s = analysis_runner._seconds_until_reset(str(exc))
             when = f" (libera em ~{max(1, wait_s // 60)} min)" if wait_s else ""
             raise ChatUnavailableError(
-                f"⏳ Atingi meu limite de uso do Claude{when}. "
-                "Me manda a mensagem de novo mais tarde — a memória fica guardada."
+                f"⏳ Atingi meu limite de uso do Claude{when}.",
+                kind="limit",
+                retry_after=wait_s,
             ) from exc
         except AuthError as exc:
             # Not transient and not fixable by resending: without this branch
@@ -899,12 +917,13 @@ def run_chat_turn(text: str) -> tuple[str, model_router.Route, StepResult]:
             raise ChatUnavailableError(
                 "🔐 Perdi o acesso ao Claude no servidor (login expirado ou "
                 "plano sem Claude Code). Reenviar não resolve: renove o login "
-                f"do `claude` no Pi para eu voltar. Detalhe: {exc}"
+                f"do `claude` no Pi para eu voltar. Detalhe: {exc}",
+                kind="auth",
             ) from exc
         except RetryableError as exc:
             raise ChatUnavailableError(
-                f"⚠️ Tive um problema transitório ao pensar na resposta ({exc}). "
-                "Me manda a mensagem de novo, por favor."
+                f"⚠️ Tive um problema transitório ao pensar na resposta ({exc}).",
+                kind="transient",
             ) from exc
         except AnalysisError as exc:
             raise ChatUnavailableError(f"✖ Não consegui responder: {exc}") from exc
@@ -934,9 +953,16 @@ def _record(
     channel: ChatChannel,
     *,
     status: ChatTurnStatus = ChatTurnStatus.DONE,
+    prompt: str | None = None,
 ) -> UUID:
     with Session(engine) as session:
-        message = ChatMessage(role=role, content=content, channel=channel, status=status)
+        message = ChatMessage(
+            role=role,
+            content=content,
+            channel=channel,
+            status=status,
+            prompt=prompt,
+        )
         session.add(message)
         session.commit()
         session.refresh(message)
@@ -993,26 +1019,43 @@ def _as_naive_utc(value: datetime) -> datetime:
 
 
 def reconcile_orphan_turns() -> int:
-    """Settle RUNNING assistant rows left behind by a dead process.
+    """Re-queue RUNNING assistant rows left behind by a dead process.
 
-    A backend restart mid-turn kills the worker thread before ``_settle`` runs,
-    so the pending row stays RUNNING forever and the web UI renders a ghost
-    "Pensando…" bubble. Called on startup; a genuinely live turn (lock held by
-    a living process) is left alone.
+    A backend restart mid-turn (a deploy, an OOM, a power cut) kills the worker
+    before ``_settle`` runs, so the row would stay RUNNING forever and the web
+    UI would render a ghost "Pensando…" bubble. Called on startup; a genuinely
+    live turn (lock held by a living process) is left alone.
+
+    The message goes back to the QUEUED head of the line rather than dying,
+    which is the whole point of a durable queue — the client should not have to
+    retype anything because the Pi rebooted. It costs one attempt, so a message
+    that crashes the process every single time cannot loop forever, and the
+    retry carries ``_RESUME_PREFACE`` so a half-done ledger write is checked
+    before being repeated. Rows with no prompt (written before the queue
+    existed) have nothing to re-send and are settled as failed.
     """
     if is_busy():
         return 0
+    requeued = 0
     with Session(engine) as session:
         rows = session.exec(
             select(ChatMessage).where(ChatMessage.status == ChatTurnStatus.RUNNING)
         ).all()
         for row in rows:
-            row.content = row.content or "✖ Resposta interrompida por um reinício do sistema."
-            row.status = ChatTurnStatus.FAILED
+            if (row.prompt or "").strip() and (row.attempts or 0) < _MAX_TRANSIENT_ATTEMPTS:
+                row.status = ChatTurnStatus.QUEUED
+                row.attempts = (row.attempts or 0) + 1
+                row.retry_kind = "resume"
+                row.run_after = None
+                row.content = "⏳ Retomando de onde parei…"
+                requeued += 1
+            else:
+                row.content = row.content or "✖ Resposta interrompida por um reinício do sistema."
+                row.status = ChatTurnStatus.FAILED
             session.add(row)
         if rows:
             session.commit()
-            logger.info("chat_orphan_turns_reconciled", count=len(rows))
+            logger.info("chat_orphan_turns_reconciled", count=len(rows), requeued=requeued)
     return len(rows)
 
 
@@ -1084,29 +1127,280 @@ def _push_reply_ready(channel: ChatChannel, body: str) -> None:
     webpush_service.notify("Consultor respondeu", body.strip()[:200], url="/consultor")
 
 
-def start_turn(
+# ── The queue: send whenever you want, it answers in order ────────────────────
+#
+# One worker thread drains a FIFO whose jobs are the pending assistant rows in
+# chat_message. Two things follow from the queue being IN THE DATABASE rather
+# than in memory: the client can fire three messages in a row without waiting,
+# and a turn the usage limit knocked down survives a backend restart, so the
+# consultant comes back on his own when credit returns instead of leaving the
+# message stranded behind a "send it again later".
+
+_QUEUE_WAKE = threading.Event()
+_QUEUE_SPAWN_LOCK = threading.Lock()
+_queue_thread: threading.Thread | None = None
+
+# Nothing to do: wake up now and then anyway, in case a row was queued by
+# another process (the Telegram door, a script) that cannot set our Event.
+_QUEUE_IDLE_S = 60.0
+# A usage window can stay shut for hours, so patience for a limit is counted in
+# retries that each sleep until the announced reset. A transient failure (CLI
+# crash, network) gets three quick tries — hammering a broken CLI all day would
+# only bury the real error under noise.
+_MAX_LIMIT_ATTEMPTS = 24
+_MAX_TRANSIENT_ATTEMPTS = 3
+_TRANSIENT_BACKOFF_S = (30, 120, 300)
+_LIMIT_FALLBACK_BACKOFF_S = (300, 900, 1800, 3600)
+# Somebody else holds the cross-process turn lock (the bot, a CLI run). Not a
+# failure and not worth an attempt — just look again shortly.
+_LOCK_BUSY_RETRY_S = 20.0
+
+
+def enqueue(
     text: str,
     channel: ChatChannel = ChatChannel.WEB,
     *,
     display: str | None = None,
-) -> None:
-    """Fire a turn in the background and return at once.
+) -> UUID:
+    """Put one message in the queue and return at once.
 
-    A turn can take minutes; no HTTP client will hold that connection open. The
-    caller polls ``history()`` and watches the pending assistant row flip from
-    RUNNING to DONE or FAILED.
+    A turn can run for minutes and no HTTP client will hold that connection
+    open, so what the caller gets back is the id of the pending assistant row.
+    It then polls ``history()`` and watches that row walk QUEUED → RUNNING →
+    DONE (or FAILED).
     """
     text = text.strip()
     if not text:
         raise ChatUnavailableError("Mensagem vazia.")
+    _record(ChatRole.USER, (display or text).strip(), channel)
+    job_id = _record(
+        ChatRole.ASSISTANT,
+        "",
+        channel,
+        status=ChatTurnStatus.QUEUED,
+        prompt=text,
+    )
+    start_queue_worker()
+    _QUEUE_WAKE.set()
+    return job_id
 
-    def _worker() -> None:
+
+# The name every caller already uses; queuing IS how a turn starts now.
+start_turn = enqueue
+
+
+def start_queue_worker() -> None:
+    """Make sure the drain thread is alive. Safe to call from anywhere."""
+    global _queue_thread
+    with _QUEUE_SPAWN_LOCK:
+        if _queue_thread is not None and _queue_thread.is_alive():
+            return
+        _queue_thread = threading.Thread(target=_queue_loop, name="chat-queue", daemon=True)
+        _queue_thread.start()
+
+
+def _queue_loop() -> None:
+    while True:
         try:
-            converse(text, channel, display=display)
-        except Exception:  # noqa: BLE001 — already recorded on the pending row
-            logger.warning("chat_web_turn_failed", exc_info=True)
+            wait = _drain_once()
+        except Exception:  # noqa: BLE001 — a bad job must never kill the queue
+            logger.warning("chat_queue_loop_failed", exc_info=True)
+            wait = _QUEUE_IDLE_S
+        _QUEUE_WAKE.wait(timeout=wait)
+        _QUEUE_WAKE.clear()
 
-    threading.Thread(target=_worker, name="chat-turn", daemon=True).start()
+
+def _drain_once() -> float:
+    """Run the job at the head of the queue. Returns seconds to sleep after."""
+    claimed = _claim_next_job()
+    if claimed is None:
+        return _seconds_until_due()
+    job_id, prompt, channel, attempts = claimed
+    _run_job(job_id, prompt, channel, attempts)
+    return 0.0
+
+
+def _claim_next_job() -> tuple[UUID, str, ChatChannel, int] | None:
+    """Mark the oldest due job RUNNING and hand it over.
+
+    Strictly FIFO, including past a job that is waiting out a usage limit: the
+    messages behind it would hit the very same shut window, and answering them
+    first would reorder the conversation for nothing.
+    """
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with Session(engine) as session:
+        row = session.exec(
+            select(ChatMessage)
+            .where(ChatMessage.status == ChatTurnStatus.QUEUED)
+            .order_by(ChatMessage.created_at.asc())
+        ).first()
+        if row is None:
+            return None
+        if row.run_after is not None and _as_naive_utc(row.run_after) > now:
+            return None
+        if not (row.prompt or "").strip():
+            # Pre-queue row (or a corrupted one): nothing to send, and leaving
+            # it QUEUED would block the whole line forever.
+            row.status = ChatTurnStatus.FAILED
+            row.content = row.content or "✖ Mensagem sem conteúdo para processar."
+            session.add(row)
+            session.commit()
+            return None
+        row.status = ChatTurnStatus.RUNNING
+        row.run_after = None
+        session.add(row)
+        session.commit()
+        return row.id, row.prompt or "", row.channel, row.attempts or 0
+
+
+def _seconds_until_due() -> float:
+    """How long until the head of the queue is allowed to run."""
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with Session(engine) as session:
+        row = session.exec(
+            select(ChatMessage)
+            .where(ChatMessage.status == ChatTurnStatus.QUEUED)
+            .order_by(ChatMessage.created_at.asc())
+        ).first()
+    if row is None or row.run_after is None:
+        return _QUEUE_IDLE_S
+    delay = (_as_naive_utc(row.run_after) - now).total_seconds()
+    return max(1.0, min(delay, _QUEUE_IDLE_S))
+
+
+# Prefixed onto a retried prompt. A turn that died halfway may already have
+# written to the ledger before the limit hit, and the consultant is the only
+# one who can tell: the chained session shows him what he did last time.
+_RESUME_PREFACE = (
+    "[RETOMADA AUTOMÁTICA] Sua resposta a esta mensagem foi interrompida no "
+    "meio (limite de uso ou reinício do sistema) e estou te devolvendo ela "
+    "agora. ANTES de gravar qualquer coisa, confira se você já não gravou na "
+    "tentativa anterior (GET /api/cashflow do mês, GET /api/recurrences) — "
+    "lançamento em dobro é pior que lançamento nenhum. Mensagem original do "
+    "cliente abaixo.\n\n"
+)
+
+
+def _run_job(job_id: UUID, prompt: str, channel: ChatChannel, attempts: int) -> None:
+    text = f"{_RESUME_PREFACE}{prompt}" if attempts else prompt
+    try:
+        reply, picked, step = run_chat_turn(text)
+    except ChatBusyError:
+        # Another door is mid-turn. Not this job's fault: put it back at the
+        # head of the line without spending one of its attempts.
+        _reschedule(job_id, wait_s=_LOCK_BUSY_RETRY_S, spend_attempt=False)
+        return
+    except ChatUnavailableError as exc:
+        _handle_job_failure(job_id, exc, channel)
+        return
+    except Exception as exc:  # noqa: BLE001 — the transcript must never dangle
+        message = f"✖ Erro inesperado: {exc}"
+        _settle(job_id, message, ChatTurnStatus.FAILED)
+        _push_reply_ready(channel, message)
+        logger.warning("chat_queue_job_crashed", exc_info=True)
+        return
+    _settle(
+        job_id,
+        reply,
+        ChatTurnStatus.DONE,
+        model=picked.model,
+        tier=picked.tier.value,
+        cost_usd=step.cost_usd,
+        duration_s=step.duration_s,
+    )
+    _push_reply_ready(channel, reply)
+
+
+def _handle_job_failure(job_id: UUID, exc: ChatUnavailableError, channel: ChatChannel) -> None:
+    kind = getattr(exc, "kind", "error")
+    retry_after = getattr(exc, "retry_after", None)
+    with Session(engine) as session:
+        row = session.get(ChatMessage, job_id)
+        if row is None:
+            return
+        attempts = (row.attempts or 0) + 1
+        budget = _MAX_LIMIT_ATTEMPTS if kind == "limit" else _MAX_TRANSIENT_ATTEMPTS
+        if kind in {"limit", "transient"} and attempts <= budget:
+            wait = retry_after or _fallback_wait(kind, attempts)
+            row.status = ChatTurnStatus.QUEUED
+            row.attempts = attempts
+            row.retry_kind = kind
+            row.run_after = datetime.now(UTC) + timedelta(seconds=wait)
+            row.content = _waiting_note(kind, wait)
+            session.add(row)
+            session.commit()
+            note, first = row.content, attempts == 1
+            logger.info("chat_queue_job_deferred", kind=kind, attempt=attempts, wait_s=wait)
+        else:
+            row.status = ChatTurnStatus.FAILED
+            row.attempts = attempts
+            row.content = _giving_up_note(str(exc), kind, attempts, budget)
+            session.add(row)
+            session.commit()
+            note, first = row.content, True
+    if first:
+        # Only the first deferral pushes: a limit that takes four windows to
+        # lift would otherwise buzz the phone four times saying the same thing.
+        _push_reply_ready(channel, note)
+    _QUEUE_WAKE.set()
+
+
+def _fallback_wait(kind: str, attempt: int) -> int:
+    table = _LIMIT_FALLBACK_BACKOFF_S if kind == "limit" else _TRANSIENT_BACKOFF_S
+    return table[min(attempt - 1, len(table) - 1)]
+
+
+def _waiting_note(kind: str, wait_s: int) -> str:
+    when = (datetime.now() + timedelta(seconds=wait_s)).strftime("%H:%M")
+    if kind == "limit":
+        return (
+            f"⏳ Sem créditos do Claude agora. Guardei sua mensagem e respondo "
+            f"sozinho assim que o limite voltar (por volta de {when}) — não "
+            "precisa reenviar."
+        )
+    return f"⚠️ Tropecei num erro temporário. Tento de novo por volta de {when}."
+
+
+def _giving_up_note(message: str, kind: str, attempts: int, budget: int) -> str:
+    if kind in {"limit", "transient"}:
+        return (
+            f"{message} Tentei {attempts}x (teto de {budget}) e desisti desta "
+            "mensagem. Me manda de novo quando quiser."
+        )
+    return message
+
+
+def _reschedule(job_id: UUID, *, wait_s: float, spend_attempt: bool) -> None:
+    with Session(engine) as session:
+        row = session.get(ChatMessage, job_id)
+        if row is None:
+            return
+        row.status = ChatTurnStatus.QUEUED
+        row.run_after = datetime.now(UTC) + timedelta(seconds=wait_s)
+        if spend_attempt:
+            row.attempts = (row.attempts or 0) + 1
+        session.add(row)
+        session.commit()
+
+
+def queued_count() -> int:
+    """Messages waiting their turn (the live one is not in this count)."""
+    with Session(engine) as session:
+        rows = session.exec(
+            select(ChatMessage).where(ChatMessage.status == ChatTurnStatus.QUEUED)
+        ).all()
+    return len(rows)
+
+
+def has_pending_turns() -> bool:
+    """A turn is live or waiting — resetting the session now would drop it."""
+    if queued_count():
+        return True
+    with Session(engine) as session:
+        running = session.exec(
+            select(ChatMessage).where(ChatMessage.status == ChatTurnStatus.RUNNING)
+        ).first()
+    return running is not None or is_busy()
 
 
 # ── Attachments: photos and documents, from either door ───────────────────────

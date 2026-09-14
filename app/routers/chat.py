@@ -10,6 +10,7 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 def _state(limit: int = 60) -> ChatState:
     return ChatState(
         busy=chat_service.is_busy(),
+        queued=chat_service.queued_count(),
         messages=[
             ChatMessageRead.model_validate(m, from_attributes=True)
             for m in chat_service.history(limit)
@@ -29,13 +30,12 @@ async def send_message(payload: ChatSend) -> ChatState:
 
     A consultant turn can run for minutes, so the reply is never awaited here.
     The client polls this same resource and watches the pending assistant
-    message flip from ``running`` to ``done`` or ``failed``.
+    message walk ``queued`` → ``running`` → ``done`` (or ``failed``).
+
+    Sending while he is still answering is allowed on purpose: the message
+    goes to the back of the queue and is read in order. Refusing it with a 409
+    only made the client hold the thought and retype it later.
     """
-    if chat_service.is_busy():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Ainda estou terminando a resposta anterior.",
-        )
     try:
         chat_service.start_turn(payload.text, ChatChannel.WEB)
     except chat_service.ChatUnavailableError as exc:
@@ -51,17 +51,13 @@ async def upload_attachments(
     """Send up to 3 photos/documents to the consultant in ONE message.
 
     They land in the same inbox the Telegram bot writes to and become a single
-    turn — a receipt photographed front and back is one purchase, not two.
+    turn — a receipt photographed front and back is one purchase, not two. Like
+    a text message, it queues instead of being refused mid-turn.
     """
     if not 1 <= len(files) <= chat_service.MAX_ATTACHMENTS_PER_TURN:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Envie de 1 a {chat_service.MAX_ATTACHMENTS_PER_TURN} arquivos.",
-        )
-    if chat_service.is_busy():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Ainda estou terminando a resposta anterior.",
         )
     # Read (and size-check) everything BEFORE saving anything, so a too-big
     # third file doesn't leave half a message sitting in the inbox.
@@ -96,9 +92,9 @@ async def reset_chat() -> None:
     Rows stay in chat_message (cost/tier stats); the GET only serves
     messages written after this moment. MEMORY.md survives untouched.
     """
-    if chat_service.is_busy():
+    if chat_service.has_pending_turns():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Não dá para reiniciar no meio de uma resposta.",
+            detail="Tem mensagem em andamento ou na fila — espera ela terminar.",
         )
     chat_service.reset_session()

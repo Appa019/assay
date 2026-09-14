@@ -27,4 +27,7 @@ class ChatState(BaseModel):
     """Everything the chat screen needs in one poll."""
 
     busy: bool
+    # How many messages are waiting behind the one being answered. The screen
+    # uses it to keep polling fast while the queue drains.
+    queued: int = 0
     messages: list[ChatMessageRead]

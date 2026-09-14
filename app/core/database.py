@@ -71,6 +71,13 @@ _ADDED_COLUMNS: dict[str, dict[str, str]] = {
         "installment_count": "INTEGER",
         "installment_group": "CHAR(32)",
     },
+    # Durable chat queue (2026-09-14): a pending assistant row is the job.
+    "chat_message": {
+        "prompt": "TEXT",
+        "attempts": "INTEGER NOT NULL DEFAULT 0",
+        "run_after": "TIMESTAMP",
+        "retry_kind": "TEXT",
+    },
     "order": {
         "suggested_quantity": "NUMERIC",
         "reference_price": "NUMERIC",
