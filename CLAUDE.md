@@ -20,8 +20,9 @@
 >   nada exposto na internet. Só aparelhos logados na conta do Pedro enxergam.
 >   Home Assistant (bônus) na `:8443`.
 > - **Serviços no Pi** (`systemctl --user`): `investimentos-backend` (uvicorn em
->   127.0.0.1:8000) · `investimentos-frontend` (Next em 127.0.0.1:3001) + 10
->   timers. `Linger=yes`, sobem no boot.
+>   127.0.0.1:8000) · `investimentos-frontend` (Next em 127.0.0.1:3001) + 11
+>   timers (scheduled · cadence · weekly · resume · prices · snapshot · alerts
+>   · monthly · insights · digest · backup). `Linger=yes`, sobem no boot.
 > - **O bot do Telegram está PARADO e DESABILITADO** desde 2026-09-05 (D30). O
 >   cliente não usa Telegram: os avisos vão para o inbox do app + Web Push. Não
 >   religue sem pedido. Se religar um dia: NUNCA em duas máquinas (os dois
@@ -29,8 +30,11 @@
 > - **Bind SEMPRE em 127.0.0.1.** A LAN é compartilhada com o prédio inteiro;
 >   `0.0.0.0` entrega as finanças do cliente aos vizinhos. Quem publica é o
 >   `tailscale serve`.
-> - **Deploy**: `rsync` do desktop excluindo `.venv node_modules .next storage
->   .env .env.local`, depois `pnpm build` + `systemctl --user restart` no Pi.
+> - **Deploy**: `rsync --delete` do desktop excluindo `.venv node_modules .next
+>   storage .env .env.local`, depois `pnpm build` + `systemctl --user restart`
+>   no Pi. O `--delete` importa: sem ele, todo arquivo removido do repo fica
+>   vivo no Pi para sempre (foi assim que specs consumidos e o ícone
+>   pré-rebrand sobreviveram lá).
 >   O `.env` e o banco do Pi são a fonte da verdade e NÃO são sobrescritos.
 > - **Detalhes de máquina, firewall e correções ARM**: `acesso-remoto-pi.md`.
 
@@ -287,8 +291,9 @@ Telegram for religado um dia, as duas portas compartilham a mesma transcrição.
 - **Transcrição compartilhada** (`ChatMessage`): toda mensagem, dos dois lados e
   das duas portas, vira linha em `chat_message` (role · channel · status ·
   model · tier). Rotacionar a sessão do Claude NÃO apaga o histórico. Todo
-  caller deve usar `chat_service.converse(text, channel)`, nunca
-  `run_chat_turn` direto — é `converse` que persiste.
+  caller entra por `chat_service.enqueue()` (site: enfileira e volta na hora)
+  ou `chat_service.converse()` (bot: síncrono), nunca `run_chat_turn` direto —
+  são esses dois que persistem.
 - **API**: `GET /api/chat` (histórico + `busy`), `POST /api/chat` (enfileira e
   volta 202 na hora — um turno leva minutos, ninguém segura HTTP), `POST
   /api/chat/reset`. O front faz polling: 2,5s ocupado, 12s ocioso (o turno
@@ -376,9 +381,12 @@ sudo tailscale serve status                         # o que está publicado na V
 
 ### Deploy do desktop para o Pi
 ```bash
-rsync -a --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
+# --delete: o que saiu do repo tem que sair do Pi. Rode antes com -n para ver
+# a lista (com -v, senão o dry-run não imprime NADA e parece limpo).
+rsync -a --delete --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
   --exclude '__pycache__' --exclude '*.pyc' --exclude 'storage' \
   --exclude '.env' --exclude '.env.local' --exclude 'frontend/.env.local' \
+  --exclude '.git' \
   ./ pi:~/investimentos_manual/
 # no Pi: pnpm install && pnpm build (em frontend/) e restart dos serviços
 ```

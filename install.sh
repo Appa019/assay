@@ -70,12 +70,12 @@ cat > "$APPS_DIR/investimentos-manual.desktop" <<EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Investimentos Manual
-GenericName=Mesa de Aportes
-Comment=Comitê autônomo de investimentos · aporte → recomendação
+Name=Assay
+GenericName=Finanças e investimentos
+Comment=Finanças pessoais e comitê de aportes, tudo local
 Exec=bash --login -c "$PROJECT_DIR/start.sh"
 Path=$PROJECT_DIR
-Icon=$PROJECT_DIR/assets/icon.svg
+Icon=$PROJECT_DIR/frontend/public/icon.svg
 Terminal=true
 Categories=Finance;Office;
 Keywords=investimentos;aporte;carteira;claude;

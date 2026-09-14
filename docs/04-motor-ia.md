@@ -286,10 +286,12 @@ novo na mensagem seguinte. `converse()` persiste `cost_usd`/`duration_s` na
 FAILED bolhas RUNNING órfãs de um restart.
 
 - Turno fresh recebe instrução de **ler `./MEMORY.md` antes de responder**.
-- Limite de uso → `ChatUnavailableError` com mensagem amigável e estimativa de
-  quando libera. **Fail-fast**: o chat não espera horas como o comitê.
-- `converse()` grava as duas pontas em `ChatMessage`; `start_turn()` dispara em
-  thread e volta na hora (um turno leva minutos; nenhum cliente HTTP segura isso).
+- Limite de uso → `ChatUnavailableError(kind="limit")`, e a mensagem **volta
+  para a fila** com `run_after` na hora do reset: o consultor retoma sozinho
+  quando o crédito volta (D41). Só `auth` (login expirado) não é retentado.
+- `enqueue()` grava as duas pontas em `ChatMessage` e devolve na hora; quem
+  roda é o worker da fila (um turno leva minutos, nenhum cliente HTTP segura
+  isso). `converse()` é o caminho síncrono que o bot usa.
 - Anexos: `save_attachment` → `inbox/`, nome saneado (`safe_filename`, ASCII,
   sem traversal), 20 MB de teto. `media_turn_text` monta o prompt que manda o
   consultor ler o arquivo e agir (cupom → registra gasto; extrato → resume e

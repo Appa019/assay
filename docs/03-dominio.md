@@ -160,11 +160,18 @@ pagamento. `DELETE` só sem lançamentos (409).
 ### `ChatMessage` — transcrição compartilhada
 
 Toda mensagem, dos dois lados e das **duas portas** (Telegram e site). Guarda
-`channel`, `status` (`running`/`done`/`failed`), `model` e `tier` escolhidos
-pelo roteador, custo e duração.
+`channel`, `status` (`queued`/`running`/`done`/`failed`), `model` e `tier`
+escolhidos pelo roteador, custo e duração.
 
-> **Regra crítica:** todo caller deve usar `chat_service.converse(text, channel)`
-> — **nunca** `run_chat_turn` direto. É `converse` que persiste as duas pontas.
+A tabela é **também a fila** (D41): a linha do assistente pendente É o job, com
+`prompt` (o texto que vai ao modelo, distinto do `content` que o humano lê),
+`attempts`, `run_after` e `retry_kind`. Por estar no banco, uma mensagem barrada
+pelo limite de uso atravessa restart e é respondida quando o crédito volta.
+
+> **Regra crítica:** todo caller entra por `chat_service.enqueue(text, channel)`
+> (site: enfileira e volta na hora) ou `chat_service.converse(text, channel)`
+> (bot: síncrono, porque precisa devolver o texto na resposta do Telegram) —
+> **nunca** `run_chat_turn` direto, que não persiste nada.
 > Rotacionar a sessão do Claude não apaga esta tabela. O reset ("nova
 > sessão") também não: ele grava um corte em `display_state.json` e
 > `history()` só devolve o que veio depois — a tela recomeça em branco

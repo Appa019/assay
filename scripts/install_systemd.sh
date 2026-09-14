@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Install systemd USER units for the whole system (preferred over cron):
-#   services : backend (uvicorn) + telegram bot — Restart=always
-#   timers   : maturidade · revisão semanal · resume (15min) · preços (6h)
-#              · snapshot diário · insights diários · digest semanal
-#              · backup diário — all Persistent=true, so a
-#              machine that was OFF at the scheduled time catches up on boot
-#              (plain cron silently skips missed windows).
+#   services : backend (uvicorn) + frontend (Next) — Restart=always. The
+#              Telegram bot unit is WRITTEN but left disabled: the client does
+#              not use Telegram (D30), and two polling bots answer twice.
+#   timers   : aportes agendados · maturidade · revisão semanal · resume
+#              (15min) · preços (6h) · snapshot diário · alertas de alvo/stop
+#              · relatório mensal · insights diários · digest semanal · backup
+#              diário — 11 in all, Persistent=true, so a machine that was OFF
+#              at the scheduled time catches up on boot (plain cron silently
+#              skips missed windows).
 # Idempotent. Remove with --uninstall. Requires a systemd user session.
 set -euo pipefail
 
@@ -123,9 +126,15 @@ oneshot_pair digest   "digest financeiro semanal"    "${PY} ${PROJECT_ROOT}/scri
 oneshot_pair backup   "backup do SQLite"             "/usr/bin/env bash ${PROJECT_ROOT}/scripts/backup_db.sh" "*-*-* 03:00"
 
 systemctl --user daemon-reload
-systemctl --user enable --now "${PREFIX}-backend.service" "${PREFIX}-bot.service" \
-  "${PREFIX}-frontend.service"
-for t in cadence weekly resume prices snapshot alerts monthly insights digest backup; do
+# The bot unit is installed but NOT enabled on purpose (D30): the client reads
+# every notice in the app, and a second polling bot would answer him twice.
+# Turning it on is a deliberate `systemctl --user enable --now`, never a side
+# effect of reinstalling the units.
+systemctl --user enable --now "${PREFIX}-backend.service" "${PREFIX}-frontend.service"
+# `scheduled` belongs in this loop: since D38 a contribution asked for during
+# the day is parked for the 01:00 window, so leaving its timer out meant the
+# client could ask for an aporte and nothing would ever run it.
+for t in scheduled cadence weekly resume prices snapshot alerts monthly insights digest backup; do
   systemctl --user enable --now "${PREFIX}-${t}.timer"
 done
 
