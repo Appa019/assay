@@ -1201,13 +1201,16 @@ def start_queue_worker() -> None:
 
 def _queue_loop() -> None:
     while True:
+        # Cleared BEFORE looking at the table, never after: a message queued
+        # while a turn was running would otherwise have its wake-up wiped out
+        # and sit there until the idle timer came round.
+        _QUEUE_WAKE.clear()
         try:
             wait = _drain_once()
         except Exception:  # noqa: BLE001 — a bad job must never kill the queue
             logger.warning("chat_queue_loop_failed", exc_info=True)
             wait = _QUEUE_IDLE_S
         _QUEUE_WAKE.wait(timeout=wait)
-        _QUEUE_WAKE.clear()
 
 
 def _drain_once() -> float:
