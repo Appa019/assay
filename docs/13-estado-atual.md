@@ -1,8 +1,20 @@
 # 13 · Estado atual
 
-> **Fotografia de 2026-09-12.** Este é o documento que envelhece —
+> **Fotografia de 2026-09-13.** Este é o documento que envelhece —
 > atualize-o quando mudar algo estrutural. Os outros 12 descrevem como o
 > sistema funciona; este descreve como ele está **agora**.
+
+## 2026-09-13 — fluxo de caixa previsto
+
+Tabela `recurrence` (criada pelo `create_all` no boot, sem migração manual) +
+`GET /api/cashflow/forecast` + CRUD em `/api/recurrences`. O `/extrato` ganhou
+duas sub-abas na URL (`?aba=mes|fluxo`); `fluxo` mostra 6 meses de entrada ×
+saída com barras em escala compartilhada, composição por mês e a fatura como
+legenda. Só conta compromisso cadastrado — sem média histórica (D40). Cadastro
+exclusivamente pelo consultor, que ganhou ordens e endpoints novos. Sem
+variável de ambiente nova. Depois do deploy no Pi: contar ao consultor o
+salário e os gastos fixos ("meu salário é 8.000 todo dia 5"), senão a aba abre
+no estado vazio.
 
 ## 2026-09-12 — cartão de crédito e olhinho
 

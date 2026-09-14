@@ -254,6 +254,20 @@ sem Playwright.
   (`card_service.resolve_card`, única fonte da regra); `installments` expande
   em N linhas; faturas são calculadas (`/api/cards`), nunca gravadas; aviso
   no dia seguinte ao fechamento. Roteador: "fatura" → opus sempre.
+- **Fluxo de caixa previsto (`Recurrence`, D40, 2026-09-13)**: `/extrato?aba=
+  fluxo` mostra 6 meses de entrada × saída. Regra ÚNICA do mês:
+  `total = lançamentos reais + recorrências NÃO cumpridas` — "cumprida" = existe
+  lançamento real no mês com mesmo kind+categoria, pareado 1-para-1 pelo valor
+  mais próximo; linha de parcela NUNCA casa (senão uma compra parcelada em
+  "lazer" anularia a mensalidade da academia). `Recurrence` é CONFIGURAÇÃO, não
+  lançamento — nada materializa linha futura no ledger (mesma escolha da
+  fatura). Competência como no D39: parcela conta no `occurred_on`, fatura é só
+  LEGENDA do mês de vencimento e nunca soma. Só carteira `conta` (VR/VA são
+  benefício). **Nenhuma média histórica entra**: a sobra prevista é TETO, não
+  expectativa — gasto variável fica de fora por decisão do cliente. `starts_on`
+  default = dia 1 do mês corrente. Cadastro SÓ pelo consultor
+  (`/api/recurrences`), sem formulário. Fonte única da matemática:
+  `forecast_service.build_forecast` — não recalcule no front.
 
 ### Chat no site + roteador de modelo (2026-07-28)
 O consultor mora na página `/consultor`. **É UMA conversa só**: se o espelho do
@@ -317,9 +331,10 @@ manifest. Não edite os assets à mão — rode o script.
      metades do dinheiro juntas.
   2. **`/consultor`** — o chat. É por onde se registra gasto/ganho e se pede
      aporte. Aceita foto e arquivo.
-  3. **`/extrato`** — ledger pessoal do mês, somente leitura (por categoria,
-     com exclusão de lançamento). Substituiu a antiga `/financas`, que não
-     existe mais.
+  3. **`/extrato`** — casca com duas sub-abas na URL (`?aba=mes|fluxo`):
+     **Mês** = ledger pessoal do mês, somente leitura (por categoria, com
+     exclusão de lançamento; substituiu a antiga `/financas`) · **Fluxo** =
+     fluxo de caixa previsto, 6 meses de entrada × saída.
   4. **`/investimentos`** — casca com sub-abas na URL (`?aba=carteira|aportar|
      analises|ir`) que hospeda as views de `/ativos`, `/aporte`, `/relatorios`
      e `/ir`. Essas 4 páginas exportam o componente por NOME (`AtivosView` etc.)
@@ -397,9 +412,10 @@ rsync -a --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
   - `agents_prompts/`: 5 templates Jinja2 (macro · seleção · DD ações · DD crypto · decisão)
   - `core/database.py`: SQLite + SQLModel
   - `models/`: Asset, Contribution, ContributionPrompt, Report (weekly/
-    maturity), Order, Trade, PortfolioSnapshot, CashflowEntry (gastos/ganhos)
+    maturity), Order, Trade, PortfolioSnapshot, CashflowEntry (gastos/ganhos),
+    CreditCard, Recurrence (compromisso mensal)
   - `routers/`: portfolio, contributions, macro, cadence, reports, orders, tax,
-    cashflow
+    cashflow, cards, recurrences
   - `services/`: portfolio_service, market_data_service, prompt_generator,
     contribution_service (cria aporte + renderiza prompts), analysis_runner
     (MOTOR: `run_chain` genérico encadeado + auto-resume por limite + workspace/
@@ -408,7 +424,9 @@ rsync -a --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
     Web Push + espelho opcional), telegram_service (Bot API),
     notification_service (marcos de maturidade por lote), chat_service (consultor
     turno de chat = `_run_claude_step` no chat_workspace),
-    cashflow_service (ledger pessoal de gastos/ganhos)
+    cashflow_service (ledger pessoal de gastos/ganhos),
+    recurrence_service (compromissos mensais) + forecast_service (fluxo
+    de caixa previsto)
 - `/scripts/`: run_analysis (aporte→análise), telegram_setup, telegram_bot,
   check_cadence, weekly_review, resume_pending (retoma análises interrompidas),
   install_cron

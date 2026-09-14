@@ -61,8 +61,23 @@ Base: `http://127.0.0.1:8000` (o navegador nunca fala direto — o Next reescrev
 | `GET` | `/summary?month=YYYY-MM` | `income_brl`, `expense_brl`, `net_brl`, `entries`, `card_expense_brl`, `by_category[]`, `by_wallet[]` |
 | `GET` | `/wallets` | Saldo **acumulado** por carteira (entrou − saiu desde sempre) — responde "quanto ainda tenho de VR?" |
 | `GET` | `/history?months=6` | Totais por mês, **mais antigo primeiro** (a tendência) |
+| `GET` | `/forecast?months=6` | **Fluxo de caixa previsto** (1–24 meses, mês corrente primeiro). Por mês: `income_brl`/`expense_brl`/`net_brl`, o par `realized_*`/`pending_*`, `lines[]` (`origin` `realized`\|`installment`\|`recurring`, `day`, `label`, `card_name`, `installment_no/count`) e `invoices[]` (**legenda**: a fatura vence nesse mês mas NÃO soma na saída). Só carteira `conta`; só compromisso cadastrado — nenhuma média histórica |
 | `DELETE` | `/groups/{installment_group}` | Apaga a compra parcelada inteira → `{deleted}`. 404 se nenhuma linha |
 | `DELETE` | `/{id}` | Apaga um lançamento |
+
+---
+
+## Recorrências (o que alimenta o fluxo) — `/api/recurrences`
+
+Configuração, não lançamento: nada aqui move o ledger. Quem escreve é o
+consultor.
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `GET` | `?active_only=false` | Todas as recorrências, com `card_name` |
+| `POST` | `` | Body: `kind`, `amount_brl>0`, `category`, `description?`, `day_of_month` (1–31, mês curto cai no último dia), `wallet?`, `card?` (**omitido = SEM cartão**, ao contrário do lançamento), `starts_on?` (default: dia 1 do mês corrente), `ends_on?` (último mês que conta). **201**; cartão desconhecido/mal usado → 422 |
+| `PATCH` | `/{id}` | Campos opcionais; `ends_on: null` reabre. 404 se não existe |
+| `DELETE` | `/{id}` | Remove de vez (para preservar histórico, use `active: false`) |
 
 ---
 

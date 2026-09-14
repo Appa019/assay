@@ -83,7 +83,9 @@ Tradução de exceção usada em todo lugar:
 | `prompt_generator.py` | 204 | Renderiza os 5 templates Jinja2 com contexto de datas dinâmico |
 | `tax_service.py` | 182 | IR simplificado: isenções 20k/35k, compensação de prejuízo, DARF mínima |
 | `price_refresh_service.py` | 171 | Marcação a mercado de TODO lote (Yahoo · CoinGecko · CDI acumulado) |
-| `cashflow_service.py` | 169 | Ledger pessoal: lançamento, resumo mensal, histórico, deduplicação |
+| `cashflow_service.py` | 494 | Ledger pessoal: lançamento, resumo mensal, histórico, deduplicação |
+| `forecast_service.py` | 184 | Fluxo de caixa previsto: lançamentos + recorrências não cumpridas, mês a mês |
+| `recurrence_service.py` | 152 | Compromissos mensais (CRUD) e as ocorrências de cada mês |
 | `benchmark_service.py` | 169 | TWR da carteira vs CDI/IBOV/BTC, rebased 100 |
 | `classifier_service.py` | 152 | "gastei 42,90 no mercado" → rascunho estruturado (haiku, sem MCP) |
 | `model_router.py` | 148 | Triagem que escolhe fast/balanced/deep para cada turno de chat |

@@ -660,3 +660,36 @@ carteira (cartão não é pote de dinheiro), e o roteador manda toda frase com
 um lançamento rápido. O aviso de fechamento sai no dia SEGUINTE (compra no
 dia do fechamento ainda entra) e fora do orçamento semanal de insights (é
 conta a pagar).
+
+### D40 · Fluxo de caixa: recorrência é configuração, e previsão é cadastro
+O app só sabia olhar para trás. Parcelas futuras já estavam gravadas mas eram
+invisíveis (a seta de mês trava no corrente), e nada representava salário,
+aluguel ou assinatura — só viravam linha no dia em que aconteciam.
+
+Três decisões. **(1) Previsão é cadastro, não estatística.** Nenhuma média
+histórica entra no número: o fluxo soma compromissos registrados. O cliente
+pediu explicitamente — ele vai registrar tudo. Consequência assumida e dita na
+tela: gasto variável fica de fora, então a sobra prevista é TETO, não
+expectativa. **(2) `Recurrence` é configuração, nunca lançamento** — a mesma
+escolha que já vale para fatura ("invoices are NEVER stored"). Materializar 6
+linhas futuras em `cashflow_entry` duplicaria o gasto no dia em que ele
+acontece de verdade, exigiria reescrever o futuro a cada reajuste, e poluiria
+o `/extrato`, que é fato consumado. **(3) Competência, como em D39** — a
+parcela conta no mês do `occurred_on` e a fatura entra no mês do vencimento
+apenas como legenda; somá-la contaria as mesmas compras duas vezes.
+
+A única heurística do desenho é o **casamento**: uma recorrência é considerada
+cumprida quando existe lançamento real no mês com mesmo `kind` e mesma
+`category`, pareado um-para-um e pelo valor mais próximo (duas assinaturas na
+mesma categoria, uma lançada → cancela a correspondente, não a mais barata).
+Linhas de parcela nunca casam — uma compra parcelada em "lazer" anularia a
+mensalidade da academia. É isso que impede o salário de contar duas vezes no
+mês em que ele cai.
+
+`starts_on` nasce no primeiro dia do mês corrente, não em hoje: cadastrar o
+aluguel no dia 13 significa "esse é o meu aluguel", e começar hoje derrubaria
+o mês atual de toda recorrência cujo dia já passou — a tela abriria com a
+primeira coluna quebrada logo no primeiro uso.
+
+Cadastro é só pelo consultor (nenhum formulário), coerente com o resto do app:
+quem registra gasto conversando também registra o fixo conversando.

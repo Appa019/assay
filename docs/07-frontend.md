@@ -25,7 +25,7 @@ src/
 │       │                     <main> + <MobileNav>
 │       ├── page.tsx          / — Visão geral (727 linhas)
 │       ├── consultor/        chat
-│       ├── extrato/          ledger pessoal + fatura do cartão, somente leitura
+│       ├── extrato/          ?aba=mes (ledger + fatura) | ?aba=fluxo (previsto)
 │       ├── investimentos/    casca com 4 sub-abas na URL
 │       ├── ativos/           AtivosView (1423 linhas — o maior arquivo)
 │       ├── aporte/           AporteView + [id]/ (acompanhamento)
@@ -48,8 +48,14 @@ src/
 |---|---|---|
 | Visão geral | `/` | patrimônio + saldo do mês + alocação vs mandato + benchmark + ordens pendentes + macro |
 | Consultor | `/consultor` | o chat (registrar gasto, pedir aporte, tirar dúvida) |
-| Extrato | `/extrato` | ledger pessoal do mês, por categoria, com exclusão |
+| Extrato | `/extrato` | casca de 2 sub-abas: **Mês** (ledger, por categoria, com exclusão) e **Fluxo** (6 meses de entrada × saída previstas) |
 | Investimentos | `/investimentos` | casca de 4 sub-abas |
+
+`/extrato` hospeda duas sub-abas na URL (`?aba=mes|fluxo`): `MesView` mora na
+própria `page.tsx` e `FluxoView` em `extrato/fluxo-view.tsx`. No Fluxo, as
+barras de entrada e saída de todos os meses usam **uma escala compartilhada** —
+é o que torna visível o aperto e o alívio quando a última parcela cai; tocar o
+mês abre a composição (recorrência com o dia, parcela `3/10`, fatura vencendo).
 
 `/investimentos` hospeda as views por sub-aba na URL
 (`?aba=carteira|aportar|analises|ir`). As páginas correspondentes exportam o

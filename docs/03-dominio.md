@@ -13,6 +13,7 @@ Contribution ──1:N──▶ ContributionPrompt        (aporte → 5 prompts 
 Report          (weekly · maturity · monthly)
 CashflowEntry   (ledger pessoal: gasto/ganho)
 CreditCard      (cartão de crédito: fechamento, vencimento, padrão)
+Recurrence      (compromisso mensal: salário, aluguel, assinatura)
 ChatMessage     (transcrição do consultor, telegram + web)
 ```
 
@@ -104,6 +105,23 @@ benefício (crédito rola entre meses). No banco a coluna armazena o VALOR
 minúsculo (`values_callable` no `SAEnum`) — diferente de `kind`/`source`, que
 o SQLModel guarda pelo NOME — porque linhas antigas ganham o default `'conta'`
 do `ALTER TABLE` e o ORM precisa ler esse texto cru de volta.
+
+### `Recurrence` — compromisso mensal (2026-09-13)
+
+Salário, aluguel, assinatura, financiamento. É **configuração, não
+lançamento**: nada aqui escreve no ledger, e o fluxo de caixa
+(`forecast_service`) recalcula a partir destas linhas a cada leitura — a mesma
+escolha que já vale para fatura. Materializar as parcelas futuras em
+`cashflow_entry` duplicaria o gasto no dia em que ele acontece de verdade.
+
+Campos: `kind`, `amount_brl`, `category` (normalizada como no ledger),
+`day_of_month` (1–31, mês curto cai no último dia), `wallet`, `card_id`,
+`starts_on` (default: dia 1 do mês corrente), `ends_on` (NULL = indefinido —
+preencher é o que faz o financiamento sumir do fluxo) e `active`.
+
+`card` em branco significa **fora do cartão**, ao contrário do lançamento
+avulso: compromisso mensal costuma ser boleto ou pix, e o consultor pode ser
+explícito quando for no cartão.
 
 **Deduplicação:** um lançamento idêntico em todos os campos (carteira
 inclusive) dentro de 120s é tratado como repetição do mesmo POST e devolve a
