@@ -1,8 +1,25 @@
 # 13 · Estado atual
 
-> **Fotografia de 2026-09-13.** Este é o documento que envelhece —
+> **Fotografia de 2026-09-14.** Este é o documento que envelhece —
 > atualize-o quando mudar algo estrutural. Os outros 12 descrevem como o
 > sistema funciona; este descreve como ele está **agora**.
+
+## 2026-09-14 — fila do consultor e banco zerado
+
+Quatro colunas novas em `chat_message` (`prompt`, `attempts`, `run_after`,
+`retry_kind`, migração automática no boot) + o status `queued`. O chat virou
+uma fila durável drenada por um worker único que sobe com o backend: dá para
+mandar várias mensagens seguidas (o POST não devolve mais 409) e uma mensagem
+barrada pelo limite de uso é retomada sozinha quando o crédito volta,
+inclusive atravessando restart do Pi (D41). No front, a caixa de texto esvazia
+sempre ao enviar e a mensagem na fila aparece com relógio. Sem variável de
+ambiente nova.
+
+**O banco e a memória foram zerados a pedido do cliente** (backup consistente
+em `storage/backups/portfolio_pre_wipe_20260914_003614.db`, no Pi). O app
+subiu com carteira, ledger, transcrição e `chat_workspace/` vazios — a memória
+do consultor sobre o cliente começa do zero, então vale recontar salário,
+gastos fixos e cartão.
 
 ## 2026-09-13 — fluxo de caixa previsto
 

@@ -693,3 +693,47 @@ primeira coluna quebrada logo no primeiro uso.
 
 Cadastro é só pelo consultor (nenhum formulário), coerente com o resto do app:
 quem registra gasto conversando também registra o fixo conversando.
+
+### D41 · A fila do consultor: mensagem guardada vale mais que erro honesto
+O chat era fail-fast por desenho (D23): bater no limite de uso devolvia
+"me manda de novo mais tarde" e ficava por isso mesmo. A assimetria com o
+comitê — que espera a janela reabrir e retoma sozinho — tinha uma razão: 90
+minutos de comitê não podem ser jogados fora, enquanto segurar "gastei 42 no
+mercado" por 4 horas parecia pior que falhar na hora.
+
+Estava errado pelo lado do cliente. Quem manda um gasto às 23h não quer um
+aviso; quer o gasto registrado. E "reenvia depois" só funciona se ele lembrar
+— o app existe justamente para ele não ter que lembrar.
+
+**A fila é o próprio transcript.** A linha do assistente pendente É o job:
+`status=QUEUED` + `prompt` (o texto que vai ao modelo, separado do `content`
+que o humano lê) + `attempts` + `run_after` + `retry_kind`. Nada de tabela
+nova, nada de fila em memória: está no SQLite, então sobrevive a restart,
+deploy e queda de energia, e a tela já sabe desenhar o estado — cada mensagem
+esperando aparece como o que é.
+
+Três consequências deliberadas:
+
+1. **O POST nunca mais dá 409.** Mandar três mensagens seguidas é o caso
+   normal, não um erro; elas entram atrás e são lidas em ordem na mesma sessão
+   encadeada. O 409 sobrevive só no `/reset`, onde descartar a fila seria
+   perda de dados.
+2. **FIFO estrito, inclusive na espera.** Se a primeira mensagem está
+   segurando por limite, as de trás seguram junto: passar na frente
+   reordenaria a conversa e elas bateriam na mesma janela fechada.
+3. **Paciência por causa, não uniforme.** `limit` espera até o reset
+   anunciado, até 24 vezes; `transient` tenta 3 vezes com backoff curto;
+   `auth` (login expirado) não é retentado nenhuma vez — repetir esconderia o
+   único erro que exige um humano. É a mesma separação de orçamentos que o
+   motor já fazia (D-espera inteligente), agora no chat.
+
+O risco real do desenho é **gravar em dobro**: um turno pode ter chamado
+`POST /api/cashflow` e só então bater no limite. Nenhuma chave de idempotência
+resolveria isso de fora — quem sabe o que fez é o consultor. Então toda
+retomada leva `_RESUME_PREFACE` no prompt, mandando conferir o ledger do mês
+antes de gravar. A sessão encadeada mostra a ele o que ele mesmo fez na
+tentativa anterior.
+
+Push só na PRIMEIRA espera: um limite que leva quatro janelas para liberar
+faria o celular vibrar quatro vezes dizendo a mesma coisa.
+

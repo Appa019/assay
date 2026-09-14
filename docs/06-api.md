@@ -97,12 +97,14 @@ consultor.
 
 | Método | Rota | O que faz |
 |---|---|---|
-| `GET` | `?limit=60` | `{busy, messages[]}` — histórico em ordem de leitura, com `channel`, `status`, `model`, `tier` |
-| `POST` | `` | **202.** Enfileira o turno e volta na hora. **409** se ocupado. Body: `{text}` (1–8000 chars) |
+| `GET` | `?limit=60` | `{busy, queued, messages[]}` — histórico em ordem de leitura, com `channel`, `status` (`queued`/`running`/`done`/`failed`), `model`, `tier` |
+| `POST` | `` | **202 SEMPRE.** Põe na fila e volta na hora — mandar durante um turno é permitido, entra atrás. Body: `{text}` (1–8000 chars) |
 | `POST` | `/upload` | multipart `files` (1 a 3) + `caption`. Salva no inbox e enfileira UM turno sobre o conjunto. **413** acima de 20 MB por arquivo · **422** mais de 3 |
-| `POST` | `/reset` | **204.** Descarta a sessão do Claude e ZERA a tela: o GET passa a devolver só mensagens posteriores ao reset. As linhas antigas continuam no banco (custo/tier); MEMORY.md fica. 409 no meio de um turno |
+| `POST` | `/reset` | **204.** Descarta a sessão do Claude e ZERA a tela: o GET passa a devolver só mensagens posteriores ao reset. As linhas antigas continuam no banco (custo/tier); MEMORY.md fica. **409** com turno rodando OU mensagem na fila (o reset a descartaria) |
 
-Polling do cliente: 2,5s ocupado / 12s ocioso.
+Polling do cliente: 2,5s enquanto trabalha (turno rodando ou fila prestes a
+ser puxada) / 12s ocioso — e também 12s quando a fila está parada esperando o
+limite de uso voltar, que pode levar horas.
 
 ---
 

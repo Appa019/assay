@@ -227,8 +227,20 @@ sem Playwright.
   carteira/IR/ordens pela API local e responde tickers com dados ao vivo
   (yahoo-finance/coingecko). Lock de turno próprio (`_chat_turn.lock`) — NÃO usa
   o lock global pesado, então chat funciona mesmo com comitê rodando; fila
-  serial no bot com indicador "digitando…". Limite de uso → mensagem amigável
-  (fail-fast, sem esperar horas). `/resetchat` descarta a sessão (memória fica).
+  serial no bot com indicador "digitando…".
+  **Fila durável (D41, 2026-09-14)**: a linha do assistente pendente É o job
+  (`status=queued` + `prompt`/`attempts`/`run_after`/`retry_kind` em
+  `chat_message`), drenada por um worker único que sobe no lifespan do
+  backend. O cliente manda QUANTAS mensagens quiser (o `POST /api/chat` não dá
+  mais 409) e elas são lidas em ordem — **FIFO estrito, inclusive na espera**.
+  Limite de uso NÃO descarta mais a mensagem: volta para `queued` com
+  `run_after` na hora do reset e o consultor retoma sozinho (24 tentativas),
+  atravessando restart do Pi. Transiente = 3 tentativas; `auth` = zero
+  (só humano resolve). Toda retomada prefixa `_RESUME_PREFACE` no prompt
+  mandando conferir o ledger antes de gravar — a tentativa anterior pode ter
+  registrado metade. Push só na primeira espera. `/resetchat` e `POST
+  /api/chat/reset` descartam a sessão (memória fica); o reset dá 409 se houver
+  fila.
   Aceita **foto e arquivo** (≤20 MB): o bot, quando ligado, baixa via
   `getFile` p/ `storage/chat_workspace/inbox/` e o consultor lê (visão p/
   imagem; parsing p/ PDF/CSV/planilha) — cupom/nota vira gasto registrado,

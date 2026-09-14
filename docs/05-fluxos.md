@@ -157,24 +157,48 @@ Proteção: lançamento idêntico dentro de 120s é colapsado em um só.
 **Uma conversa só, duas portas.**
 
 ```
-Telegram: texto sem "/"          Site: POST /api/chat
-        │                               │
-        └──────────┬────────────────────┘
+Site: POST /api/chat                    Telegram: texto sem "/"
+        │                                        │
+        ▼                                        ▼
+ chat_service.enqueue()                 chat_service.converse()
+  ├─ ChatMessage(user)                   (síncrono: o bot precisa
+  └─ ChatMessage(assistant,               devolver o texto na hora)
+        status=QUEUED, prompt=…)  ← a FILA é esta linha
+                   │
                    ▼
-      chat_service.converse(text, channel)
-        ├─ grava ChatMessage(user)
-        ├─ grava ChatMessage(assistant, status=running)   ← bolha pendente
+      worker único (_queue_loop, thread do backend)
+        ├─ _claim_next_job(): mais ANTIGO primeiro, FIFO estrito
+        ├─ status → RUNNING
         ├─ run_chat_turn()
-        │    ├─ adquire _chat_turn.lock (fila serial)
+        │    ├─ adquire _chat_turn.lock (serializa entre processos)
         │    ├─ model_router.route(text) → tier/modelo
         │    ├─ resume session.json (rotaciona em 40 turnos)
         │    └─ _run_claude_step() no chat_workspace
-        └─ settle: content + status(done|failed) + model + tier
+        └─ settle: content + status(done|failed) + model + tier + push
 ```
 
-O site faz polling: **2,5s ocupado, 12s ocioso** — a resposta pode chegar do
-Telegram. O bot mostra "digitando…" enquanto roda (o indicador expira em ~5s,
-então há um loop que renova).
+**A fila mora no banco**, não na memória — é isso que dá as duas propriedades:
+
+- **Mandar várias mensagens seguidas**: o POST nunca devolve 409; cada
+  mensagem entra atrás e é lida na ordem, na mesma sessão encadeada.
+- **Voltar sozinho quando o crédito volta**: `LimitError` não mata o turno —
+  a linha volta a `QUEUED` com `run_after` na hora do reset (`retry_kind =
+  limit`, até 24 tentativas) e o worker a retoma. Sobrevive a restart do
+  backend, porque está no SQLite. Erro transitório: 3 tentativas curtas.
+  `AuthError` (login expirado) NÃO é retentado — só um humano resolve.
+- Um turno morto por reinício volta para a fila (`reconcile_orphan_turns`).
+  Toda retomada prefixa `_RESUME_PREFACE` no prompt, mandando o consultor
+  conferir o ledger antes de gravar — a tentativa anterior pode ter registrado
+  metade do trabalho antes de cair.
+
+FIFO é **estrito**: se a primeira mensagem está esperando o limite, as de trás
+esperam junto. Passar na frente reordenaria a conversa e elas bateriam na
+mesma janela fechada.
+
+O site faz polling: **2,5s trabalhando, 12s ocioso** (e 12s enquanto a fila
+espera crédito) — a resposta pode chegar do Telegram. O bot mostra
+"digitando…" enquanto roda (o indicador expira em ~5s, então há um loop que
+renova).
 
 `/resetchat` (bot) e `POST /api/chat/reset` descartam a sessão do Claude. A
 transcrição e o `MEMORY.md` **ficam**.
