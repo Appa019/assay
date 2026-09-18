@@ -61,12 +61,29 @@ class Settings(BaseSettings):
     # Telegram consultant chat (free-text conversation over the bot). Opus by
     # default for advice quality; set CHAT_MODEL=sonnet for snappier replies.
     chat_model: str = "opus"
-    chat_effort: str = "high"
+    chat_effort: str = "medium"
     # Per-turn subprocess ceiling (seconds) — one chat answer, not a committee run.
     chat_turn_timeout: int = 900
     # Rotate the chained chat session after this many turns; MEMORY.md carries
     # the durable context across rotations so old turns can be dropped.
     chat_max_turns: int = 40
+    # ...or as soon as the conversation itself gets this big (tokens read on a
+    # single model call, as reported by the CLI). Measured on the real chat:
+    # by turn 14 the session was already at ~200k tokens of context, and a
+    # chained session re-reads ALL of it on every iteration of every later
+    # turn — one "ok, obrigado" cost US$ 2.36 that way. The turn counter never
+    # saw it coming, which is why the ceiling is in tokens.
+    chat_max_context_tokens: int = 120_000
+
+    # Attachments (receipt photos, statements, invoices) are transcribed in a
+    # THROWAWAY session and only the text joins the chained conversation. Read
+    # inline, a photo's base64 stays in the session forever and is re-sent on
+    # every later turn: 8 photos were 99% of the chat history's payload.
+    # Vision quality matters here (these are numbers being copied), so this is
+    # the middle model rather than the cheapest one.
+    chat_vision_model: str = "sonnet"
+    chat_vision_effort: str = "low"
+    chat_vision_timeout: int = 300
 
     # Free-text expense/income classifier. Deliberately a small, fast model with
     # no MCPs: this runs while the user waits with a thumb on the screen, so
@@ -88,7 +105,11 @@ class Settings(BaseSettings):
     chat_lookup_model: str = "sonnet"
     chat_lookup_effort: str = "low"
     chat_deep_model: str = "opus"
-    chat_deep_effort: str = "high"
+    # medium, not high: the thinking blocks of every past turn stay in the
+    # chained session and are re-read on each iteration (392k chars of them in
+    # the measured session). This is the one knob here that trades depth for
+    # cost — CHAT_DEEP_EFFORT=high in .env puts it back.
+    chat_deep_effort: str = "medium"
     # Small model for auxiliary steps (the chat's rotation summary).
     chat_router_model: str = "haiku"
     chat_router_effort: str = "low"

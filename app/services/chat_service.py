@@ -18,6 +18,7 @@ rotated (fresh session, memory carries the context) to keep latency and cost
 bounded. A cross-process file lock serializes turns; the caller queues.
 """
 
+import hashlib
 import json
 import re
 import threading
@@ -382,10 +383,11 @@ não conseguir registrar via API, avise o cliente e peça para tentar depois.
   ./.mcp.agent.json (carrega na próxima sessão).
 
 ## Arquivos recebidos (./inbox/)
-- Quando a mensagem indicar um arquivo salvo em ./inbox/, LEIA-o ANTES de
-  responder: imagens (cupom, nota, print de corretora/app) pela visão;
-  PDF/CSV/planilha pelas ferramentas de leitura (instale libs via Bash se
-  precisar, ex. openpyxl para xlsx).
+- A mensagem já chega com a TRANSCRIÇÃO do arquivo (um leitor separado abriu a
+  imagem/PDF e copiou o conteúdo). Trabalhe a partir dela; o original continua
+  em ./inbox/ e você só o abre se a transcrição estiver ambígua, incompleta ou
+  marcar `[ilegível]` num número que muda a decisão. Abrir a imagem sem
+  necessidade enche a conversa e encarece todo turno seguinte.
 - Cupom/nota fiscal → extraia valor, data e estabelecimento e REGISTRE o gasto
   (categoria inferida) via API; confirme em 1 linha.
 - Extrato bancário → registre os lançamentos relevantes com `"card": "none"`
@@ -646,18 +648,31 @@ def _load_state() -> dict[str, Any]:
         return {}
 
 
-def _save_state(session_id: str, turns: int) -> None:
+def _save_state(session_id: str, turns: int, context_tokens: int = 0) -> None:
     _state_path().parent.mkdir(parents=True, exist_ok=True)
     _state_path().write_text(
         json.dumps(
             {
                 "session_id": session_id,
                 "turns": turns,
+                "context_tokens": context_tokens,
                 "updated_at": datetime.now(UTC).isoformat(),
             }
         ),
         encoding="utf-8",
     )
+
+
+def _should_rotate(session_id: str | None, turns: int, context_tokens: int) -> bool:
+    """Is this chained session too old OR too fat to keep resuming?
+
+    Size is the binding constraint in practice: a session crosses the token
+    ceiling long before it reaches ``chat_max_turns``, and every turn after
+    that pays for the whole conversation again on each iteration.
+    """
+    if not session_id:
+        return False
+    return turns >= settings.chat_max_turns or context_tokens >= settings.chat_max_context_tokens
 
 
 def _display_state_path() -> Path:
@@ -860,11 +875,17 @@ def run_chat_turn(text: str) -> tuple[str, model_router.Route, StepResult]:
     if not analysis_runner._try_acquire_lock_file(_chat_lock_path()):
         raise ChatBusyError("⏳ Ainda estou terminando a resposta anterior — já te respondo.")
     try:
+        # Attachments become text HERE, inside the lock: a transcription is a
+        # Claude call of its own, and paying for it before a busy turn even
+        # starts would be paying twice.
+        text, attachment_cost = _expand_attachments(text)
         state = _load_state()
         session_id = state.get("session_id") or None
         turns = int(state.get("turns") or 0)
-        rotated = bool(session_id) and turns >= settings.chat_max_turns
+        context_tokens = int(state.get("context_tokens") or 0)
+        rotated = _should_rotate(session_id, turns, context_tokens)
         if rotated:
+            logger.info("chat_session_rotating", turns=turns, context_tokens=context_tokens)
             session_id, turns = None, 0
 
         fresh = session_id is None
@@ -929,12 +950,15 @@ def run_chat_turn(text: str) -> tuple[str, model_router.Route, StepResult]:
             raise ChatUnavailableError(f"✖ Não consegui responder: {exc}") from exc
 
         new_session = result.session_id or session_id or ""
-        _save_state(new_session, turns + 1)
+        # The transcription is part of what this answer cost the plan.
+        result.cost_usd = round(result.cost_usd + attachment_cost, 6)
+        _save_state(new_session, turns + 1, result.context_tokens)
         logger.info(
             "chat_turn_done",
             turns=turns + 1,
             cost_usd=result.cost_usd,
             duration_s=result.duration_s,
+            context_tokens=result.context_tokens,
             fresh=fresh,
             model=picked.model,
             tier=picked.tier.value,
@@ -1446,8 +1470,8 @@ def media_turn_text(kind: str, path: Path, caption: str, origin: str) -> str:
     return (
         f"[ARQUIVO RECEBIDO — {kind}] O cliente enviou um arquivo {origin}, "
         f"salvo em: {path}\n{caption_line}\n"
-        "Leia o arquivo (imagem pela visão; PDF/CSV/planilha pelas ferramentas de "
-        "leitura) e siga suas ordens permanentes: cupom/nota → registre o gasto; "
+        f"{attachment_marker([path])}\n"
+        "Siga suas ordens permanentes: cupom/nota → registre o gasto; "
         'extrato bancário → registre o que saiu da conta com "card": "none", '
         "pulando o pagamento da fatura do cartão; fatura do cartão → NUNCA "
         "registre a fatura nem o pagamento dela: concilie linha a linha com "
@@ -1463,8 +1487,8 @@ def _media_group_turn_text(paths: list[Path], caption: str, origin: str) -> str:
     return (
         f"[ARQUIVOS RECEBIDOS — {len(paths)}] O cliente enviou {len(paths)} "
         f"arquivos {origin}, numa única mensagem:\n{listing}\n{caption_line}\n"
-        "Leia TODOS (imagem pela visão; PDF/CSV/planilha pelas ferramentas de "
-        "leitura) e trate como um CONJUNTO — podem ser páginas ou fotos do mesmo "
+        f"{attachment_marker(paths)}\n"
+        "Trate-os como um CONJUNTO — podem ser páginas ou fotos do mesmo "
         "cupom/extrato. Siga suas ordens permanentes: cupom/nota → registre o "
         'gasto; extrato bancário → registre o que saiu da conta com "card": '
         '"none", pulando o pagamento da fatura do cartão; fatura do cartão → '
@@ -1475,6 +1499,150 @@ def _media_group_turn_text(paths: list[Path], caption: str, origin: str) -> str:
         "registre o mesmo valor duas vezes se dois arquivos mostrarem a mesma "
         "compra."
     )
+
+
+# ── Attachment transcription: the bytes never enter the chained session ──────
+#
+# Reading a photo inline used to leave its base64 in the chained session for
+# good: it is re-sent on every later turn until rotation. In the measured
+# session, 8 receipt photos accounted for 3.9M of the 4.4M characters of
+# history. The file is read ONCE here, by a throwaway session, and only the
+# transcription travels on — the original stays on disk for whoever needs it.
+
+_ATTACHMENT_MARKER_RE = re.compile(r"\[\[ANEXOS:(.*?)\]\]", re.DOTALL)
+
+_TRANSCRIPTION_PROMPT = """Transcreva o conteúdo dos arquivos abaixo. Você é um \
+LEITOR: não interprete, não classifique, não registre nada em lugar nenhum e \
+não acesse a rede.
+
+{listing}
+
+Para CADA arquivo, nesta ordem:
+1. Que documento é (cupom fiscal, nota, extrato bancário, fatura de cartão, \
+comprovante, planilha, print de aplicativo...).
+2. Cabeçalho: estabelecimento ou emissor, CNPJ, data e hora, número do \
+documento, banco/bandeira, período, titular — o que existir.
+3. TODAS as linhas de valor, uma por linha, como `data | descrição | valor`. \
+Copie os números EXATAMENTE como aparecem (vírgula decimal, sinal, parcela \
+"3/10"). Não arredonde, não converta e não invente: o que não der para ler é \
+`[ilegível]`.
+4. Os totais que o documento mostra (subtotal, desconto, total, total da \
+fatura, saldo).
+
+Se dois arquivos forem o mesmo documento (frente e verso, páginas, foto \
+repetida), diga isso numa linha ao final. Responda só com a transcrição."""
+
+
+def attachment_marker(paths: list[Path]) -> str:
+    """Placeholder the queued prompt carries until the turn actually runs."""
+    return "[[ANEXOS:" + "|".join(str(p) for p in paths) + "]]"
+
+
+def _inbox_paths(raw: str) -> list[Path]:
+    """Parse a marker's payload, keeping only real files inside the inbox.
+
+    The prompt is stored in the database and a client message is free text, so
+    a hand-typed marker must not turn the transcriber into a file reader for
+    the rest of the machine.
+    """
+    inbox = (CHAT_WORKSPACE / "inbox").resolve()
+    paths: list[Path] = []
+    for chunk in raw.split("|"):
+        candidate = Path(chunk.strip())
+        if not chunk.strip():
+            continue
+        try:
+            resolved = candidate.resolve()
+            resolved.relative_to(inbox)
+        except (OSError, ValueError):
+            continue
+        if resolved.is_file():
+            paths.append(resolved)
+    return paths[:MAX_ATTACHMENTS_PER_TURN]
+
+
+def _transcription_cache_path(paths: list[Path]) -> Path:
+    """Where this exact set of files keeps its transcription.
+
+    Inbox names are already unique (they carry an upload timestamp), so the
+    joined names identify the set. The cache is what keeps a turn that died on
+    a usage limit from paying for the same photo again when the queue resumes
+    it — which is exactly when nobody wants to spend tokens twice.
+    """
+    key = hashlib.sha256("|".join(p.name for p in paths).encode()).hexdigest()[:16]
+    return CHAT_WORKSPACE / "inbox" / ".transcripts" / f"{key}.txt"
+
+
+def _transcribe_attachments(paths: list[Path]) -> tuple[str, float]:
+    """Read the files in a fresh, disposable session → (text, cost in USD)."""
+    cached = _transcription_cache_path(paths)
+    try:
+        text = cached.read_text(encoding="utf-8")
+        if text.strip():
+            return text, 0.0
+    except OSError:
+        pass
+
+    listing = "\n".join(f"{i}. {attachment_kind(p)}: {p}" for i, p in enumerate(paths, 1))
+    _AUX_WORKSPACE.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+    step = analysis_runner._run_claude_step(
+        _TRANSCRIPTION_PROMPT.format(listing=listing),
+        resume_session_id=None,
+        model=settings.chat_vision_model,
+        effort=settings.chat_vision_effort,
+        timeout=settings.chat_vision_timeout,
+        cwd=_AUX_WORKSPACE,
+        transcript_tag=f"vision_{stamp}",
+    )
+    logger.info(
+        "chat_attachment_transcribed",
+        files=len(paths),
+        cost_usd=step.cost_usd,
+        duration_s=step.duration_s,
+    )
+    try:
+        cached.parent.mkdir(parents=True, exist_ok=True)
+        cached.write_text(step.result, encoding="utf-8")
+    except OSError:  # a cache that cannot be written is not a failed turn
+        logger.warning("chat_transcription_cache_write_failed", exc_info=True)
+    return step.result, step.cost_usd
+
+
+def _expand_attachments(prompt: str) -> tuple[str, float]:
+    """Swap every attachment marker for its transcription. Returns the cost.
+
+    A failed transcription falls back to the old behaviour — the consultant is
+    told to open the file itself — because losing the receipt the client just
+    photographed is worse than paying for it in context.
+    """
+    extra_cost = 0.0
+
+    def _replace(match: re.Match[str]) -> str:
+        nonlocal extra_cost
+        paths = _inbox_paths(match.group(1))
+        if not paths:
+            return "(O arquivo citado não está mais disponível — peça para reenviar.)"
+        files = ", ".join(str(p) for p in paths)
+        try:
+            text, cost = _transcribe_attachments(paths)
+        except AnalysisError:
+            logger.warning("chat_attachment_transcription_failed", exc_info=True)
+            return (
+                f"Leia você mesmo estes arquivos (imagem pela visão; PDF/CSV/planilha "
+                f"pelas ferramentas de leitura): {files}"
+            )
+        extra_cost += cost
+        return (
+            "Transcrição automática do que os arquivos mostram (feita por um "
+            "leitor, não por você; os originais seguem em disco, em "
+            f"{files}, se precisar conferir algum detalhe):\n"
+            "--- início da transcrição ---\n"
+            f"{text}\n"
+            "--- fim da transcrição ---"
+        )
+
+    return _ATTACHMENT_MARKER_RE.sub(_replace, prompt), round(extra_cost, 6)
 
 
 def _display_name(path: Path) -> str:

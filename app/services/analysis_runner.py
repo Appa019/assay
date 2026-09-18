@@ -765,6 +765,10 @@ class StepResult:
     duration_s: float
     session_id: str = ""
     num_turns: int | None = None
+    # Peak context (tokens) the model actually read on this step. A chained
+    # session pays for its whole context on EVERY iteration, so this — not the
+    # turn count — is what says when a session got expensive.
+    context_tokens: int = 0
 
 
 @dataclass
@@ -999,7 +1003,35 @@ def _run_claude_step(
         duration_s=round(duration, 1),
         session_id=str(data.get("session_id") or ""),
         num_turns=data.get("num_turns"),
+        context_tokens=_peak_context_tokens(data),
     )
+
+
+def _iteration_context(entry: dict[str, Any]) -> int:
+    """Tokens read on one model call: fresh input + both halves of the cache."""
+    return sum(
+        int(entry.get(key) or 0)
+        for key in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+    )
+
+
+def _peak_context_tokens(data: dict[str, Any]) -> int:
+    """Largest context read by a single model call inside this step.
+
+    The CLI reports usage summed over every iteration of the agent loop, so the
+    raw totals grow with how many tools the model reached for and say nothing
+    about how big the conversation itself got. ``usage.iterations`` carries the
+    per-call figures; without it, the average over the turns is the best
+    available proxy.
+    """
+    usage = data.get("usage")
+    if not isinstance(usage, dict):
+        return 0
+    iterations = usage.get("iterations")
+    if isinstance(iterations, list) and iterations:
+        return max(_iteration_context(it) for it in iterations if isinstance(it, dict))
+    turns = data.get("num_turns") or 1
+    return int(_iteration_context(usage) / max(int(turns), 1))
 
 
 def _seconds_until_reset(message: str, *, cap: int = 6 * 3600) -> int | None:

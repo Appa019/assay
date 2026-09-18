@@ -465,3 +465,33 @@ def test_revoked_entitlement_is_auth_not_transient() -> None:
     )
     assert any(p in blob for p in ar._AUTH_PATTERNS)
     assert not any(p in blob for p in ar._LIMIT_PATTERNS)
+
+
+def test_peak_context_is_the_biggest_single_call() -> None:
+    """The CLI sums usage over every iteration of the agent loop, so the raw
+    totals measure how many tools were used, not how big the conversation is.
+    Rotation needs the latter — the largest context read by ONE call."""
+    data = {
+        "num_turns": 3,
+        "usage": {
+            "input_tokens": 12,
+            "cache_read_input_tokens": 600_000,
+            "cache_creation_input_tokens": 30_000,
+            "iterations": [
+                {"input_tokens": 12, "cache_read_input_tokens": 180_000},
+                {"cache_read_input_tokens": 200_000, "cache_creation_input_tokens": 10_000},
+                {"cache_read_input_tokens": 220_000},
+            ],
+        },
+    }
+    assert ar._peak_context_tokens(data) == 220_000
+
+
+def test_peak_context_falls_back_to_the_average() -> None:
+    """Older CLI payloads carry no per-iteration breakdown."""
+    data = {
+        "num_turns": 4,
+        "usage": {"cache_read_input_tokens": 400_000, "cache_creation_input_tokens": 40_000},
+    }
+    assert ar._peak_context_tokens(data) == 110_000
+    assert ar._peak_context_tokens({"result": "x"}) == 0
