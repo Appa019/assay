@@ -55,6 +55,7 @@ _ADDED_COLUMNS: dict[str, dict[str, str]] = {
         "cost_usd": "REAL",
         "duration_s": "REAL",
         "num_turns": "INTEGER",
+        "context_tokens": "INTEGER",
     },
     "asset": {
         "thesis": "TEXT",

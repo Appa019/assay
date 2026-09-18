@@ -1624,6 +1624,7 @@ def _run_analysis_locked(
             prompt.cost_usd = None
             prompt.duration_s = None
             prompt.num_turns = None
+            prompt.context_tokens = None
             session.add(prompt)
         session.commit()
 
@@ -1643,6 +1644,7 @@ def _run_analysis_locked(
                 prompts[abs_index].cost_usd = step.cost_usd
                 prompts[abs_index].duration_s = step.duration_s
                 prompts[abs_index].num_turns = step.num_turns
+                prompts[abs_index].context_tokens = step.context_tokens
                 session.add(prompts[abs_index])
                 session.commit()
 

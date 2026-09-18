@@ -51,3 +51,16 @@ def test_card_columns_are_patched_in_with_fk_on(tmp_path) -> None:
     with pytest.raises(IntegrityError), engine.begin() as conn:
         conn.exec_driver_sql("INSERT INTO cashflow_entry (id, card_id) VALUES ('e2', 'zz')")
     engine.dispose()
+
+
+def test_step_telemetry_columns_land_on_an_old_prompt_table(tmp_path) -> None:
+    """`context_tokens` joins the per-step telemetry: cost alone never said
+    whether a step got expensive from thinking harder or from carrying more."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'mig.db'}")
+    with engine.begin() as conn:
+        conn.exec_driver_sql("CREATE TABLE contribution_prompt (id TEXT PRIMARY KEY)")
+    _ensure_sqlite_columns(engine)
+    with engine.begin() as conn:
+        cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(contribution_prompt)")}
+    assert {"cost_usd", "duration_s", "num_turns", "context_tokens"} <= cols
+    engine.dispose()

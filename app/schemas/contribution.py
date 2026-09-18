@@ -25,6 +25,7 @@ class PromptRead(BaseModel):
     cost_usd: float | None = None
     duration_s: float | None = None
     num_turns: int | None = None
+    context_tokens: int | None = None
 
 
 class ContributionRead(BaseModel):

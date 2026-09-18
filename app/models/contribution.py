@@ -77,5 +77,9 @@ class ContributionPrompt(SQLModel, table=True):
     cost_usd: float | None = Field(default=None)
     duration_s: float | None = Field(default=None)
     num_turns: int | None = Field(default=None)
+    # Largest context ONE model call read in this step. Cost per step is
+    # roughly this times the number of iterations, so it is what says whether
+    # a chain got expensive from thinking harder or from carrying more.
+    context_tokens: int | None = Field(default=None)
 
     created_at: datetime = Field(default_factory=_now_utc)
