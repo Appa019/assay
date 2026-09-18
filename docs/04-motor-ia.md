@@ -50,8 +50,10 @@ disco** com `CLAUDE.md`, `MEMORY.md`, ferramentas e notas.
 | `out/<contribution_id>/etapa_NN.json` | o agente | sim — fonte canônica entre etapas se o contexto truncar |
 | `memory/graph.json` | MCP `memory` | sim |
 
-O `chat_workspace/` é análogo, mais `session.json` (session_id + contagem de
-turnos) e `inbox/` (fotos e arquivos recebidos, ≤20 MB).
+O `chat_workspace/` é análogo, mais `session.json` (session_id, contagem de
+turnos e o tamanho de contexto do último turno, que é o que dispara a rotação)
+e `inbox/` (fotos e arquivos recebidos, ≤20 MB — lidos por uma sessão
+descartável, nunca dentro da conversa encadeada; D42).
 
 ## MCPs — três tiers
 

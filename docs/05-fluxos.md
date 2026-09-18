@@ -142,7 +142,7 @@ Quatro caminhos, todos terminando no mesmo `cashflow_service.add_entry`:
 |---|---|
 | **Chat** (normal) | "gastei 42 no mercado" → consultor chama `POST /api/cashflow` com `source=chat` e confirma em 1 linha |
 | **Bot** | `/gasto 42 compras #mercado` → `source=bot` |
-| **Foto** | manda o cupom no chat → cai em `chat_workspace/inbox/` → consultor lê pela visão, extrai valor/data/estabelecimento e registra |
+| **Foto** | manda o cupom no chat → cai em `chat_workspace/inbox/` → um leitor descartável transcreve o arquivo (D42) → o consultor registra a partir da transcrição |
 | **API/UI** | `POST /api/cashflow` direto, `source=api` |
 
 Proteção: lançamento idêntico dentro de 120s é colapsado em um só.
@@ -172,7 +172,8 @@ Site: POST /api/chat                    Telegram: texto sem "/"
         ├─ run_chat_turn()
         │    ├─ adquire _chat_turn.lock (serializa entre processos)
         │    ├─ model_router.route(text) → tier/modelo
-        │    ├─ resume session.json (rotaciona em 40 turnos)
+        │    ├─ _expand_attachments(): anexo → transcrição (sessão descartável)
+        │    ├─ resume session.json (rotaciona em 120k tokens ou 40 turnos)
         │    └─ _run_claude_step() no chat_workspace
         └─ settle: content + status(done|failed) + model + tier + push
 ```

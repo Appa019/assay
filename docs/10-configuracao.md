@@ -47,7 +47,7 @@ validadores em `Settings` derrubam o boot com mensagem explícita se não somare
 | Variável | Default | O que faz |
 |---|---|---|
 | `MIN_HOLDING_DAYS` | `30` | Trava de venda **por lote** das AÇÕES (compliance do cliente). Interpolada nas ordens permanentes e no preâmbulo |
-| `MIN_HOLDING_DAYS_CRYPTO` | `15` | Trava de venda **por lote** da CRIPTO. CDB nunca trava |
+| `MIN_HOLDING_DAYS_CRYPTO` | `7` | Trava de venda **por lote** da CRIPTO (D36). CDB nunca trava |
 | `AGENT_MODEL` | `opus` | Modelo do comitê |
 | `AGENT_EFFORT` | `max` | **Sempre `max` no fluxo automático** |
 | `AGENT_STEP_TIMEOUT` | `2400` | Teto (s) por etapa do subprocess. Opus/max com pesquisa ao vivo é lento — dê folga |
@@ -58,9 +58,11 @@ validadores em `Settings` derrubam o boot com mensagem explícita se não somare
 | Variável | Default | O que faz |
 |---|---|---|
 | `CHAT_MODEL` | `opus` | Usado quando o roteador está **desligado** |
-| `CHAT_EFFORT` | `high` | idem |
+| `CHAT_EFFORT` | `medium` | idem |
 | `CHAT_TURN_TIMEOUT` | `900` | Teto (s) de **um** turno de chat |
 | `CHAT_MAX_TURNS` | `40` | Rotaciona a sessão encadeada depois de N turnos. O `MEMORY.md` carrega o contexto durável através da rotação |
+| `CHAT_MAX_CONTEXT_TOKENS` | `120000` | Rotaciona quando UMA chamada do modelo lê esse tanto de contexto. É o teto que pega na prática — o de turnos nunca chegou a valer (D42) |
+| `CHAT_VISION_MODEL` / `_EFFORT` / `_TIMEOUT` | `sonnet` / `low` / `300` | Leitor de anexo: transcreve foto/PDF numa sessão descartável, antes do turno do consultor (D42) |
 
 ## Roteador de modelo
 
@@ -70,7 +72,7 @@ validadores em `Settings` derrubam o boot com mensagem explícita se não somare
 | `CHAT_ROUTER_MODEL` / `_EFFORT` / `_TIMEOUT` | `haiku` / `low` / `60` | Modelo dos passos auxiliares (resumo de rotação da sessão) |
 | `CHAT_FAST_MODEL` / `_EFFORT` | `haiku` / `low` | Saudação e lançamento no ledger |
 | `CHAT_LOOKUP_MODEL` / `_EFFORT` | `sonnet` / `low` | Consulta factual: saldo, preço, ordens pendentes, extrato (D37) |
-| `CHAT_DEEP_MODEL` / `_EFFORT` | `opus` / `high` | Decisão de investimento, análise de ativo, macro, risco, tributação — e tudo o que não for provadamente os dois de cima |
+| `CHAT_DEEP_MODEL` / `_EFFORT` | `opus` / `medium` | Decisão de investimento, análise de ativo, macro, risco, tributação — e tudo o que não for provadamente os dois de cima |
 | `CONTRIBUTION_NIGHT_RUN` | `true` | `false` faz `run=true` executar na hora, como antes de D38 |
 | `CONTRIBUTION_NIGHT_HOUR` | `1` | Hora LOCAL em que os aportes agendados rodam. O timer `investimentos-scheduled` precisa apontar para a mesma hora |
 | `MACRO_DELTA_ENABLED` | `true` | `false` faz a Reunião nº 1 rodar sempre o macro completo (11 rodadas) |

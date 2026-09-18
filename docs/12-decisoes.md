@@ -737,3 +737,71 @@ tentativa anterior.
 Push só na PRIMEIRA espera: um limite que leva quatro janelas para liberar
 faria o celular vibrar quatro vezes dizendo a mesma coisa.
 
+
+### D42 · O caro no consultor é o tamanho da conversa, não o modelo
+
+**Medição antes de mexer** (Pi, banco e transcripts de 2026-09-14, únicos
+dados após a limpeza): consultor US$ 14,77 em 14 mensagens de um dia; revisão
+semanal US$ 3,90. O chat é 79% do gasto, média US$ 1,12 por mensagem.
+
+O que os transcripts mostraram:
+
+- **Uma resposta de 23 segundos custou US$ 2,36.** Ela tinha 1.047 tokens de
+  saída e 220.755 tokens de escrita de cache: a sessão inteira foi
+  reprocessada porque a mensagem anterior fora sete horas antes. O preço da
+  mensagem não veio do que foi dito, veio do que já estava na sessão.
+- **O contexto por chamada estava em ~200-250k tokens no turno 14.** Como o
+  agente itera (5,6 chamadas por mensagem, em média), um turno chegou a ler
+  2,15M tokens. O teto de `CHAT_MAX_TURNS=40` nunca chegaria perto de pegar
+  isso — a sessão fica cara muito antes de ficar velha.
+- **8 fotos eram 3,9M dos 4,4M de caracteres do histórico**, ou seja 99% de
+  todo o payload de `tool_result`. Cupom e fatura são lidos com visão DENTRO
+  da sessão encadeada, então o base64 de cada foto é reenviado em todo turno
+  seguinte, para sempre.
+- O piso de uma sessão nova são 48,7k tokens (24,2k do CLI, 8,4k do
+  `CLAUDE.md` do consultor, o resto de MCP e ambiente) — medido rodando o
+  workspace real com um prompt de uma palavra.
+
+Três correções, em ordem de impacto:
+
+1. **Rotação por tamanho, não por idade.** `StepResult.context_tokens` guarda
+   o maior contexto lido por UMA chamada (de `usage.iterations`, que é o único
+   número que não infla com a quantidade de ferramentas usadas), o
+   `session.json` persiste, e a sessão rotaciona ao cruzar
+   `CHAT_MAX_CONTEXT_TOKENS` (120k) ou os 40 turnos, o que vier primeiro. O
+   resumo estruturado de rotação, que já existia, é o que segura a
+   continuidade.
+2. **Anexo vira texto antes de entrar na conversa.** O prompt enfileirado
+   carrega um marcador `[[ANEXOS:...]]`; na hora de rodar, uma sessão
+   DESCARTÁVEL (sonnet/low, workspace auxiliar sem MCP) abre o arquivo e
+   devolve uma transcrição fiel — documento, cabeçalho, linhas `data |
+   descrição | valor`, totais. Só a transcrição segue para o consultor; o
+   original fica em `./inbox/` e ele só abre se algo estiver `[ilegível]`.
+   Falha na transcrição cai no comportamento antigo (ele lê o arquivo): perder
+   o cupom que o cliente acabou de fotografar é pior que pagar o contexto. O
+   marcador só expande caminhos DENTRO do inbox — o prompt vem do banco e a
+   mensagem do cliente é texto livre, então um marcador digitado à mão não
+   pode virar um leitor de arquivo da máquina. O custo da transcrição é somado
+   ao da mensagem, senão o track record de custo mentiria; e a transcrição
+   fica em cache no disco (`inbox/.transcripts/`), porque um turno que morreu
+   no limite volta com o MESMO prompt — repagar a foto na retomada seria
+   gastar token exatamente onde se queria economizar.
+3. **`CHAT_DEEP_EFFORT` de `high` para `medium`.** Os blocos de raciocínio de
+   todo turno passado ficam na sessão e são relidos a cada iteração (392k
+   caracteres deles na sessão medida). Esta é a única das três que troca
+   profundidade por custo, e é a única reversível por `.env` sem code change.
+
+**O comitê ficou fora — medido, não presumido.** A revisão semanal de 14/09
+rodou com pico de 95-101k tokens por chamada: contexto saudável, que o teto de
+120k do consultor nem tocaria. O custo dele é trabalho (19 iterações e 33k
+tokens de output na etapa 1), não bagagem. E cortar MCP do comitê é alavanca
+FALSA: o CLI defere as ferramentas (`ToolSearch` nos transcripts), então o
+baseline do workspace do comitê com 10 MCPs (42,7k tokens) é MENOR que o do
+chat com 6 (48,7k) — quem pesa é o `CLAUDE.md`, não os servidores. Tirar
+playwright e companhia economiza RAM e latência no Pi, não token. Para não
+voltar a discutir isso sem dado, `ContributionPrompt.context_tokens` passa a
+gravar o pico por etapa do aporte.
+
+A revisão semanal (US$ 3,90) ficou de pé de propósito: ela é o que habilita o
+modo delta do macro no aporte (template de 11k chars em vez de 38,6k).
+Desligá-la economiza no ciclo semanal e devolve o custo no próximo aporte.

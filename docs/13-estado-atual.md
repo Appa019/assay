@@ -114,7 +114,7 @@ workspaces efêmeros, chaves VAPID (é preciso reassinar o push em
 | Branch | `feat/consultor-upgrade` (sobre `feat/state-of-art-overhaul`; `main` é a principal) |
 | Versão backend | `0.4.0` (`app/main.py`, `pyproject.toml`) |
 | Versão frontend | `0.3.0` (`frontend/package.json`) — desalinhada, cosmético |
-| Testes | **325 passando** (191 → 193 auth/entitlement → 204 sizing de ordem → 221 roteador + inbox → 227 mandato do CDB → 231 trava por classe → 252 corte de custo → 325 cartão de crédito) |
+| Testes | **384 passando** (191 → 193 auth/entitlement → 204 sizing de ordem → 221 roteador + inbox → 227 mandato do CDB → 231 trava por classe → 252 corte de custo → 325 cartão de crédito → 384 fila do consultor + rotação por contexto) |
 | Tamanho | ~10.700 linhas de Python · ~8.400 de TS/CSS |
 
 ## O que aconteceu na madrugada de 2026-08-06 (upgrade do consultor)

@@ -63,7 +63,7 @@ Registrados via `setMyCommands` no boot (aparecem no menu do Telegram).
 
 | Tipo | Comportamento |
 |---|---|
-| Foto / documento (PDF, CSV, planilha) ≤20 MB | baixado via `getFile` para `storage/chat_workspace/inbox/` e enfileirado como turno do consultor. Cupom vira gasto registrado; extrato/fatura vira lançamentos |
+| Foto / documento (PDF, CSV, planilha) ≤20 MB | baixado via `getFile` para `storage/chat_workspace/inbox/` e enfileirado como turno do consultor. O arquivo é transcrito fora da sessão encadeada (D42); cupom vira gasto registrado, extrato/fatura vira lançamentos |
 | Acima de 20 MB | aviso (é o teto de download da Bot API) |
 | Áudio, voz, vídeo, sticker, animação, localização, contato | aviso de "não leio esse tipo" |
 | Mensagem de serviço (entrou no grupo etc.) | **silêncio** |

@@ -68,7 +68,7 @@ O agente roda autônomo: workspace persistente próprio
 que ele mesmo gerencia entre ciclos), carta branca (web + Bash + criar
 ferramentas via `--dangerously-skip-permissions`), effort sempre `max`, e
 respeita a trava de venda por CLASSE (`MIN_HOLDING_DAYS` 30 nas ações,
-`MIN_HOLDING_DAYS_CRYPTO` 15 na cripto). Ao concluir, avisa no **app** (inbox +
+`MIN_HOLDING_DAYS_CRYPTO` 7 na cripto). Ao concluir, avisa no **app** (inbox +
 push); quando um lote cruza a trava da sua classe, um cron roda a análise de
 maturidade. Aporte é ad-hoc.
 
@@ -220,13 +220,13 @@ sem Playwright.
 - **Consultor em tempo real (chat, 2026-07-28)**: qualquer texto SEM `/` no bot
   é uma conversa com o consultor (`app/services/chat_service.py`) — sessão
   Claude encadeada persistente (`storage/chat_workspace/session.json` sobrevive
-  a reinícios; rotaciona após `CHAT_MAX_TURNS` turnos), workspace PRÓPRIO
+  a reinícios; rotaciona por TAMANHO de contexto ou `CHAT_MAX_TURNS`), workspace PRÓPRIO
   (`storage/chat_workspace/`) com CLAUDE.md de ordens do consultor (reescrito a
   cada turno) + MEMORY.md (memória FIXA sobre o cliente, gerida pelo próprio
   agente) + MCPs em **perfil enxuto** (`profile="chat"`: dados financeiros +
   fetch + memory, ∪ `.mcp.agent.json` do chat, `--strict-mcp-config` — o
   baseline completo do comitê NÃO carrega no chat, é latência; D23). Modelo/effort próprios: `CHAT_MODEL` (opus) /
-  `CHAT_EFFORT` (high) / `CHAT_TURN_TIMEOUT` (900s). Ele registra gastos/ganhos
+  `CHAT_EFFORT` (medium desde D42) / `CHAT_TURN_TIMEOUT` (900s). Ele registra gastos/ganhos
   que o cliente contar via `POST /api/cashflow` (source=chat), consulta
   carteira/IR/ordens pela API local e responde tickers com dados ao vivo
   (yahoo-finance/coingecko). Lock de turno próprio (`_chat_turn.lock`) — NÃO usa
@@ -246,10 +246,21 @@ sem Playwright.
   /api/chat/reset` descartam a sessão (memória fica); o reset dá 409 se houver
   fila.
   Aceita **foto e arquivo** (≤20 MB): o bot, quando ligado, baixa via
-  `getFile` p/ `storage/chat_workspace/inbox/` e o consultor lê (visão p/
-  imagem; parsing p/ PDF/CSV/planilha) — cupom/nota vira gasto registrado,
-  extrato/fatura vira lançamentos. Áudio/vídeo/sticker → aviso de não
-  suportado; mensagens de serviço ficam em silêncio.
+  `getFile` p/ `storage/chat_workspace/inbox/` — cupom/nota vira gasto
+  registrado, extrato/fatura vira lançamentos. **Desde D42 o arquivo NÃO é
+  lido dentro da conversa**: `_expand_attachments` troca o marcador
+  `[[ANEXOS:...]]` por uma transcrição feita numa sessão DESCARTÁVEL
+  (`CHAT_VISION_MODEL`, workspace auxiliar sem MCP) e só o texto entra na
+  sessão encadeada — o base64 de uma foto ficava no histórico e era reenviado
+  em todo turno seguinte (8 fotos = 99% do payload medido). O marcador só
+  expande caminhos DENTRO do inbox. Falha na transcrição = o consultor lê o
+  arquivo, como antes. Áudio/vídeo/sticker → aviso de não suportado;
+  mensagens de serviço ficam em silêncio.
+  **Rotação por TAMANHO (D42)**: a sessão encadeada rotaciona ao cruzar
+  `CHAT_MAX_CONTEXT_TOKENS` (120k, medido em `StepResult.context_tokens`) ou
+  `CHAT_MAX_TURNS` (40) — o que vier primeiro. O teto de turnos sozinho nunca
+  pegava: no turno 14 a conversa já lia ~200k tokens POR chamada, e o turno
+  relê tudo a cada iteração.
 - **Push nativo do PWA (2026-08-06)**: Web Push padrão (VAPID auto-gerado em
   `storage/webpush/`, payload cifrado ponta a ponta). Aparelho se inscreve em
   `/configuracoes` (PWA pela Tela de Início, iOS 16.4+); dispara quando um
