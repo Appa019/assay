@@ -121,6 +121,10 @@ def classify(text: str) -> CashflowCreate:
             timeout=settings.classifier_timeout,
             cwd=_WORKSPACE,
             transcript_tag=None,
+            # No tools, no CLI persona: the prompt carries everything, and the
+            # default system prompt is ~15k tokens the user would wait on.
+            tools="",
+            system_prompt="Você responde só com o JSON pedido.",
         )
     except AnalysisError as exc:
         raise ClassificationError(f"Não consegui classificar: {exc}") from exc

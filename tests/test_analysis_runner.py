@@ -226,6 +226,35 @@ def test_agent_env_denylist(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "TELEGRAM_BOT_TOKEN" not in env
     assert "AWS_SECRET_ACCESS_KEY" not in env
     assert env["SOME_HARMLESS_VAR"] == "ok"
+    # A git-status snapshot in the system prompt broke the cache on --resume.
+    assert env["CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS"] == "1"
+
+
+def test_stream_output_keeps_every_top_level_text_block() -> None:
+    lines = [
+        {"type": "system", "subtype": "init"},
+        {
+            "type": "assistant",
+            "parent_tool_use_id": None,
+            "message": {"content": [{"type": "text", "text": "a resposta"}, {"type": "tool_use"}]},
+        },
+        {
+            "type": "assistant",
+            "parent_tool_use_id": "t1",
+            "message": {"content": [{"type": "text", "text": "subagente"}]},
+        },
+        {
+            "type": "assistant",
+            "parent_tool_use_id": None,
+            "message": {"content": [{"type": "text", "text": "fim"}]},
+        },
+        {"type": "result", "result": "fim", "session_id": "s"},
+    ]
+    stdout = "\n".join(json.dumps(x) for x in lines) + "\nlixo"
+    data, texts = ar._parse_cli_output(stdout, stream=True)
+    assert data["session_id"] == "s"
+    assert texts == ["a resposta", "fim"]
+    assert ar._parse_cli_output('{"result": "x"}', stream=False) == ({"result": "x"}, [])
 
 
 # --- pending orders context + final-block validator ----------------------------

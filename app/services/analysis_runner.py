@@ -518,6 +518,11 @@ def _agent_subprocess_env() -> dict[str, str]:
     for var, val in injected.items():
         if val:
             env[var] = val
+    # Drops the git-status snapshot from the system prompt. The committee
+    # workspace is a git repo the agent writes to mid-run, so every --resume
+    # saw a different snapshot, missed the prompt cache and re-wrote the whole
+    # conversation (101k tokens on step 2 of the 2026-10-11 weekly review).
+    env["CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS"] = "1"
     return env
 
 
@@ -769,6 +774,10 @@ class StepResult:
     # session pays for its whole context on EVERY iteration, so this — not the
     # turn count — is what says when a session got expensive.
     context_tokens: int = 0
+    # Every top-level text block of the step, in order (only with stream=True).
+    # ``result`` is just the LAST block: a reply written before a tool call
+    # and followed by a one-line sign-off would otherwise be lost.
+    texts: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -869,6 +878,8 @@ def _emit(on_event: EventCallback | None, name: str, **payload: Any) -> None:
         on_event(name, payload)
 
 
+_DEV_CLAUDE_MD = [str(_PROJECT_ROOT / "CLAUDE.md"), str(_PROJECT_ROOT / ".claude" / "**")]
+
 _TRANSCRIPT_DIR = _PROJECT_ROOT / "storage" / "analysis_runs" / "transcripts"
 
 
@@ -917,18 +928,24 @@ def _run_claude_step(
     timeout: int,
     cwd: Path,
     transcript_tag: str | None = None,
+    tools: str | None = None,
+    system_prompt: str | None = None,
+    stream: bool = False,
 ) -> StepResult:
     """Invoke `claude -p` once (stdin prompt) and return its result.
 
     A fresh step (``resume_session_id=None``) starts a new session and the
     returned ``session_id`` is captured so later steps can ``--resume`` it.
+    ``tools`` narrows the built-in tool set and ``system_prompt`` replaces the
+    CLI's default one — both shrink the per-call floor for narrow jobs.
+    ``stream`` also collects every text block into ``StepResult.texts``.
     Classifies failures into LimitError / RetryableError / AnalysisError.
     """
     cmd = [
         _claude_bin(),
         "-p",
         "--output-format",
-        "json",
+        *(["stream-json", "--verbose"] if stream else ["json"]),
         "--dangerously-skip-permissions",
         "--model",
         model,
@@ -944,6 +961,14 @@ def _run_claude_step(
         cmd += ["--mcp-config", str(mcp_path), "--strict-mcp-config"]
     if resume_session_id:
         cmd += ["--resume", resume_session_id]
+    # The workspaces live under the repo, and the CLI walks up loading every
+    # CLAUDE.md on the way: the developer contract (+ .claude/rules) rode along
+    # on every committee and consultant call — 15.6k tokens each, measured.
+    cmd += ["--settings", json.dumps({"claudeMdExcludes": _DEV_CLAUDE_MD})]
+    if tools is not None:
+        cmd += ["--tools", tools, "--disable-slash-commands"]
+    if system_prompt is not None:
+        cmd += ["--system-prompt", system_prompt]
 
     started = time.monotonic()
     proc = subprocess.Popen(
@@ -966,11 +991,7 @@ def _run_claude_step(
 
     duration = time.monotonic() - started
     _write_transcript(transcript_tag, stdout, stderr)
-    data: dict[str, Any] = {}
-    try:
-        data = json.loads(stdout) if stdout.strip() else {}
-    except json.JSONDecodeError:
-        data = {}
+    data, texts = _parse_cli_output(stdout, stream=stream)
 
     blob = f"{stderr}\n{data.get('result', '')}\n{data.get('subtype', '')}".lower()
 
@@ -1004,7 +1025,31 @@ def _run_claude_step(
         session_id=str(data.get("session_id") or ""),
         num_turns=data.get("num_turns"),
         context_tokens=_peak_context_tokens(data),
+        texts=texts,
     )
+
+
+def _parse_cli_output(stdout: str, *, stream: bool) -> tuple[dict[str, Any], list[str]]:
+    """The final result object, plus the top-level text blocks when streamed."""
+    if not stream:
+        try:
+            return (json.loads(stdout) if stdout.strip() else {}), []
+        except json.JSONDecodeError:
+            return {}, []
+    data: dict[str, Any] = {}
+    texts: list[str] = []
+    for line in stdout.splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("type") == "result":
+            data = event
+        elif event.get("type") == "assistant" and not event.get("parent_tool_use_id"):
+            for block in (event.get("message") or {}).get("content") or []:
+                if block.get("type") == "text" and str(block.get("text", "")).strip():
+                    texts.append(block["text"].strip())
+    return data, texts
 
 
 def _iteration_context(entry: dict[str, Any]) -> int:
