@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -544,3 +544,26 @@ def test_weekly_consult_block_carries_the_analysis_not_the_summary(session: Sess
     block = ar._latest_weekly_context(session)
     assert "memo completo com a curva DI" in block
     assert "resumo curto" not in block
+
+
+def test_weekly_is_due_seven_calendar_days_later_even_minutes_short(session: Session) -> None:
+    """The report is stamped when the run ends (~02:24) and the timer checks at
+    ~02:10: 7 x 24h was always 13 minutes short and the review slid to day 8."""
+    from app.models.report import Report, ReportKind
+    from app.services import review_service
+
+    session.add(
+        Report(
+            kind=ReportKind.WEEKLY,
+            title="Revisão semanal",
+            content="x",
+            cost_usd=0.0,
+            # 23:59 local, seven calendar days ago: due today whatever the hour.
+            created_at=(datetime.now().astimezone() - timedelta(days=7))
+            .replace(hour=23, minute=59)
+            .astimezone(UTC)
+            .replace(tzinfo=None),
+        )
+    )
+    session.commit()
+    assert review_service.days_until_weekly_due(session) == 0.0

@@ -57,12 +57,19 @@ def last_weekly_age_days(session: Session) -> int | None:
 
 
 def days_until_weekly_due(session: Session, *, interval_days: int = WEEKLY_INTERVAL_DAYS) -> float:
-    """Days until the weekly review is due; 0.0 when it is due (or overdue)."""
+    """Days until the weekly review is due; 0.0 when it is due (or overdue).
+
+    Counted in calendar days, not hours: the report is stamped when the run
+    ENDS (~02:24) and the timer checks at ~02:10, so "7 x 24h" was 13 minutes
+    short every week and the review slid to every 8th day — leaving the next
+    contribution one day outside the macro delta window.
+    """
     last = _last_weekly(session)
     if last is None:
         return 0.0
-    due_at = last.created_at.replace(tzinfo=UTC) + timedelta(days=interval_days)
-    return max(0.0, (due_at - datetime.now(UTC)).total_seconds() / 86400)
+    due_on = analysis_runner._local_date(last.created_at) + timedelta(days=interval_days)
+    today = analysis_runner._local_date(datetime.now(UTC))
+    return float(max(0, (due_on - today).days))
 
 
 async def fetch_macro() -> dict[str, Any]:
