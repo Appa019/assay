@@ -236,6 +236,34 @@ def _weekly_steps(
     return [("Revisão semanal — análise", analysis), ("Revisão semanal — relatório", synthesis)]
 
 
+# The review used to be two chained steps: analysis, then the client report.
+# The second one only reformatted, yet it was a NEW process resuming the
+# session, and the CLI rebuilds large tool results differently on resume: the
+# whole conversation after the first big search result was re-written to the
+# cache (149k tokens, US$ 1.61 of a US$ 4.08 review on 2026-10-19). One step
+# that ends with both documents keeps the cache and drops that cost.
+_REPORT_MARKER = "=== RELATÓRIO DO CLIENTE ==="
+
+
+def _single_step(steps: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Fold [analysis, report] prompts into one step that returns both."""
+    (title, analysis), (_, report) = steps
+    merged = (
+        f"{analysis}\n\n---\nENTREGA, numa resposta só (a sua ÚLTIMA mensagem): primeiro o "
+        f"memo completo da análise; depois uma linha exatamente `{_REPORT_MARKER}`; depois "
+        f"o texto para o cliente, assim:\n{report}"
+    )
+    return [(title, merged)]
+
+
+def _split_report(final: str) -> tuple[str, str]:
+    """(analysis memo, client report). Without the marker, both are the text."""
+    if _REPORT_MARKER not in (final or ""):
+        return final, final
+    memo, report = final.split(_REPORT_MARKER, 1)
+    return memo.strip(), report.strip()
+
+
 def _maturity_steps(
     matured: list[dict[str, Any]], macro_ctx: dict[str, Any], today: date
 ) -> list[tuple[str, str]]:
@@ -270,6 +298,12 @@ def _persist_report(
     macro_ctx: dict[str, Any],
     portfolio_rows: list[dict[str, Any]],
 ) -> Report:
+    # The single step returns memo + client report; keep the two-document
+    # shape (steps[0] = analysis) that the contribution's consult block reads.
+    memo, client = _split_report(summary.final_summary)
+    summary.final_summary = client
+    step_cost = summary.steps[0].cost_usd if summary.steps else 0.0
+    step_duration = summary.steps[0].duration_s if summary.steps else 0.0
     report = Report(
         kind=kind,
         title=title,
@@ -281,12 +315,17 @@ def _persist_report(
         portfolio_snapshot={"assets": portfolio_rows},
         steps=[
             {
-                "title": s.label,
-                "response": s.result,
-                "cost_usd": s.cost_usd,
-                "duration_s": s.duration_s,
-            }
-            for s in summary.steps
+                "title": f"{title} — análise",
+                "response": memo,
+                "cost_usd": step_cost,
+                "duration_s": step_duration,
+            },
+            {
+                "title": f"{title} — relatório",
+                "response": client,
+                "cost_usd": 0.0,
+                "duration_s": 0.0,
+            },
         ],
     )
     session.add(report)
@@ -322,7 +361,7 @@ def run_weekly_review(
     # position anyway, so it ABSORBS them instead of paying for a second
     # committee run. Marked only after the review succeeds (below).
     _, maturity_keys = notification_service.pending_maturities(session)
-    steps = _weekly_steps(rows, macro_ctx, today)
+    steps = _single_step(_weekly_steps(rows, macro_ctx, today))
     summary = analysis_runner.run_chain(
         steps, run_id=str(uuid4()), model=model, effort=effort, on_event=on_event
     )
@@ -359,7 +398,7 @@ def run_maturity_review(
     if not matured_rows:
         return None
     today = date.today()
-    steps = _maturity_steps(matured_rows, macro_ctx, today)
+    steps = _single_step(_maturity_steps(matured_rows, macro_ctx, today))
     summary = analysis_runner.run_chain(
         steps, run_id=str(uuid4()), model=model, effort=effort, on_event=on_event
     )
