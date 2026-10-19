@@ -805,3 +805,59 @@ gravar o pico por etapa do aporte.
 A revisão semanal (US$ 3,90) ficou de pé de propósito: ela é o que habilita o
 modo delta do macro no aporte (template de 11k chars em vez de 38,6k).
 Desligá-la economiza no ciclo semanal e devolve o custo no próximo aporte.
+
+### D43 · O que se paga sem ver: prompt de sistema, cache quebrado e resposta perdida
+
+**Medição** (Pi, 18/09 a 19/10, após o D42): consultor US$ 10,93 em 26
+mensagens (US$ 0,42 cada, contra 1,12 antes do D42), revisões semanais
+US$ 3,6 a 3,9 cada, nenhum aporte no período. Cinco vazamentos, todos fora do
+que o modelo diz:
+
+1. **Cache do comitê quebrava em todo `--resume`.** O `agent_workspace` é repo
+   git e o CLI põe um snapshot do `git status` no system prompt. O agente
+   escreve MEMORY.md e `out/` durante a etapa, então a etapa seguinte via outro
+   prompt e reescrevia a conversa INTEIRA a preço de escrita de cache: 101k
+   tokens na 1ª chamada da etapa 2 da semanal de 11/10 (~US$ 1 de 3,86). No
+   aporte, com 6 etapas e contexto crescente, isso se repetia em cada etapa.
+   Reproduzido no Pi com haiku (resume em repo sujo: cw 6.638; sem git: 65) e
+   corrigido com `CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS=1` em
+   `_agent_subprocess_env` (resume voltou a cw 57).
+2. **O CLAUDE.md de desenvolvimento ia em toda chamada.** Os workspaces moram
+   dentro do repo e o CLI sobe a árvore carregando todo CLAUDE.md que acha: o
+   contrato do projeto (41 KB) + `.claude/rules` = 15,6k tokens em cada
+   iteração do consultor, da visão e do comitê. E ainda dava ao comitê o
+   "perfil do investidor" que ele não deve ver. `--settings
+   {"claudeMdExcludes": [...]}` em `_run_claude_step` corta os dois.
+3. **A visão pagava um agente inteiro para ler uma foto.** Piso de 54,9k
+   tokens antes de abrir o arquivo (persona do CLI + todas as ferramentas +
+   CLAUDE.md do repo). Com `--tools Read` e `--system-prompt` curto, a mesma
+   foto (IMG_3214) custou US$ 0,055 contra US$ 0,370, com os mesmos números
+   na transcrição. Resumo de rotação e classificador ganharam o mesmo
+   tratamento (`--tools ""`).
+4. **O consultor carrega só as ferramentas que usa.** Nas sessões medidas ele
+   usou Bash, Edit, Read, ToolSearch e WebSearch. `_CHAT_TOOLS` mantém essas +
+   Write/Glob/Grep/WebFetch; ToolSearch fica porque os MCPs são deferidos atrás
+   dele (testado: o coingecko continua acessível). O piso do workspace com MCP
+   ficou em 20k tokens (haiku).
+5. **Resposta perdida em 4 de 27 turnos.** O consultor escrevia a resposta,
+   editava MEMORY.md e fechava com uma linha. O `result` do CLI é só o ÚLTIMO
+   bloco de texto, então o cliente recebia a linha ("I'm here when you want to
+   set that reserve number.") e perguntava de novo, pagando o turno duas
+   vezes. O chat passa a rodar com `stream-json`, `StepResult.texts` guarda
+   todos os blocos de nível superior e `_reply_text` devolve o bloco longo +
+   o fechamento quando o último é menos da metade dele. As ordens também
+   mandam gravar ANTES de responder. Só o chat usa stream: no comitê o stdout
+   viraria dezenas de MB de resultado de ferramenta por etapa, e lá não houve
+   nenhum caso.
+
+E um ajuste de política: **rotação por pausa**. Passado o TTL de 1h do cache,
+o primeiro turno reescreve a sessão inteira (19/10: US$ 0,75 por 361 tokens de
+resposta, contexto de 74k). Se a sessão está fria E acima da metade do teto de
+tamanho, rotacionar com resumo + cauda sai mais barato. Abaixo disso, retomar
+custa pouco e preserva o fio, então não rotaciona.
+
+Ficou de fora de propósito: o tier `fast` do roteador manda haiku para uma
+sessão aquecida em opus, e haiku não tem esse cache, então ele escreve o
+contexto inteiro (09/14: 89k de escrita). Fica mais caro que o opus lendo do
+cache, mas aconteceu 0 vezes desde o D42. Effort `max` do comitê também não
+mexe: o custo da etapa 1 é output de trabalho (33-48k tokens), não bagagem.

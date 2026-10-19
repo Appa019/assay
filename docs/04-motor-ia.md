@@ -17,6 +17,13 @@ claude -p --output-format json --dangerously-skip-permissions \
 # prompt entra por stdin
 ```
 
+Desde o D43 toda chamada leva também `--settings '{"claudeMdExcludes": [...]}'`
+(o CLAUDE.md de desenvolvimento não sobe para os workspaces) e o env
+`CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS=1` (sem snapshot de git no system prompt,
+senão o `--resume` perde o cache). Jobs estreitos passam `--tools` e
+`--system-prompt` próprios; o chat usa `stream-json` para recuperar todos os
+blocos de texto do turno.
+
 A saída é um JSON com `result`, `session_id`, `total_cost_usd`, `num_turns`,
 `is_error`. A **primeira** etapa roda fresh e o `session_id` é capturado; as
 seguintes usam `--resume <id>` — é assim que as 5 reuniões herdam contexto uma

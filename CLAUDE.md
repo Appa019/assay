@@ -260,7 +260,14 @@ sem Playwright.
   `CHAT_MAX_CONTEXT_TOKENS` (120k, medido em `StepResult.context_tokens`) ou
   `CHAT_MAX_TURNS` (40) — o que vier primeiro. O teto de turnos sozinho nunca
   pegava: no turno 14 a conversa já lia ~200k tokens POR chamada, e o turno
-  relê tudo a cada iteração.
+  relê tudo a cada iteração. Desde D43 também rotaciona por PAUSA (> 1h, o TTL
+  do cache, com contexto ≥ metade do teto).
+- **Higiene de contexto (D43)**: `_run_claude_step` exclui o CLAUDE.md de dev
+  (`claudeMdExcludes`) e o env desliga o snapshot de git (quebrava o cache em
+  todo `--resume` do comitê). Visão/resumo/classificador rodam com `--tools`
+  mínimo + `--system-prompt` curto; o chat com `_CHAT_TOOLS` e `stream-json`
+  (`_reply_text` recupera a resposta escrita antes de uma edição de memória).
+  Não volte o chat para `result` puro: 4 de 27 turnos perdiam a resposta.
 - **Push nativo do PWA (2026-08-06)**: Web Push padrão (VAPID auto-gerado em
   `storage/webpush/`, payload cifrado ponta a ponta). Aparelho se inscreve em
   `/configuracoes` (PWA pela Tela de Início, iOS 16.4+); dispara quando um

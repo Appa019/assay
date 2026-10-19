@@ -4,6 +4,15 @@
 > atualize-o quando mudar algo estrutural. Os outros 12 descrevem como o
 > sistema funciona; este descreve como ele está **agora**.
 
+## 2026-10-19 — vazamentos de token fora do modelo (D43)
+
+Cache do comitê quebrava em todo `--resume` (snapshot de git), CLAUDE.md de dev
+ia em toda chamada (15,6k tokens), visão pagava piso de 55k por foto, e o chat
+perdia a resposta quando editava a memória depois de escrevê-la. Corrigidos
+em `analysis_runner._run_claude_step` + `chat_service`. Rotação do chat
+também por pausa > 1h. Falta medir o primeiro aporte depois disso
+(`ContributionPrompt.context_tokens`).
+
 ## 2026-09-14 — fila do consultor e banco zerado
 
 Quatro colunas novas em `chat_message` (`prompt`, `attempts`, `run_after`,
