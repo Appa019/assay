@@ -14,7 +14,8 @@
   --bg-elevated: #ffffff;
   --text-primary: oklch(0.21 0.015 255);
   --text-secondary: oklch(0.46 0.013 255);
-  --text-muted: oklch(0.62 0.011 255);
+  /* 0.53 clears 4.5:1 on every surface (0.62 measured 3.2-3.6:1). */
+  --text-muted: oklch(0.53 0.011 255);
   --accent: oklch(0.2982 0.1779 268.6); /* #111184 */
   --accent-light: oklch(0.94 0.035 268.6);
   --accent-strong: oklch(0.24 0.16 268.6);
@@ -161,9 +162,9 @@ button:disabled {
 .md-doc blockquote {
   margin: 1rem 0;
   padding: 0.4rem 1.1rem;
-  border-left: 3px solid var(--accent);
+  border: 1px solid var(--border);
   background: var(--bg-secondary);
-  border-radius: 0 4px 4px 0;
+  border-radius: 4px;
   color: var(--text-secondary);
 }
 
