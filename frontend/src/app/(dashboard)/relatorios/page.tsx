@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import {
   deleteContribution,
+  fetchCadence,
   fetchContribution,
   fetchReport,
   listContributions,
@@ -22,18 +23,37 @@ import {
   type Contribution,
   type ContributionListItem,
   type Prompt,
+  type ReportAction,
   type ReportListItem,
   type ReportRead,
 } from "@/lib/api";
 import { MarkdownViewer } from "@/components/markdown-viewer";
 import { DownloadButton } from "@/components/download-button";
 import {
+  cleanReport,
+  daysSince,
   formatBRL,
   formatDate,
   formatDateLong,
-  formatDateTime,
+  formatScheduledFor,
+  parseLocalDate,
   stripMachineBlocks,
 } from "@/lib/format";
+
+/** "Revisão semanal · 2026-10-11" → "Revisão semanal · 11/10/2026"; drops a
+ *  leading markdown "#" some report titles were stored with. */
+const reportTitle = (title: string): string =>
+  title
+    .replace(/^#+\s*/, "")
+    .replace(/\s+[—–-]\s+/g, " · ")
+    .replace(/(\d{4})-(\d{2})-(\d{2})/g, "$3/$2/$1");
+
+const reportWhen = (iso: string): string =>
+  parseLocalDate(iso).toLocaleDateString("pt-BR", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+  });
 
 /**
  * Committee reports + past contributions. Exported by name so /investimentos
@@ -49,6 +69,16 @@ export const RelatoriosView = () => {
   // wrong item, and revisiting an item is instant.
   const [details, setDetails] = useState<Record<string, Contribution>>({});
   const [error, setError] = useState<string | null>(null);
+  // Delete is two taps on the same button: the first arms it, the second
+  // deletes. Replaces window.confirm, which iOS renders as a system alert.
+  const [armedDelete, setArmedDelete] = useState<string | null>(null);
+  const [nextWeekly, setNextWeekly] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!armedDelete) return;
+    const timer = setTimeout(() => setArmedDelete(null), 4000);
+    return () => clearTimeout(timer);
+  }, [armedDelete]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -68,6 +98,19 @@ export const RelatoriosView = () => {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    // Best-effort: the schedule line is a hint, not a reason to fail the page.
+    const loadCadence = async () => {
+      try {
+        const cadence = await fetchCadence();
+        setNextWeekly(cadence.next_weekly_review ?? null);
+      } catch {
+        setNextWeekly(null);
+      }
+    };
+    void loadCadence();
+  }, []);
+
   const handleExpand = async (id: string) => {
     if (expandedId === id) {
       setExpandedId(null);
@@ -86,7 +129,11 @@ export const RelatoriosView = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Apagar este aporte e todas as respostas?")) return;
+    if (armedDelete !== id) {
+      setArmedDelete(id);
+      return;
+    }
+    setArmedDelete(null);
     try {
       await deleteContribution(id);
       if (expandedId === id) setExpandedId(null);
@@ -108,12 +155,12 @@ export const RelatoriosView = () => {
           className="text-4xl md:text-5xl tracking-tight leading-[1.05]"
           style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
         >
-          Histórico
+          Análises
         </h2>
         <p className="text-sm mt-3" style={{ color: "var(--text-secondary)" }}>
-          Todos os aportes analisados e os relatórios do comitê. Clique para
-          revisitar as reuniões e as folhas de ordens.
+          O que o comitê disse e mandou fazer: revisões semanais e aportes.
         </p>
+        {nextWeekly && <NextWeekly due={nextWeekly} />}
       </header>
 
       {error && (
@@ -155,7 +202,7 @@ export const RelatoriosView = () => {
             Nenhum aporte registrado
           </p>
           <Link
-            href="/aporte"
+            href="/investimentos?aba=aportar"
             className="inline-flex items-center gap-2 mt-5 px-5 py-2.5 min-h-11 md:min-h-0 rounded-md text-sm font-semibold"
             style={{ background: "var(--accent)", color: "white" }}
           >
@@ -211,7 +258,9 @@ export const RelatoriosView = () => {
                         ? "Concluído"
                         : item.status === "in_progress"
                           ? `Em curso ${item.prompts_answered}/${item.prompts_total}`
-                          : "Aberto"}
+                          : item.scheduled_for
+                            ? `Agendado · ${formatScheduledFor(item.scheduled_for)}`
+                            : "Aberto"}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -230,11 +279,17 @@ export const RelatoriosView = () => {
                         e.stopPropagation();
                         void handleDelete(item.id);
                       }}
-                      className="p-2 rounded-md transition-colors flex md:block items-center justify-center min-h-11 min-w-11 md:min-h-0 md:min-w-0"
-                      style={{ color: "var(--text-muted)" }}
+                      className="p-2 rounded-md transition-colors flex items-center justify-center gap-1 text-xs font-medium min-h-11 min-w-11 md:min-h-0 md:min-w-0"
+                      style={
+                        armedDelete === item.id
+                          ? { color: "var(--danger)", background: "var(--danger-light)" }
+                          : { color: "var(--text-muted)" }
+                      }
                       title="Apagar aporte"
+                      aria-label={armedDelete === item.id ? "Toque de novo para apagar" : "Apagar aporte"}
                     >
                       <Trash2 size={14} />
+                      {armedDelete === item.id && "Apagar?"}
                     </button>
                     {expanded ? (
                       <ChevronUp
@@ -348,11 +403,12 @@ const AgentReports = ({ reports }: { reports: ReportListItem[] }) => {
                   )}
                   <div className="min-w-0">
                     <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                      {r.title}
+                      {reportTitle(r.title)}
                     </p>
-                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                      {formatDateTime(r.created_at)} · {kindLabel} · US${" "}
-                      {r.cost_usd.toFixed(2)}
+                    <p className="text-xs tabular" style={{ color: "var(--text-muted)" }}>
+                      {reportWhen(r.created_at)} · {kindLabel}
+                      {r.cost_usd > 0 &&
+                        ` · US$ ${r.cost_usd.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     </p>
                   </div>
                 </div>
@@ -377,10 +433,14 @@ const AgentReports = ({ reports }: { reports: ReportListItem[] }) => {
                 >
                   {full ? (
                     <>
-                      <div className="mb-3 flex justify-end">
-                        <DownloadButton content={full.content} title={full.title} />
+                      {full.actions && <ReportActions actions={full.actions} />}
+                      <MarkdownViewer content={cleanReport(full.content)} maxHeight={560} />
+                      <div className="mt-4 flex justify-end">
+                        <DownloadButton
+                          content={cleanReport(full.content)}
+                          title={reportTitle(full.title)}
+                        />
                       </div>
-                      <MarkdownViewer content={full.content} maxHeight={560} />
                     </>
                   ) : loadError ? (
                     <p className="text-xs" style={{ color: "var(--danger)" }}>
@@ -402,6 +462,83 @@ const AgentReports = ({ reports }: { reports: ReportListItem[] }) => {
   );
 };
 
+const NextWeekly = ({ due }: { due: string }) => {
+  const late = daysSince(due);
+  const text =
+    late > 0
+      ? `Revisão semanal atrasada desde ${formatDate(due)}: o timer tenta de novo de madrugada.`
+      : late === 0
+        ? "Próxima revisão semanal: hoje de madrugada."
+        : `Próxima revisão semanal: ${reportWhen(due)}.`;
+  return (
+    <p
+      className="text-xs mt-2 tabular"
+      style={{ color: late > 0 ? "var(--warning)" : "var(--text-muted)" }}
+    >
+      {text}
+    </p>
+  );
+};
+
+const ACTION_LABEL: Record<ReportAction["tipo"], string> = {
+  comprar: "Comprar",
+  vender: "Vender",
+  manter: "Manter",
+};
+
+/** The report's machine block, read first: what the client has to DO. */
+const ReportActions = ({ actions }: { actions: ReportAction[] }) => (
+  <section
+    className="mb-5 rounded-md p-3 md:p-4"
+    style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
+  >
+    <p
+      className="text-[11px] uppercase tracking-[0.16em] font-medium mb-2"
+      style={{ color: "var(--text-muted)" }}
+    >
+      O que fazer
+    </p>
+    {actions.length === 0 ? (
+      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+        Nada a executar: manter a carteira como está.
+      </p>
+    ) : (
+      <ul className="space-y-2">
+        {actions.map((a, i) => (
+          <li key={`${a.ticker}-${i}`} className="text-sm leading-relaxed">
+            <span
+              className="font-semibold"
+              style={{
+                color:
+                  a.tipo === "comprar"
+                    ? "var(--success)"
+                    : a.tipo === "vender"
+                      ? "var(--danger)"
+                      : "var(--text-secondary)",
+              }}
+            >
+              {ACTION_LABEL[a.tipo] ?? a.tipo}
+            </span>{" "}
+            <strong style={{ color: "var(--text-primary)" }}>{a.ticker}</strong>
+            {a.valor_brl ? <span className="tabular"> · {formatBRL(a.valor_brl)}</span> : null}
+            {a.stop ? (
+              <span className="tabular" style={{ color: "var(--text-muted)" }}>
+                {" "}
+                · stop {a.stop.toLocaleString("pt-BR")}
+              </span>
+            ) : null}
+            {a.motivo && (
+              <span className="block text-xs" style={{ color: "var(--text-secondary)" }}>
+                {a.motivo}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    )}
+  </section>
+);
+
 const DetailView = ({ contribution }: { contribution: Contribution }) => {
   const [activeKey, setActiveKey] = useState<Prompt["prompt_key"]>(
     contribution.prompts[0]?.prompt_key ?? "macro"
@@ -419,10 +556,10 @@ const DetailView = ({ contribution }: { contribution: Contribution }) => {
           style={{ background: "var(--bg-secondary)" }}
         >
           <p
-            className="text-[10px] uppercase tracking-[0.16em] font-medium mb-2"
+            className="text-[11px] uppercase tracking-[0.16em] font-medium mb-2"
             style={{ color: "var(--text-muted)" }}
           >
-            Snapshot macro injetado
+            Mercado na criação do aporte
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 tabular">
             <p>
@@ -512,14 +649,14 @@ const DetailView = ({ contribution }: { contribution: Contribution }) => {
       {contribution.final_summary && (
         <div
           className="p-4 md:p-5 rounded-md min-w-0"
-          style={{ background: "var(--accent-light)", border: "1px solid var(--accent)" }}
+          style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
         >
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <p
               className="text-[11px] uppercase tracking-[0.16em] font-medium"
-              style={{ color: "var(--accent-strong)" }}
+              style={{ color: "var(--text-muted)" }}
             >
-              Resumo executivo
+              Fechamento do comitê
             </p>
             <DownloadButton
               content={stripMachineBlocks(contribution.final_summary)}

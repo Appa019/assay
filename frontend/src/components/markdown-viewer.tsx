@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSlug from "rehype-slug";
@@ -97,7 +97,7 @@ export const MarkdownViewer = ({
 }: {
   content: string;
   withToc?: boolean;
-  /** Cap the document area with its own scrollbar (long docs inside cards). */
+  /** Cap the document area with its own scrollbar on md+ (long docs inside cards). */
   maxHeight?: number;
 }) => {
   const toc = useMemo(() => extractToc(content), [content]);
@@ -136,10 +136,12 @@ export const MarkdownViewer = ({
   const article = (
     <div
       ref={articleRef}
-      className="md-doc min-w-0 flex-1"
+      // The cap applies from md up (globals.css): on a phone a scroll box
+      // inside the scrolling page is a trap for the thumb.
+      className={`md-doc min-w-0 flex-1${maxHeight !== undefined ? " md-capped" : ""}`}
       style={
         maxHeight !== undefined
-          ? { maxHeight, overflowY: "auto", paddingRight: 12 }
+          ? ({ "--md-max-h": `${maxHeight}px` } as CSSProperties)
           : undefined
       }
     >
