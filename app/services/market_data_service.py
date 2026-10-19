@@ -402,8 +402,25 @@ async def _build_full_context_uncached() -> dict[str, Any]:
             return fallback
         return value
 
+    macro_data = _safe(macro, {}, "macro")
+    # A BCB outage returns nulls, not an exception: without this line the app
+    # showed four dashes under "qualquer dado faltante será sinalizado" and
+    # the prompts carried no warning at all (2026-10-18, BCB API down).
+    missing = [
+        label
+        for key, label in (
+            ("selic", "Selic"),
+            ("ipca_12m", "IPCA 12m"),
+            ("cdi", "CDI"),
+            ("usd_brl", "USD/BRL"),
+        )
+        if isinstance(macro_data, dict) and macro_data.get(key) is None
+    ]
+    if missing:
+        warnings.append(f"BCB sem resposta: {', '.join(missing)} sem dado (pesquisar ao vivo)")
+
     context = {
-        "macro": _safe(macro, {}, "macro"),
+        "macro": macro_data,
         "ibovespa": _safe(ibov, {}, "ibovespa"),
         "crypto_global": _safe(btc_dom, {}, "crypto_global"),
         "fear_greed_index": _safe(fear_greed, None, "fear_greed"),
