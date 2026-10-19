@@ -156,3 +156,25 @@ def test_delta_prompt_keeps_the_contract_the_next_meetings_read() -> None:
 
 def test_delta_prompt_is_far_smaller_than_the_full_macro() -> None:
     assert len(_macro_prompt(_delta_context(2))) < len(_macro_prompt(_delta_context(None))) / 2
+
+
+def test_committee_rules_that_keep_the_numbers_honest() -> None:
+    """Quality fixes from D44: each one replaced a computation that produced a
+    number without information (or blocked the wrong stocks)."""
+    macro, selection, equity, crypto, decision = (
+        p["content"] for p in pg.render_all_prompts(_sample_context(date(2026, 7, 27)))
+    )
+    # Risk parity with a zero-vol CDB inside is 100% CDB by construction.
+    assert "SLEEVE DE RISCO" in macro
+    assert "TED spread" not in macro  # discontinued with LIBOR
+    # Banks fail EBITDA/Altman filters for the wrong reason.
+    assert "Financeiras" in selection and "FINANCEIRAS" in equity
+    # Held names with an intact thesis get an incremental DD, not a new memo.
+    assert "reforco" in selection and "DD INCREMENTAL" in equity and "DD INCREMENTAL" in crypto
+    assert "2% do patrimônio" in selection
+    # Long-only retail sheet: no options, pair trades or institutional algos.
+    for gone in ("Greeks", "pair_trades", "VWAP", "iv_rv_options_analysis"):
+        assert gone not in decision, gone
+    assert "pair_trade" not in equity
+    # A stop inside the sell lock cannot be executed.
+    assert "não de venda" in decision and "não de venda" in equity

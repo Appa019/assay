@@ -861,3 +861,55 @@ sessão aquecida em opus, e haiku não tem esse cache, então ele escreve o
 contexto inteiro (09/14: 89k de escrita). Fica mais caro que o opus lendo do
 cache, mas aconteceu 0 vezes desde o D42. Effort `max` do comitê também não
 mexe: o custo da etapa 1 é output de trabalho (33-48k tokens), não bagagem.
+
+### D44 · Revisão do comitê: número sem informação é pior que nenhum
+
+Revisão dos 6 templates (116k chars) e das ordens permanentes antes do deploy
+do D43. O critério foi qualidade primeiro: o que sai é o que produzia número
+sem informação, pedia o mesmo dado duas vezes ou não cabia num comprador de
+varejo long-only com trava de venda. Template por template:
+
+- **Reunião 1 (completa).** A tabela de premissas trazia Sharpe incompatível com
+  a própria E[r]/vol (BTC: CDI+15% com vol 70% dá 0,21, não 0,4); a coluna saiu
+  e o Sharpe passa a ser calculado. Risk-parity, HRP e min-variance rodavam com
+  o CDB (vol ≈ 0) dentro, o que dá ~100% CDB por construção: agora otimizam o
+  SLEEVE DE RISCO (ações × cripto) e o CDB sai do orçamento de drawdown. Saíram
+  a tabela de fundos com Sharpe sem fonte, o TED spread (morreu com a LIBOR), o
+  GS FCI (proprietário, trocado pelo NFCI), z-scores inventados para 14 setores,
+  ESG/special sit (julgados por nome nas reuniões 2-3), o checklist de vieses
+  (é da reunião 5) e o "perfil do cliente — confirmar" (não há a quem perguntar).
+- **Reunião 1 (delta).** O "macro já pesquisado, colado acima" era o resumo do
+  celular, de ~2k chars. `_latest_weekly_context` agora injeta o memo de
+  análise da semanal (7,5-9,5k), que é o que o delta precisa.
+- **Reunião 2.** Bancos eram barrados por EBITDA/ROIC/Altman, métricas que não
+  se aplicam a eles. Financeiras ganharam filtro próprio. A validação em 3 fontes
+  da long list inteira (15-20 nomes) passou a valer só para os selecionados, com
+  2 fontes. Duas regras de construção de carteira: posição existente com tese
+  intacta entra como `reforco` (DD incremental, não memo do zero), e nome NOVO
+  precisa de ≥ 2% do patrimônio pós-aporte (valor calculado no render). Uma
+  posição de 0,5% da carteira não move nada e não paga a DD que recebe.
+- **Reuniões 3 e 4.** Financeiras: P/VP justificado + Basileia/inadimplência,
+  com campos inaplicáveis em `null`. A técnica virou técnica de ENTRADA
+  (EMA 50/200, RSI, volume, S&R); Wyckoff, Elliott, Ichimoku, Volume Profile,
+  VWAP, Fib, Bollinger e ADX saíram. Pair trades (o cliente não vende a
+  descoberto) e Dechow também. Na cripto, as métricas de ciclo de BTC/ETH são
+  reaproveitadas da reunião 1, e a stablecoin ganha um memo de peg/yield e fica
+  fora da assimetria (stablecoin com bull/base/bear distorcia a média).
+- **Reunião 5.** O texto dizia "opções e pair trades não geram ordem, deixe
+  vazio" enquanto o schema pedia strikes e gregas. Saíram os dois, junto com
+  VWAP/TWAP/POV/slippage (ordem de varejo, e o `order_sizing` recalcula a
+  quantidade), EVT/CDaR/IR/TE/Sharpe 36-60m, PEP/suitability e sentimento macro
+  re-pesquisado. A sanidade do Bradesco (feita até 4 vezes por aporte) e a regra
+  de dividendos (2 vezes) passam a ser verificadas uma vez e reusadas.
+- **Trava × stop (todas).** Com 30 dias sem poder vender, o stop de um lote
+  novo não executa. Agora ele é gatilho de revisão, e a reunião 5 calcula a
+  perda do bear 31d DENTRO da trava por nome.
+- **Ordens permanentes.** "Convoque SEMPRE o time inteiro" virou debate real:
+  fala quem traz evidência ou objeção, toda decisão tem contra-tese numérica.
+  Entrou um bloco de disciplina de dados: não pesquisar o que não muda a
+  decisão, não estimar para fechar campo, reusar fatos lentos do MEMORY.md.
+
+O que ficou de propósito: as 5 etapas encadeadas, o effort `max`, as 12
+personas da reunião 1, DCF/Reverse DCF/CCA, os 8 cenários de stress e o
+pre-mortem. Ainda não há aporte medido depois disso; o primeiro grava
+`context_tokens` por etapa e responde quanto custou.

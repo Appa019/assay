@@ -570,19 +570,23 @@ decisão tactical (BL+RP+HRP) → pre-mortem. Saída: `final_tactical_brl`
 
 ### Reunião nº 2 — Universo, Filtros e Seleção (+ CDB final)
 12 personas + 2 vetos. Universo → long lists → filtros (quant + forense preview)
-→ **SELEÇÃO** (4-5 ações + 3-4 cryptos, com sizing-alvo — poucos nomes de
-propósito: a DD escreve um memo completo por nome, D37) → **CDB final**
-(instrumento fixo: Bradesco 100% CDI liquidez diária; só valor + sanidade de
-crédito). Saída: `selecao_acoes_b3`, `selecao_crypto`, `shortlist_cdb`
+→ **SELEÇÃO** (até 5 ações + até 4 cryptos, com sizing-alvo; nome NOVO só com
+≥ 2% do patrimônio pós-aporte, posição existente com tese intacta entra como
+`reforco` e ganha DD incremental — D37/D44) → **CDB final** (instrumento fixo:
+Bradesco 100% CDI liquidez diária; só valor + sanidade de crédito, a ÚNICA
+checagem do emissor no aporte). Financeiras têm filtro próprio (sem EBITDA/
+Altman). Saída: `selecao_acoes_b3`, `selecao_crypto`, `shortlist_cdb`
 (1 item, valor_brl + credit do emissor), `sanidade_selecao`. NÃO escreve o memo final.
 
 ### Reunião nº 3 — Due Diligence de Ações B3
 Equity desk. Memo COMPLETO por ação de `selecao_acoes_b3`: thesis + valuation
 triangulada em **3 métodos** (múltiplos + Reverse DCF + DCF 3-stage + CCA +
 consenso com ≥3 fontes; Precedent/LBO/SOTP foram CORTADOS em D37 — não
-reintroduza) + forense (Piotroski/Altman/Beneish/Sloan/Dechow) + Capital Allocation + técnica + factor + bull/base/
-bear. Saída: `shortlist_acoes_b3` (objeto completo por nome) + pair_trades. Pode
-usar subagentes (Task) por ticker (memo em ./dd/), best-effort.
+reintroduza) + forense (Piotroski/Altman/Beneish/Sloan; financeiras usam P/VP
+justificado + Basileia/inadimplência) + Capital Allocation + técnica de ENTRADA
+(EMA/RSI/volume/S&R — Wyckoff/Elliott/Ichimoku cortados em D44) + factor +
+bull/base/bear. Saída: `shortlist_acoes_b3`. Sem pair trades (D44). Pode usar
+subagentes (Task) por ticker (memo em ./dd/), best-effort.
 
 ### Reunião nº 4 — Due Diligence de Crypto
 Crypto desk. Memo COMPLETO por cripto de `selecao_crypto`: tese + tokenomics/
@@ -591,12 +595,13 @@ unlocks + on-chain (MVRV-Z/NUPL/SOPR/…) + derivativos (Coinglass) + dev activi
 (best-effort).
 
 ### Reunião nº 5 — Investment Committee Final
-14 personas. 14 rounds: risk overlay (VaR/CVaR/EVT/CDaR/Component VaR) → stress 8
-cenários (incl. **evento de crédito bancário**) → sentiment + IV/RV → confirma
-CDB (vindo da R2) → tax → pair trades + options (informativos, não geram ordem)
-→ compliance → behavioral →
-cross-check CIO → execution → folha de ordens → monitoramento → resumo. Bolso ∈
-{cdb, acoes_b3, crypto}.
+12 personas. 12 rounds: risk overlay (vol/DD/beta/VaR-CVaR 95/Component VaR +
+perda do bear DENTRO da trava) → stress 8 cenários (incl. **evento de crédito
+bancário**) → sentiment por ativo → confirma CDB (vindo da R2) → tax →
+compliance de mandato → behavioral → cross-check CIO → execução (ordem
+limitada) → folha de ordens → monitoramento → resumo. Bolso ∈ {cdb, acoes_b3,
+crypto}. Opções, pair trades, VWAP/TWAP e EVT/CDaR saíram em D44: a folha é
+long-only de varejo e a quantidade é recalculada pelo `order_sizing`.
 
 **Folha de ordens SEM coluna plataforma** — cliente decide onde executar.
 

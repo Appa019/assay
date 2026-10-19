@@ -7,8 +7,9 @@ MANDATO: RF = CDB BRADESCO 100% CDI LIQ. DIÁRIA · AÇÕES = SÓ B3 · CRYPTO (
 # POR QUE ESTA REUNIÃO É CURTA
 
 Você — este mesmo comitê — fechou uma revisão semanal
-**há {{ weekly_review_age_days }} dia(s)**, e ela está colada logo acima, no
-bloco de CONSULTA. O macro estrutural
+**há {{ weekly_review_age_days }} dia(s)**, e o memo de análise dela está colado
+logo acima, no bloco de CONSULTA (os números e notas completos da semana estão
+em `./out/weekly/` e `./notes/`). O macro estrutural
 (cenários Brasil, Fed, China, commodities, regime de cripto, riscos de cauda) já
 foi pesquisado e debatido lá.
 
@@ -91,7 +92,8 @@ alvo custa menos (e menos IR) do que vender onde está acima.
 # RODADAS (4, não 11)
 
 ## R0 — Delta desde a revisão semanal
-Liste **o que mudou** e, para cada item, se muda ou não a alocação:
+Abra com as **3 questões top of mind** deste aporte (hipótese + conviction
+0-10). Depois liste **o que mudou** e, para cada item, se muda ou não a alocação:
 - Juros/inflação BR (Selic, DI 12m, IPCA, Focus), câmbio;
 - Ibov: nível, earnings da janela, o que reprecificou;
 - Global que chega no Brasil: Fed/UST, DXY, commodities, VIX/HY;
@@ -118,7 +120,9 @@ Regime (btc_season/alt_season/neutral/stress), split BTC+ETH core vs alts
 ## R4 — Alocação tática + pre-mortem
 Black-Litterman enxuto sobre os 3 buckets: equilibrium do SAA + **≥ 2 views
 numéricas** vindas do delta (não invente views para preencher). Sanity check
-risk-parity. Feche `final_tactical_pct` e `final_tactical_brl`, rode o pior
+risk-parity sobre o SLEEVE DE RISCO (Ações B3 × Crypto) — com o CDB dentro ele
+dá ~100% CDB por construção; o tamanho do CDB sai do orçamento de drawdown.
+Feche `final_tactical_pct` e `final_tactical_brl`, rode o pior
 cenário contra a tolerância de drawdown e responda o pre-mortem: "se este
 aporte perder 5% em 31 dias, o erro provável foi ___".
 
@@ -181,7 +185,7 @@ Markdown curto (o memo do delta, não um tratado) + **JSON validável** entre
       "views": [{"id": 1, "tese": "", "diff_bps_anualizado": 0, "confidence_omega_pct": 0}],
       "tactical_tilts_resultantes_pct": {}
     },
-    "risk_parity_pesos_pct": {},
+    "risk_parity_sleeve_risco_pct": {"acoes_b3": 0, "crypto": 0},
     "stress_pre_aporte_pior_cenario_pct_pat": null,
     "viola_tolerancia_dd_pre": false
   },

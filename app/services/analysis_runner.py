@@ -172,14 +172,32 @@ analista só. Rigor máximo institucional, sempre.
 - Esse mandato sobrepõe qualquer escopo mais amplo que apareça nos prompts.
 
 ## Padrão de equipe (time completo GS / J.P. Morgan)
-- Convoque SEMPRE o time inteiro, por nome e função, e faça-os debater:
-  Economista-chefe (macro BR + global), Estrategista de Alocação, Analistas de
-  Equity Research setoriais da B3, Especialista de Crypto/DeFi on-chain, Head de
-  Renda Fixa (CDB/curva DI), Quant (fatores/risco), CRO (VaR/CVaR/stress),
-  Forensic/CFE (qualidade contábil), Behavioral, Tax, e o CIO que decide.
-- Debate real: tese, contra-tese (devil's advocate), evidência numérica e fontes
-  verificadas AO VIVO. Conclua com convicção (tier) e assimetria risco/retorno.
-- Nível de output equivalente a um Investment Committee memo de banco tier-1.
+- A mesa inteira está na sala: Economista-chefe (macro BR + global),
+  Estrategista de Alocação, Analistas de Equity Research setoriais da B3,
+  Especialista de Crypto/DeFi on-chain, Head de Renda Fixa (CDB/curva DI), Quant
+  (fatores/risco), CRO (VaR/CVaR/stress), Forensic/CFE (qualidade contábil),
+  Behavioral, Tax, e o CIO que decide.
+- Debate REAL, não teatro: fala quem traz evidência nova ou objeção. Toda decisão
+  tem tese, contra-tese (devil's advocate) com número, e veredito do CIO. Nada
+  de falas protocolares ("concordo com o colega") nem de repetir um número já
+  estabelecido em reunião anterior — cite a reunião e siga.
+- Conclua com convicção (tier) e assimetria risco/retorno. Nível de output
+  equivalente a um Investment Committee memo de banco tier-1.
+
+## Disciplina de dados
+- Número que não muda decisão não se pesquisa. Dado de fonte paga sem chave fica
+  `null` com o motivo em 1 linha — NUNCA estime um número para fechar um campo.
+- O que já foi verificado nesta sessão não se pesquisa de novo: cite onde está.
+  Fatos lentos (regra fiscal vigente, Basileia/NPL do Bradesco do último
+  balanço, tickers e CoinGecko-ids) vivem no ./MEMORY.md com data e fonte —
+  reuse e só confira se houver notícia nova.
+- Métrica tem que caber no instrumento: múltiplos de EBITDA, DCF de FCFF e
+  scores forenses de indústria não se aplicam a bancos; otimizador de risco com
+  um ativo de vol zero (o CDB) dentro é degenerado.
+
+## Trava × stop
+- Durante a trava, o stop de um lote é gatilho de REVISÃO, não de venda. Todo
+  sizing assume que o cenário bear pode acontecer inteiro dentro da trava.
 
 ## Saída
 - Sempre em português, acionável: "onde investir e quanto".
@@ -211,7 +229,7 @@ ciclo. Estrutura sugerida:
 
 _SEED_AGENT_MCP = """\
 {
-  "_comment": "Baseline ja traz: sequential-thinking, filesystem, fetch, context7, playwright, memory, time, git, coingecko, yahoo-finance, defillama, exa (+ glassnode/coinglass/messari/firecrawl/tavily quando a chave existe no .env). Adicione AQUI qualquer MCP EXTRA: e mesclado ao baseline a cada ciclo e carrega no PROXIMO ciclo (voce tem prioridade em conflito de nome). Ex. (CryptoQuant, exchange/miner flows): mcpServers: \\"cryptoquant\\": {\\"command\\": \\"npx\\", \\"args\\": [\\"-y\\", \\"pacote-mcp\\"], \\"env\\": {\\"CRYPTOQUANT_API_KEY\\": \\"${CRYPTOQUANT_API_KEY}\\"}}",
+  "_comment": "Baseline ja traz: sequential-thinking, filesystem, fetch, context7, playwright, memory, coingecko, yahoo-finance, defillama, exa (+ glassnode/coinglass/messari/firecrawl/tavily quando a chave existe no .env). Adicione AQUI qualquer MCP EXTRA: e mesclado ao baseline a cada ciclo e carrega no PROXIMO ciclo (voce tem prioridade em conflito de nome). Ex. (CryptoQuant, exchange/miner flows): mcpServers: \\"cryptoquant\\": {\\"command\\": \\"npx\\", \\"args\\": [\\"-y\\", \\"pacote-mcp\\"], \\"env\\": {\\"CRYPTOQUANT_API_KEY\\": \\"${CRYPTOQUANT_API_KEY}\\"}}",
   "mcpServers": {}
 }
 """
@@ -681,7 +699,9 @@ def _latest_weekly_context(session: Session, *, max_chars: int = 10000) -> str:
 
     Deliberately generous: in macro delta mode this block IS the macro research
     meeting #1 no longer redoes, so truncating it would cost far more than the
-    tokens it saves.
+    tokens it saves. It carries the ANALYSIS memo (step 1), not the client-facing
+    summary: the summary has the macro in 3-5 lines (~2k chars), which is what
+    the delta meeting was being told was "the research already done".
     """
     report = session.exec(
         select(Report)
@@ -691,7 +711,9 @@ def _latest_weekly_context(session: Session, *, max_chars: int = 10000) -> str:
     ).first()
     if report is None or not report.content:
         return ""
-    body = report.content
+    steps = report.steps or []
+    analysis = steps[0].get("response") if steps and isinstance(steps[0], dict) else None
+    body = analysis or report.content
     if len(body) > max_chars:
         # Cut on a paragraph boundary so the committee never reads half a phrase.
         cut = body.rfind("\n\n", 0, max_chars)

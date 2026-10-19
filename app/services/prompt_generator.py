@@ -56,7 +56,7 @@ _PROMPT_DEFINITIONS = [
         "title": "Reunião nº 2 — Universo, Filtros e Seleção",
         "description": (
             "Define o universo investível, monta long lists, aplica filtros (quant + forense + "
-            "técnico) e SELECIONA a shortlist (4-5 ações B3 + 3-4 cryptos). Confirma a fatia de CDB "
+            "técnico) e SELECIONA a shortlist (até 5 ações B3 + até 4 cryptos, reforçando posições com tese intacta). Confirma a fatia de CDB "
             "(instrumento fixo: Bradesco 100% CDI liquidez diária) com sanidade de crédito do emissor."
         ),
     },
@@ -180,6 +180,8 @@ def build_render_context(
         "amount_brl_formatted": _format_brl(amount_brl),
         "portfolio_total": portfolio_total,
         "portfolio_total_formatted": _format_brl(portfolio_total),
+        # Smallest NEW position worth a full due diligence (meeting #2 rule).
+        "min_new_position_brl_formatted": _format_brl((portfolio_total + amount_brl) * 0.02),
         "allocation_current": _NamespaceLike(allocation_current),
         "allocation_target": allocation_target,
         "allocation_deviation": _NamespaceLike(allocation_deviation),

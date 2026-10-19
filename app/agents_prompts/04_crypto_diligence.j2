@@ -58,29 +58,42 @@ playwright/fetch nos sites; + sequential-thinking, context7, memory.
 
 # PROCESSO — MEMO COMPLETO PARA CADA CRYPTO SELECIONADA
 
-Para **CADA** cripto de `selecao_crypto`:
+> **Não re-pesquise o que já está nesta sessão.** As métricas de ciclo de BTC/ETH
+> (MVRV-Z, NUPL, SOPR, funding, ETF flows, dominância) foram levantadas na
+> Reunião nº 1 ou na revisão semanal: cite-as e só atualize o que tiver mudado
+> de forma material. O orçamento de pesquisa desta reunião é das ALTS.
+
+> **REFORÇO (`reforco=true` na R2) = DD INCREMENTAL**: leia o memo anterior
+> (`./dd/*_<SIMBOLO>.md` + ./MEMORY.md), escreva só o que mudou (unlocks,
+> catalisadores, on-chain, preço vs. tese) e dê veredito intacta / enfraquecida
+> / quebrada.
+
+> **STABLECOIN (USDC/yield)** não é aposta direcional: memo curto de peg,
+> reservas/atestação, risco do protocolo de yield, APY e sua origem. Fica FORA
+> das métricas de asymmetry e de bull/base/bear.
+
+Para **CADA** cripto de `selecao_crypto` sem memo anterior:
 
 1. **Investment Thesis 3 frases** + ligação à narrativa da R1
 2. **Identidade**: nome, símbolo, CoinGecko ID, chain, contract address, data lançamento, classificação (L1/L2/DeFi/AI/RWA/Meme/Restaking/Stable)
-3. **Tecnologia**: TPS, segurança, descentralização, competidores top 3
-4. **Equipe & Comunidade**: founders, VCs (a16z/Paradigm/Sequoia/Polychain/Multicoin), GitHub commits 90d, devs ativos, Discord/X/TG
+3. **Tecnologia**: segurança (histórico de exploits/halts), descentralização, competidores top 3
+4. **Equipe & Comunidade**: founders, VCs (a16z/Paradigm/Sequoia/Polychain/Multicoin), GitHub commits 90d, devs ativos
 5. **Tokenomics**: circ/total/max supply · inflation anual · **unlock schedule 12m** (Tokenomist/TokenUnlocks): próximo unlock + cliffs · distribuição (team/VC/foundation/community/public) · burn/buyback · **FDV/MC** · insider lockups expiring
-6. **On-Chain (Rafael)**: TVL + Δ30d · active addrs 7d/30d · tx count · DAUs + Δ · revenue/fees 30d · **P/F + P/S** · **BTC**: MVRV-Z, Puell, HODL 1y+, STH-LTH, Realized Cap, CDD, Dormancy, RHODL, NVT, exchange net flow, hash rate, Reserve Risk · **ETH**: stake ratio, L2 TVL share, ETH burned, restaking TVL · **L1s**: TVL/MC, validators · cohort LTH vs STH
+6. **On-Chain (Rafael)**: TVL + Δ30d · active addrs 7d/30d · DAUs + Δ · revenue/fees 30d · **P/F + P/S** · **BTC/ETH**: as métricas de ciclo da R1 (ver nota acima) · **ETH**: stake ratio, L2 TVL share, ETH burned · **L1s**: TVL/MC, validators
 7. **Derivatives (Coinglass)**: funding perp 7d (Binance/Bybit/OKX) · OI USD · **CME basis** · **DVOL** · long/short top accounts · liquidation heatmap
 8. **Correlação 90d** com BTC, ETH, Ibov
 9. **Catalyst path 31d**: mainnet upgrade, listing, governance, product, ETF news, unlocks
 10. **Riscos top 3**: regulatório, técnico, unlock, founder concentration
-11. **Coinbase premium** (CryptoQuant)
-12. **Position sizing %** do bolso de crypto (ancore no `sizing_alvo_pct_crypto` da R2; refine)
-13. **Technical (Anderson)**: tendência weekly, RSI weekly, suportes/resistências USD, Volume Profile, Wyckoff, Ichimoku
-14. **Bull/Base/Bear 31d USD** + **Asymmetry** ≥ 2:1
-15. **Stop USD + Target 31d/90d/12m USD**
-16. **Conviction 0-10**
+11. **Position sizing %** do bolso de crypto (ancore no `sizing_alvo_pct_crypto` da R2; refine)
+12. **Técnica de ENTRADA (Anderson)**: tendência weekly (vs EMA 50/200), RSI weekly, 2-3 suportes/resistências USD
+13. **Bull/Base/Bear 31d USD** + **Asymmetry** ≥ 2:1
+14. **Stop USD + Target 31d/90d/12m USD** — o lote trava {{ lock_days_crypto }} dias: nesse período o stop é gatilho de REVISÃO, não de venda
+15. **Conviction 0-10**
 
 ## CROSS-CHECK (Rafael + Tiago + Júlia)
 - Σ `position_sizing_pct_crypto` = 100 · **BTC + ETH ≥ 50%** do bolso (prudencial, mesmo agressivo)
 - Nenhuma cripto com unlock 90d > 10% do circulante sem desconto explícito no sizing
-- Asymmetry média ponderada ≥ 1.5:1 · overlap com a carteira atual
+- Asymmetry média ponderada ≥ 1.5:1 (sem a stablecoin) · overlap com a carteira atual
 - Σ R$ ≈ fatia de crypto da R1 (`final_tactical_brl.crypto`)
 
 ---
@@ -105,7 +118,8 @@ Markdown (os memos) + **JSON validável** entre ` ```json ` e ` ``` `:
       "coingecko_id": "", "simbolo": "", "chain": "", "contract_address": "",
       "data_lancamento": null,
       "classificacao": "L1|L2|DeFi|AI|RWA|Meme|Stable|Restaking|Other", "narrativa": "",
-      "investment_thesis_3_frases": "", "tecnologia": "", "throughput_tps": null,
+      "reforco": false, "veredito_reforco": "nao_se_aplica|intacta|enfraquecida|quebrada",
+      "investment_thesis_3_frases": "", "tecnologia": "",
       "competidores_diretos": [], "equipe_e_comunidade": "", "vcs_notorios": [],
       "github_commits_90d": 0, "devs_ativos": 0,
       "tokenomics": {
@@ -118,25 +132,20 @@ Markdown (os memos) + **JSON validável** entre ` ```json ` e ` ``` `:
       },
       "on_chain": {
         "tvl_usd_mi": null, "tvl_30d_change_pct": null, "active_addrs_7d": 0,
-        "active_addrs_30d": 0, "tx_count_30d": 0, "daus": 0, "daus_30d_change_pct": 0,
+        "active_addrs_30d": 0, "daus": 0, "daus_30d_change_pct": 0,
         "revenue_30d_usd_mi": 0, "fees_30d_usd_mi": 0, "p_fees_ratio": null, "p_sales_ratio": null,
-        "btc_specifics": {"mvrv_z": null, "nupl": null, "sopr": null, "puell_multiple": null,
-                           "hodl_1y_plus_pct": null, "sth_lth_cost_basis_ratio": null,
-                           "realized_cap_usd_bi": null, "cdd_spike_30d": null, "rhodl_ratio": null,
-                           "nvt_signal": null, "exchange_net_flow_30d_btc": null,
-                           "hash_rate_30d_pct": null, "reserve_risk": null},
+        "btc_eth_ciclo_ref_r1": "",
         "eth_specifics": {"stake_ratio_pct": null, "l2_tvl_share_30d_pct_change": null,
-                           "eth_burned_30d_eth": null, "restaking_tvl_usd_bi": null},
+                           "eth_burned_30d_eth": null},
         "other_l1_specifics": {"tvl_ratio_mc": null, "validator_count": null}
       },
       "derivatives": {"funding_rate_7d_avg_pct": 0, "open_interest_usd_bi": 0,
                        "cme_basis_bps": null, "dvol": null,
                        "long_short_ratio_top_accounts": 0, "liquidation_zones": ""},
       "correlacao_btc_90d": "", "correlacao_eth_90d": "", "correlacao_ibov_90d": "",
-      "catalyst_path_31d": [], "riscos_top3": [], "coinbase_premium_pct": null,
+      "catalyst_path_31d": [], "riscos_top3": [],
       "tecnica": {"tendencia_weekly": "", "rsi_weekly": 0, "suportes_usd": [],
-                   "resistencias_usd": [], "volume_profile_poc_usd": 0, "wyckoff_phase": "",
-                   "ichimoku_cloud_position": ""},
+                   "resistencias_usd": []},
       "bull_base_bear_31d": {"bull_price_usd": 0, "bull_prob_pct": 0, "base_price_usd": 0,
                               "base_prob_pct": 0, "bear_price_usd": 0, "bear_prob_pct": 0,
                               "asymmetry_ratio": 0},
@@ -157,8 +166,8 @@ Markdown (os memos) + **JSON validável** entre ` ```json ` e ` ``` `:
 >
 > 1. ✓ Um item em `shortlist_crypto` para CADA cripto de `selecao_crypto` (sem comprimir)
 > 2. ✓ Cada cripto: on-chain conforme tipo + derivatives + tokenomics/unlocks + dev activity
-> 3. ✓ Cada cripto: Bull/Base/Bear probs = 100% + asymmetry numérico
-> 4. ✓ Σ `position_sizing_pct_crypto` = 100 · **BTC + ETH ≥ 50%** · asymmetry média ≥ 1.5:1
+> 3. ✓ Cada cripto direcional: Bull/Base/Bear probs = 100% + asymmetry numérico (stablecoin: memo de peg/yield)
+> 4. ✓ Σ `position_sizing_pct_crypto` = 100 · **BTC + ETH ≥ 50%** · asymmetry média ≥ 1.5:1 (sem stablecoin)
 > 5. ✓ Unlock 90d > 10% circulante → sizing descontado (ou rejeição)
 > 6. ✓ ≥ 10 fontes verificáveis distintas (URL + data)
 > 7. ✓ **`nenhuma_recomendacao_fora_do_mandato=true`** — só crypto (USD via USDC)

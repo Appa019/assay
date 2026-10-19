@@ -172,7 +172,8 @@ def _weekly_steps(
     )
     synthesis = (
         "Agora escreva o RELATÓRIO SEMANAL EXECUTIVO para o cliente, em português, "
-        "enxuto e acionável (vai pro Telegram). Inclua:\n"
+        "enxuto e acionável (ele lê no app, no celular). Comece direto pelo "
+        "relatório, sem frase sobre memória ou arquivos. Inclua:\n"
         "• Macro em 3-5 linhas (o que importa agora).\n"
         "• Desempenho da carteira (resumo + destaques positivos/negativos).\n"
         "• Ações sobre lotes liberados: tabela curta Ticker | Ação (manter/vender/aumentar) | "
@@ -202,7 +203,8 @@ def _maturity_steps(
         "racional, preço-alvo e gatilhos de saída."
     )
     synthesis = (
-        "Escreva o aviso EXECUTIVO de maturidade para o Telegram, em português, curto: "
+        "Escreva o aviso EXECUTIVO de maturidade para o app (lido no celular), em "
+        "português, curto, começando direto pelo aviso: "
         "para cada lote liberado, Ticker | Ação (manter/vender/aumentar) | motivo (1 linha) "
         "| alvo. Atualize ./MEMORY.md antes de responder."
     )

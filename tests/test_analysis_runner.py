@@ -524,3 +524,23 @@ def test_peak_context_falls_back_to_the_average() -> None:
     }
     assert ar._peak_context_tokens(data) == 110_000
     assert ar._peak_context_tokens({"result": "x"}) == 0
+
+
+def test_weekly_consult_block_carries_the_analysis_not_the_summary(session: Session) -> None:
+    """Delta mode tells meeting #1 the macro research is pasted above; the
+    client summary has it in 3-5 lines, the analysis memo has the real thing."""
+    from app.models.report import Report, ReportKind
+
+    session.add(
+        Report(
+            kind=ReportKind.WEEKLY,
+            title="Revisão semanal",
+            content="resumo curto para o celular",
+            cost_usd=1.0,
+            steps=[{"response": "memo completo com a curva DI"}, {"response": "resumo"}],
+        )
+    )
+    session.commit()
+    block = ar._latest_weekly_context(session)
+    assert "memo completo com a curva DI" in block
+    assert "resumo curto" not in block

@@ -80,17 +80,19 @@ Associates Daily Observations + AQR Capital Management**. Esta é a reunião de
 Premissas estratégicas de longo prazo das TRÊS classes do mandato. Ponto de
 partida (**prior**) do Black-Litterman do Round 6.
 
-| Asset class | 10y E[r] (BRL nominal) | Vol annual | Sharpe | DD 99% | Correl Ibov | Correl BTC |
-|---|---:|---:|---:|---:|---:|---:|
-| **CDB Bradesco liquidez diária (100% CDI — único RF do mandato)** | CDI | 0% | 0 | 0% | 0.00 | 0.00 |
-| **Ações B3 large (Ibov beta 1)** | CDI + 7% | 22% | 0.4 | -45% | 1.00 | 0.45 |
-| **Ações B3 mid** | CDI + 8% | 26% | 0.4 | -50% | 0.90 | 0.42 |
-| **Ações B3 small** | CDI + 8% | 30% | 0.35 | -55% | 0.80 | 0.40 |
-| **BTC** | CDI + 15% (alto stdev) | 70% | 0.4 | -75% | 0.45 | 1.00 |
-| **ETH** | CDI + 12% | 85% | 0.35 | -80% | 0.40 | 0.85 |
-| **Large-cap alts (SOL/L1-L2 top)** | CDI + 18% | 95% | 0.3 | -85% | 0.40 | 0.80 |
-| **Mid/small alts + narrativas** | CDI + 25% (alto stdev) | 120% | 0.25 | -90% | 0.35 | 0.70 |
-| **Stablecoin yield (USDC DeFi)** | CDI + 2% (variável) | 5% | 0.3 | -15% (smart-contract/depeg) | 0.10 | 0.10 |
+| Asset class | 10y E[r] (BRL nominal) | Vol annual | DD 99% | Correl Ibov | Correl BTC |
+|---|---:|---:|---:|---:|---:|
+| **CDB Bradesco liquidez diária (100% CDI — único RF do mandato)** | CDI | ≈0% | 0% | 0.00 | 0.00 |
+| **Ações B3 large (Ibov beta 1)** | CDI + 7% | 22% | -45% | 1.00 | 0.45 |
+| **Ações B3 mid** | CDI + 8% | 26% | -50% | 0.90 | 0.42 |
+| **Ações B3 small** | CDI + 8% | 30% | -55% | 0.80 | 0.40 |
+| **BTC** | CDI + 15% (alto stdev) | 70% | -75% | 0.45 | 1.00 |
+| **ETH** | CDI + 12% | 85% | -80% | 0.40 | 0.85 |
+| **Large-cap alts (SOL/L1-L2 top)** | CDI + 18% | 95% | -85% | 0.40 | 0.80 |
+| **Mid/small alts + narrativas** | CDI + 25% (alto stdev) | 120% | -90% | 0.35 | 0.70 |
+| **Stablecoin yield (USDC DeFi)** | CDI + 2% (variável) | 5% | -15% (smart-contract/depeg) | 0.10 | 0.10 |
+
+Sharpe de cada linha = (E[r] − CDI) / vol — calcule, não copie de memória.
 
 **Override**: se durante a reunião acharem que premissas mudaram (ex.: Selic
 estrutural diferente, ERP comprimido, regime cripto), expliquem e ajustem para
@@ -153,22 +155,8 @@ Vieram via API. Onde `null`/`⚠️`, pesquisem. **Não inventem. URL + data.**
 > seletas. Sem timing perfeito — escalonamento mitiga sequence-of-returns risk.
 {% endif %}
 
-## Benchmarks de gestoras brasileiras (sanity check de performance)
-
-| Gestora / Fundo | Foco | Sharpe 5y |
-|---|---|---:|
-| Verde Asset Multimercado | MM macro | 1.2 |
-| SPX Nimitz | MM macro | 1.0 |
-| Kapitalo Zeta | MM macro | 1.1 |
-| Adam Capital Macro | MM macro | 0.9 |
-| **Constellation Pegasus** | Ações BR | 0.6 |
-| **IP Atlas** | Ações BR concentrado | 0.7 |
-| **Dynamo Cougar** | Ações BR | 0.5 |
-| **Squadra / Atmos / Studio** | Ações BR | 0.5-0.6 |
-
-> Os fundos acima são apenas **régua de performance** (não investíveis no
-> mandato). **Nosso target portfolio**: Sharpe líquido > 0.7 (após custos e
-> impostos) em 5y, drawdown 99% < 20%, expected return CDI + 4-6% líquido.
+> **Alvo do portfólio**: Sharpe líquido > 0.7 (após custos e impostos) em 5y,
+> drawdown 99% < 20%, expected return CDI + 4-6% líquido.
 
 ---
 
@@ -232,12 +220,12 @@ Vieram via API. Onde `null`/`⚠️`, pesquisem. **Não inventem. URL + data.**
    (preços/mcap/ids de cripto), **defillama** (TVL/yields), **exa** (busca
    semântica em research); premium quando disponíveis: glassnode, coinglass,
    messari, firecrawl, tavily. RUNTIME: sequential-thinking (raciocínio), fetch
-   (markdown), playwright (sites JS), context7, memory, time. PREFIRA MCPs a
-   scrapar HTML à mão. Use à vontade.
+   (markdown), playwright (sites JS), memory. PREFIRA MCPs a scrapar HTML à
+   mão. Use à vontade.
 
 ---
 
-# PROCESSO OBRIGATÓRIO (11 ROUNDS)
+# PROCESSO OBRIGATÓRIO (10 ROUNDS)
 
 ## ROUND 0 — "TOP OF MIND" (Bruno + Helena + Marcus — GS-style)
 
@@ -252,8 +240,9 @@ críticas do momento que definem as próximas 4 semanas:
 
 Cada questão: **hipótese inicial 1 frase** + **conviction inicial 0-10**.
 
-> **Mandato do cliente**: foco growth / income / preservation? Horizonte deste
-> aporte? Tolerância drawdown 99%: 20% do patrimônio (default — confirmar).
+> **Mandato do cliente (fato, não pergunta)**: crescimento de longo prazo com
+> crypto agressivo; aportes ad-hoc; tolerância de drawdown 99% = 20% do
+> patrimônio. Não invente outro perfil.
 
 ## ROUND 1 — Brazil Macro Diagnosis (Helena lidera)
 
@@ -311,8 +300,8 @@ Pesquise APENAS o que impacta Brasil/B3/BRL/crypto:
 ### 2.5 Leading indicators (recession risk)
 - Atlanta Fed GDPNow · Conference Board LEI 6m · Sahm Rule US · NY Fed Recession Prob
 
-### 2.6 FCI
-- GS FCI US (apertou/afrouxou 30d) · TED spread
+### 2.6 Condições financeiras
+- Chicago Fed NFCI (apertou/afrouxou 30d)
 
 ### 2.7 China (demanda commodities)
 - LPR 1y/5y, RRR, estímulos, crise imobiliária · PMI China (Caixin+NBS) · USD/CNH
@@ -340,8 +329,8 @@ de Renda Fixa como **CDB**:
 - **Custo de oportunidade**: com o carry travado em 100% do CDI, avalie quanto
   vale manter em dry powder vs deployar em ações/crypto, dado o nível da Selic
   e o sinal da curva DI.
-- **Crédito do emissor**: Bradesco é banco sistêmico — cheque Basileia Tier 1 /
-  rating como sanidade e cite o **FGC R$ 250k/CPF** se a exposição passar.
+- **Crédito do emissor**: a sanidade do Bradesco é feita UMA vez, na Reunião
+  nº 2. Aqui só some a exposição e cite o **FGC R$ 250k/CPF** se passar.
 - **Breakeven inflação** (como leitura macro, não como compra de Tesouro).
 
 **Entregue**:
@@ -362,9 +351,11 @@ Para **CADA** setor B3, atribua:
 |---|---|---:|---|---|---|---|
 
 ### 4.1 Style/Factor (Mateus aplica AQR-style)
-Para cada setor, posição vs Ibov, z-score em: **Value** (P/E, P/B vs hist 5y),
-**Growth** (CAGR receita/lucro 3y), **Quality** (ROE/ROIC, margem stability),
-**Momentum** (return 12m-1m), **Low Vol** (vol 90d), **Size** (log MC).
+Para os TOP 3 OW e BOTTOM 3 UW: leitura de **Value** (P/E, P/B vs hist 5y),
+**Growth** (CAGR 3y), **Quality** (ROE/ROIC), **Momentum** (12m-1m), **Low Vol**
+(vol 90d). Z-score só com dado de fonte (Bash sobre preços do yahoo-finance
+serve); sem dado, leitura qualitativa — nunca um número inventado para os 14
+setores.
 
 **Factor dispersion**: spread TOP 3 OW vs BOTTOM 3 UW. **Tilt dominante** (1-3 factors).
 
@@ -377,9 +368,9 @@ Para cada setor, posição vs Ibov, z-score em: **Value** (P/E, P/B vs hist 5y),
 - Stablecoin supply Δ 30d (dry powder cripto) · Stock-to-Flow BTC % deviation
 
 ### 5.2 BTC institutional metrics (Glassnode)
-- Realized Cap + Δ 30d · MVRV + MVRV-Z · NUPL + regime · SOPR · Puell · Reserve Risk
-- HODL 1y+ % · STH-LTH Cost Basis · CDD · Dormancy/VOCD/RHODL · NVT + NVT Signal
-- Hash rate Δ + difficulty · Exchange net flow 30d · LTH supply %
+- O que define regime de ciclo: MVRV-Z · NUPL · SOPR · STH cost basis ·
+  Exchange net flow 30d · LTH supply %. Puell, Reserve Risk, RHODL, Dormancy,
+  CDD e NVT só se vierem de graça no mesmo painel — não gaste busca neles.
 
 ### 5.3 BTC Derivatives (Coinglass)
 - Funding rate perp avg 7d · Open Interest USD · CME basis · DVOL Deribit
@@ -390,9 +381,6 @@ Para cada setor, posição vs Ibov, z-score em: **Value** (P/E, P/B vs hist 5y),
 
 ### 5.5 ETH + ecosystem
 - Stake ratio % · L2 TVL share 30d (ARB/OP/BASE/STRK) · Restaking TVL (EigenLayer) · ETH burned 30d
-
-### 5.6 Active Developers (Electric Capital)
-- BTC, ETH, top 5 chains devs
 
 ### 5.7 Stablecoins (dry powder cripto + veículo USDC)
 | Stable | MC USD bi | Δ 30d | Risco |
@@ -440,17 +428,28 @@ Entre: Ibov, BTC, ETH, alts agregado, USD/BRL, CDI (≈0 vol).
 
 **Posterior returns** = BL update → **Tactical tilts**.
 
-### 6.4 Sanity checks alternativos (Mateus via Bash) — 3 buckets
-- Risk-parity · HRP (López de Prado) · Max Sharpe (tangent) · Min Variance · Markowitz frontier
+### 6.4 Sanity checks alternativos (Mateus via Bash)
+O CDB é o ativo livre de risco (vol ≈ 0). Risk-parity, HRP e min-variance com
+ele DENTRO dão ~100% CDB por construção, e Max Sharpe vira divisão por zero —
+número sem informação. Faça em duas camadas:
+1. **Sleeve de risco (Ações B3 × Crypto)**: Risk-parity · HRP · Max Sharpe ·
+   Min Variance sobre esses dois buckets (sub-buckets se útil) → split interno.
+2. **Tamanho do CDB = orçamento de drawdown**: o maior sleeve de risco cujo
+   DD 99% da carteira inteira pós-aporte fica dentro da tolerância (20%),
+   comparado com o SAA e o tilt do BL.
 
-| Método | CDB % | Ações B3 % | Crypto % | Sharpe esperado |
+| Método | Ações B3 % do sleeve | Crypto % do sleeve | Sharpe esperado |
+|---|---:|---:|---:|
+| BL Tactical | | | |
+| Risk Parity | | | |
+| HRP | | | |
+| Max Sharpe | | | |
+| Min Variance | | | |
+
+| Bolso | SAA % | BL % | Orçamento DD % | **GIC Final %** |
 |---|---:|---:|---:|---:|
-| BL Tactical | | | | |
-| Risk Parity | | | | |
-| HRP | | | | |
-| Max Sharpe | | | | |
-| Min Variance | | | | |
-| **GIC Final** | | | | |
+| CDB | | | | |
+| Sleeve de risco | | | | |
 
 ### 6.5 Stress test prévio
 Choque −15% Ibov, −30% crypto (BTC −25% / alts −45%), +8% USD/BRL → perda atual
@@ -460,60 +459,33 @@ principal; muda só taxa de reinvestimento). Compare vs tolerância 20% DD 99%.
 > **A defesa é o CDB (dry powder) + USDC.** Não há bolso de "hedge" com
 > ouro/ETF/DOL. Se o regime pede defesa, suba o % de CDB líquido e/ou USDC.
 
-## ROUND 7 — ESG + Special Situations B3 (Diogo + Felipe)
+## ROUND 7 — Tax (Cláudia) — só o que muda a alocação
 
-### 7.1 ESG (Diogo)
-- Controvérsias materiais 30d nos TOP 3 setores · Red flags MSCI/Sustainalytics · Transição energética
+- **Dividendos e JCP**: VERIFIQUE ao vivo a regra vigente em {{ current_year }}
+  (reforma tributária) — NÃO assuma de memória. Registre a regra + fonte no
+  ./MEMORY.md: as reuniões seguintes e os próximos ciclos reusam.
+- Isenções que guiam vendas: R$ 20k/mês em ações, R$ 35k/mês em cripto. CDB: IR
+  regressivo pelo tempo de permanência (22,5% → 15% após 720 dias).
+- PGBL/previdência/holding estão FORA do mandato: no máximo 1 linha de observação.
 
-### 7.2 Special Situations B3 (Felipe)
-- Tender offers/OPA em curso · Spinoffs anunciados · M&A rumores (Brazil Journal/Valor)
-- Buybacks programados · Activist investors · JCP windows próximas · SBC abusivo a evitar
+## ROUND 8 — Sentimento e vieses (Tiago + Bruno)
+Leitura contrarian em 4 números: IBOV breadth (% > 200d MA) · CNN F&G · Crypto
+F&G · Put/Call CBOE. Depois, UMA pergunta: a alocação está ancorada no consenso
+ou na última semana? Responda em 2-3 linhas (o checklist completo de vieses é
+da Reunião nº 5).
 
-## ROUND 8 — Tax Overlay (Cláudia) — 3 classes
+## ROUND 9 — Decisão de Alocação Tática (Bruno consolida via BL)
 
-### 8.1 CDB
-- IR regressivo: 22.5% (≤180d) → 15% (>720d), pelo TEMPO DE PERMANÊNCIA. O CDB
-  do mandato é liquidez diária: manter o dinheiro parado >720d também chega aos 15%.
+### 9.1 SAA Baseline → BL Posterior → Final Tactical (3 buckets)
 
-### 8.2 Ações B3
-- Isenção R$ 20k vendas/mês (ganho) · Dividendos e JCP: VERIFIQUE ao vivo a regra
-  vigente em {{ current_year }} (reforma tributária) — NÃO assuma isenção de memória
-- Tax-loss harvesting em ações com perda > 10% (wash-sale 30d check)
-
-### 8.3 Crypto
-- Isenção até R$ 35k/mês de vendas · acima: 15-22.5% sobre ganho · DeC RFB/declaração anual
-
-### 8.4 Estruturais (contexto informativo APENAS)
-- PGBL, previdência, holding e afins estão **FORA do mandato** (só CDB · ações B3 ·
-  crypto): NÃO recomende nem aloque neles. Se algo estrutural for material para o
-  cliente, registre em 1 linha como observação — sem valores, sem ordem.
-
-## ROUND 9 — Behavioral Checklist (Tiago + Bruno)
-
-| Bias | Check | Mitigation |
-|---|---|---|
-| Anchoring | Cliente fixado em PM passado? | Pricing pelo valor presente |
-| Loss aversion | Stop > nível técnico razoável? | Calibrar via vol implícita |
-| Recency | View macro só dos últimos 30d? | Mean reversion teste 10y |
-| Herding | Consenso unânime BR sobre setor/cripto? | Contrarian check |
-| Confirmation | View testada vs alternativa? | Steelman do caso oposto |
-| Overconfidence | Conviction > 8 sem evidência? | Calibration histórico |
-
-**Sentiment mean reversion**: IBOV breadth (% > 200d MA) percentil · AAII Bull-Bear
-(proxy global) · CNN F&G stocks · Crypto F&G · Put/Call CBOE 5d MA.
-
-## ROUND 10 — Decisão de Alocação Tática (Bruno consolida via BL)
-
-### 10.1 SAA Baseline → BL Posterior → Final Tactical (3 buckets)
-
-| Bolso | SAA % | BL Tilt % | RP % | Final % | R$ | Justificativa |
+| Bolso | SAA % | BL Tilt % | Orçamento DD % | Final % | R$ | Justificativa |
 |---|---:|---:|---:|---:|---:|---|
 | CDB (Renda Fixa) | | | | | | |
 | Ações B3 | | | | | | |
 | Crypto + DeFi | | | | | | |
 | **Total** | 100% | — | — | **100%** | **{{ amount_brl }}** | |
 
-### 10.2 Distribuição interna por bolso
+### 9.2 Distribuição interna por bolso
 
 **CDB** (Henrique):
 - Instrumento fixo: **CDB Bradesco 100% CDI liquidez diária** — entregue só o valor R$
@@ -526,12 +498,12 @@ principal; muda só taxa de reinvestimento). Compare vs tolerância 20% DD 99%.
 - % BTC core, % ETH core, % alts L1, % narrativas (top 3), % stables yield (USDC DeFi)
 - lista preliminar 8-12 candidatos
 
-### 10.3 Stop conditions (gatilhos quantitativos)
+### 9.3 Stop conditions (gatilhos quantitativos)
 - VIX > X · DXY > Y · Selic ±W bps surpresa · BTC ±Z% em 7d · Ibov ±X% em 7d · HY OAS > 600 bps
 
-### 10.4 Expected return 31d (probability-weighted) + Confiança GIC 0-10 (calibrada)
+### 9.4 Expected return 31d (probability-weighted) + Confiança GIC 0-10 (calibrada)
 
-## ROUND 11 — Pre-Mortem GIC
+## ROUND 10 — Pre-Mortem GIC
 
 > "**Se em 31 dias esta alocação resultar em perda > 5% do aporte, qual foi o
 > erro mais provável?**"
@@ -589,7 +561,7 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
     "move_index": null, "hy_oas_bps": null, "embi_global_bps": null,
     "leading_indicators": {"atlanta_gdpnow": null, "cb_lei_direcao_6m": "",
                             "sahm_rule_us_trigger": false, "ny_fed_recession_prob_pct": null},
-    "fci_gs_us_direcao_30d": "apertou|afrouxou|estavel",
+    "nfci_direcao_30d": "apertou|afrouxou|estavel",
     "china": {"lpr_5y": null, "pmi_caixin": null, "usd_cnh": null, "estimulo_fiscal": ""},
     "geopolitica_31d_impacto_br": [],
     "riscos_cauda_31d_b3": [{"evento": "", "probabilidade": 0, "magnitude_ibov_pct": 0}]
@@ -654,37 +626,28 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
       "views": [{"id": 1, "tese": "", "diff_bps_anualizado": 0, "confidence_omega_pct": 0}],
       "tactical_tilts_resultantes_pct": {}
     },
-    "risk_parity_pesos_pct": {}, "hrp_pesos_pct": {},
-    "max_sharpe_pesos_pct": {}, "max_sharpe_esperado": 0, "min_variance_pesos_pct": {},
+    "sleeve_risco_split_pct": {
+      "risk_parity": {"acoes_b3": 0, "crypto": 0}, "hrp": {"acoes_b3": 0, "crypto": 0},
+      "max_sharpe": {"acoes_b3": 0, "crypto": 0}, "min_variance": {"acoes_b3": 0, "crypto": 0}
+    },
+    "max_sharpe_esperado": 0,
+    "cdb_por_orcamento_dd_pct": 0,
     "comparativo_final_gic_pct": {},
     "defesa_via_cdb_e_usdc": {"pct_cdb_liquido": 0, "pct_usdc": 0, "rationale": ""},
     "stress_pre_aporte_pior_cenario_pct_pat": null, "viola_tolerancia_dd_pre": false
   },
-  "esg_e_special_sit": {
-    "esg_controversias_30d": [], "esg_red_flags_setores_top": [],
-    "tender_offers_em_curso": [], "spinoffs_anunciados": [], "ma_rumores": [],
-    "buybacks_programados": [], "activist_investors_destaques": [], "jcp_windows_proximas": []
-  },
   "tax_overlay": {
-    "cdb_ir_regressivo_permanencia_nota": "",
-    "acoes_isencao_20k_mes": true,
-    "dividendos_tributacao_vigente_verificada": "",
-    "crypto_isencao_35k_mes": true,
-    "tax_loss_harvesting_oportunidades": [
-      {"ativo": "", "classe": "acao|crypto", "perda_atual_pct": 0, "vender": false, "wash_sale_30d_ok": false}
-    ],
+    "dividendos_jcp_regra_vigente_verificada": "", "fonte": "",
     "obs_estruturais_fora_do_mandato": ""
   },
-  "behavioral_check": {
-    "anchoring": "", "loss_aversion": "", "recency": "",
-    "herding_contrarian_oportunidade": "", "confirmation": "", "overconfidence_calibration": "",
-    "ibov_breadth_pct_acima_200d_ma": null, "crypto_fg": null, "put_call_5d_ma": null
+  "sentimento": {
+    "ibov_breadth_pct_acima_200d_ma": null, "cnn_fg": null, "crypto_fg": null,
+    "put_call_5d_ma": null, "leitura_contrarian": ""
   },
   "alocacao_tatica_aporte": {
     "saa_baseline_pct": {"cdb": 0, "acoes_b3": 0, "crypto": 0},
     "bl_tactical_pct": {"cdb": 0, "acoes_b3": 0, "crypto": 0},
-    "risk_parity_sanity_pct": {"cdb": 0, "acoes_b3": 0, "crypto": 0},
-    "hrp_sanity_pct": {"cdb": 0, "acoes_b3": 0, "crypto": 0},
+    "orcamento_dd_pct": {"cdb": 0, "acoes_b3": 0, "crypto": 0},
     "final_tactical_pct": {"cdb": 0, "acoes_b3": 0, "crypto": 0},
     "final_tactical_brl": {"cdb": 0, "acoes_b3": 0, "crypto": 0},
     "distribuicao_cdb": {
@@ -719,7 +682,7 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
 > 1. ✓ Σ probabilidades cenários Brasil = 100
 > 2. ✓ Σ `final_tactical_pct` (cdb + acoes_b3 + crypto) = 100 e Σ `final_tactical_brl` = {{ amount_brl }} (±R$ 5)
 > 3. ✓ Black-Litterman tem ≥ 4 views numéricas
-> 4. ✓ Risk-parity + HRP + Max Sharpe + Min Variance calculados sobre os 3 buckets
+> 4. ✓ Risk-parity + HRP + Max Sharpe + Min Variance calculados sobre o SLEEVE DE RISCO; CDB dimensionado pelo orçamento de drawdown
 > 5. ✓ Cada `null` preenchido com WebSearch + URL + data. EXCEÇÃO: métrica de
 >      fonte paga sem chave/alternativa gratuita (ex.: Glassnode Reserve Risk /
 >      RHODL / Dormancy, NAAIM, MOVE, VVIX) PODE ficar `null` — registre o motivo
@@ -730,7 +693,7 @@ Markdown + **JSON validável** entre ` ```json ` e ` ``` `:
 > 9. ✓ `distribuicao_cdb` é 100% CDB Bradesco 100% CDI liquidez diária (emissor único; sinalize FGC se exposição no Bradesco > R$ 250k)
 > 10. ✓ Stop conditions QUANTITATIVOS
 > 11. ✓ Defesa expressa como CDB líquido + USDC (sem ouro/ETF/DOL)
-> 12. ✓ Behavioral check completo + Pre-mortem com fator dominante
+> 12. ✓ Leitura de sentimento + Pre-mortem com fator dominante
 > 13. ✓ `confianca_gic_0_10` calibrada (≠ 5 default)
 > 14. ✓ **NENHUMA menção a Tesouro / LCI / LCA / debênture / CRI / CRA / fundo /
 >      FII / ETF (GOLD11/BOVA11/IVVB11) / BDR / ouro / DOL / ativo internacional**
