@@ -32,8 +32,9 @@ import {
   type CategorySlice,
 } from "@/components/overview-charts";
 
+// No weekday: on a 390px phone it shares the row with the refresh button and
+// the floating controls, and "segunda-feira, 19 de outubro" got truncated.
 const DATE_LINE = new Intl.DateTimeFormat("pt-BR", {
-  weekday: "long",
   day: "numeric",
   month: "long",
 });

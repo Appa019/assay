@@ -46,7 +46,8 @@ const reportTitle = (title: string): string =>
   title
     .replace(/^#+\s*/, "")
     .replace(/\s+[—–-]\s+/g, " · ")
-    .replace(/(\d{4})-(\d{2})-(\d{2})/g, "$3/$2/$1");
+    .replace(/(\d{4})-(\d{2})-(\d{2})/g, "$3/$2/$1")
+    .replace(/(\d{4})-(\d{2})\b/g, "$2/$1");
 
 const reportWhen = (iso: string): string =>
   parseLocalDate(iso).toLocaleDateString("pt-BR", {
