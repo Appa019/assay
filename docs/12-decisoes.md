@@ -821,7 +821,9 @@ que o modelo diz:
    aporte, com 6 etapas e contexto crescente, isso se repetia em cada etapa.
    Reproduzido no Pi com haiku (resume em repo sujo: cw 6.638; sem git: 65) e
    corrigido com `CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS=1` em
-   `_agent_subprocess_env` (resume voltou a cw 57).
+   `_agent_subprocess_env` (resume voltou a cw 57). **Correção (D46):** era
+   uma causa real, mas não a única. A semanal de 19/10, já com o fix, ainda
+   reescreveu 149k na etapa 2.
 2. **O CLAUDE.md de desenvolvimento ia em toda chamada.** Os workspaces moram
    dentro do repo e o CLI sobe a árvore carregando todo CLAUDE.md que acha: o
    contrato do projeto (41 KB) + `.claude/rules` = 15,6k tokens em cada
@@ -953,3 +955,41 @@ telas do comitê. O visual do app passou; o fluxo, não. Correções:
   faixa lateral (banida no DESIGN.md), `confirm()` nativo para apagar (virou
   dois toques), rolagem aninhada no celular e links que tiravam o usuário da
   aba de Investimentos.
+
+### D46 · Retomar a sessão num processo novo reescreve o cache depois do primeiro resultado grande
+
+**Medição.** A semanal de 19/10 (US$ 4,08) rodou com o D43 no ar e mesmo
+assim a etapa 2 leu só 17k do cache e escreveu 149k em 2 chamadas. Foi
+investigado com haiku no Pi, um fator por vez, cada experimento com centavos:
+
+| Cenário (2 etapas, resume entre elas) | 1ª chamada após o resume |
+|---|---|
+| repo git sujo, sem o env do D43 | cw 6.638 (quebra) |
+| repo git sujo, com o env | cw 57 |
+| workspace do comitê sem MCP, editando MEMORY.md | cw 148 |
+| com MCP + ToolSearch | cw 1.275 a 5.333 (quebra parcial) |
+| opus/max, mínimo, com e sem MCP | cw 704 / 60 |
+| workspace completo com commits | cw 654 / 453 |
+| **um `cat` de ~10k tokens na etapa 1** | **cw 9.931: o resultado inteiro reescrito** |
+
+Conclusão: dentro do mesmo processo o cache funciona; no `--resume` de um
+processo novo, o CLI reconstrói os tool results grandes de forma diferente da
+original, e tudo dali em diante paga escrita de cache de novo (US$ 10/M no
+opus, contra US$ 0,50/M de leitura). O comitê é feito de buscas grandes,
+então cada resume reescreve quase a conversa inteira. Não há flag documentada
+que desligue isso. A trilha do `context_hint` (beta que microcompacta tool
+results acima de 75k) foi lida no binário 2.1.218 e não se confirmou como
+causa. O que se confirmou foi o tamanho do resultado.
+
+**Feito.** A revisão semanal e a de maturidade viraram UMA etapa que devolve o
+memo e o relatório separados por um marcador. Elas tinham duas etapas só para
+reformatar. Economia esperada: ~US$ 1,5 por semanal (37%).
+
+**Próximo passo (não feito de madrugada, de propósito).** O aporte tem 6
+etapas e 5 resumes, e cada um paga essa reescrita sobre um contexto de
+100-250k (estimativa: US$ 5-10 por aporte). A correção estrutural é rodar a
+cadeia num processo só, mandando as reuniões por `--input-format stream-json`.
+O `--resume` fica só como fallback para morte do processo ou limite de uso.
+Isso mexe no motor de retomada (`run_chain`, `_run_step_resilient`) e precisa
+de teste com um aporte real. O primeiro aporte grava `context_tokens` e
+`cost_usd` por etapa e dá a linha de base.

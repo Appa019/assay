@@ -10,9 +10,11 @@ Prompts do comitê sem cálculo degenerado (otimizador com CDB de vol zero,
 filtros de EBITDA em banco, opções numa folha long-only), semanal medida em
 dias de calendário (rodava a cada 8), relatórios com bloco de ações
 (`Report.actions`, coluna nova migrada no boot) e o front mostrando agendado,
-ordens primeiro e falhas em português. Pendências: a rotação semanal ainda não
-vira `Order` (precisa modelar venda + compra) e o primeiro aporte depois disso
-precisa ser medido.
+ordens primeiro e falhas em português. Semanal e maturidade em uma etapa só
+(D46). Pendências, em ordem de valor: (1) rodar as etapas do aporte num
+processo só (`--input-format stream-json`), porque cada `--resume` reescreve o
+cache depois do primeiro resultado grande; (2) a rotação semanal ainda não
+vira `Order` (precisa modelar venda + compra); (3) medir o primeiro aporte.
 
 ## 2026-10-19 — vazamentos de token fora do modelo (D43)
 
