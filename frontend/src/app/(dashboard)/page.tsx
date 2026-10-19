@@ -94,6 +94,14 @@ const DashboardPage = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   const month = currentMonth();
+  // The page is prerendered at build time, and suppressHydrationWarning KEEPS
+  // the prerendered text: the date line read "14 de setembro" on 19/10. Dates
+  // are rendered only once the browser has mounted.
+  const [today, setToday] = useState<Date | null>(null);
+  useEffect(() => {
+    const timer = setTimeout(() => setToday(new Date()), 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   const loadPendingOrders = useCallback(async () => {
     try {
@@ -204,10 +212,8 @@ const DashboardPage = () => {
           <p
             className="truncate text-[11px] font-medium uppercase tracking-[0.18em]"
             style={{ color: "var(--text-muted)" }}
-            // Prerendered at build time; the browser renders today instead.
-            suppressHydrationWarning
           >
-            {DATE_LINE.format(new Date())}
+            {today ? DATE_LINE.format(today) : "\u00a0"}
           </p>
         </div>
         <button
@@ -288,7 +294,7 @@ const DashboardPage = () => {
                   color="var(--text-primary)"
                 />
                 {portfolio.assets.length === 0 ? (
-                  <HeroNote action={{ href: "/aporte", label: "Registrar aporte" }}>
+                  <HeroNote action={{ href: "/investimentos?aba=aportar", label: "Registrar aporte" }}>
                     Nenhuma posição ainda.
                   </HeroNote>
                 ) : (
@@ -307,7 +313,7 @@ const DashboardPage = () => {
             style={{ borderColor: "var(--border)" }}
           >
             <Eyebrow>
-              Saldo de <span suppressHydrationWarning>{monthName(month)}</span>
+              Saldo de <span>{today ? monthName(month) : "\u00a0"}</span>
             </Eyebrow>
             {cashflowFailed ? (
               <>

@@ -33,5 +33,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
 export const PRIMARY_NAV = NAV_ITEMS;
 export const SECONDARY_NAV: readonly NavItem[] = [];
 
-export const isCurrentPath = (pathname: string, href: string): boolean =>
-  href === "/" ? pathname === "/" : pathname.startsWith(href);
+// Legacy routes still served for deep links, owned by an Investimentos tab.
+const INVESTMENT_ROUTES = ["/aporte", "/relatorios", "/ativos", "/ir"];
+
+export const isCurrentPath = (pathname: string, href: string): boolean => {
+  if (href === "/") return pathname === "/";
+  if (href === "/investimentos" && INVESTMENT_ROUTES.some((r) => pathname.startsWith(r))) {
+    return true;
+  }
+  return pathname.startsWith(href);
+};
