@@ -30,7 +30,7 @@ def main() -> int:
             result = insight_service.run_daily(session)
     except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
         notification_center.notify(
-            f"✖ daily_insights falhou: {exc}",
+            notification_center.failure_text("Insights do dia", exc),
             kind=NotificationKind.SYSTEM,
             level=NotificationLevel.ERROR,
         )

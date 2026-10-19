@@ -120,7 +120,7 @@ def main() -> int:
         return 1 if failures else 0
     except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
         notification_center.notify(
-            f"✖ run_scheduled (aportes da madrugada) falhou: {exc}",
+            notification_center.failure_text("Aporte da madrugada", exc),
             kind=NotificationKind.SYSTEM,
             level=NotificationLevel.ERROR,
         )

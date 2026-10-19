@@ -63,6 +63,26 @@ def _split_title(text: str) -> tuple[str, str]:
     return (head, rest.strip() or head)
 
 
+def failure_text(task: str, exc: BaseException) -> str:
+    """A cron failure as the client should read it: what stopped and what
+    happens next on the first line (the inbox title), raw detail below.
+
+    Matched by class NAME so this module never imports the runner.
+    """
+    kind = type(exc).__name__
+    detail = str(exc).strip()
+    lower = detail.lower()
+    if kind == "LimitError":
+        plain = "o plano bateu no limite de uso. Tento de novo sozinho quando liberar."
+    elif kind == "AuthError":
+        plain = "o login do Claude expirou no servidor. Precisa renovar no Pi."
+    elif "connect" in lower or "timed out" in lower or "enotimp" in lower:
+        plain = "sem conexão com o serviço externo. Tento de novo na próxima janela."
+    else:
+        plain = "parou com um erro. Tento de novo na próxima janela."
+    return f"✖ {task}: {plain}\n\nDetalhe técnico: {detail[:400]}"
+
+
 def notify(
     text: str,
     *,

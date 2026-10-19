@@ -35,7 +35,7 @@ def main() -> int:
             snapshot = portfolio_service.record_daily_snapshot(session)
     except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
         notification_center.notify(
-            f"✖ daily_snapshot falhou: {exc}",
+            notification_center.failure_text("Snapshot da carteira", exc),
             kind=NotificationKind.SYSTEM,
             level=NotificationLevel.ERROR,
         )

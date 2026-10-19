@@ -72,7 +72,7 @@ def main() -> int:
         return 0
     except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
         notification_center.notify(
-            f"✖ check_cadence (maturidade) falhou: {exc}",
+            notification_center.failure_text("Análise de maturidade", exc),
             kind=NotificationKind.SYSTEM,
             level=NotificationLevel.ERROR,
         )

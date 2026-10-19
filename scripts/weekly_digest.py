@@ -43,7 +43,7 @@ def main() -> int:
             text = insight_service.build_weekly_digest(session)
     except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
         notification_center.notify(
-            f"✖ weekly_digest falhou: {exc}",
+            notification_center.failure_text("Resumo semanal", exc),
             kind=NotificationKind.SYSTEM,
             level=NotificationLevel.ERROR,
         )

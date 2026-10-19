@@ -29,7 +29,7 @@ def main() -> int:
             result = asyncio.run(price_refresh_service.refresh_prices(session))
     except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
         notification_center.notify(
-            f"✖ refresh_prices falhou: {exc}",
+            notification_center.failure_text("Marcação a mercado", exc),
             kind=NotificationKind.SYSTEM,
             level=NotificationLevel.ERROR,
         )

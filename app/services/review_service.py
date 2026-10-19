@@ -66,12 +66,19 @@ def days_until_weekly_due(session: Session, *, interval_days: int = WEEKLY_INTER
     short every week and the review slid to every 8th day — leaving the next
     contribution one day outside the macro delta window.
     """
-    last = _last_weekly(session)
-    if last is None:
+    due_on = weekly_due_on(session, interval_days=interval_days)
+    if due_on is None:
         return 0.0
-    due_on = analysis_runner._local_date(last.created_at) + timedelta(days=interval_days)
     today = analysis_runner._local_date(datetime.now(UTC))
     return float(max(0, (due_on - today).days))
+
+
+def weekly_due_on(session: Session, *, interval_days: int = WEEKLY_INTERVAL_DAYS) -> date | None:
+    """Local calendar day the next weekly review is due (past = overdue)."""
+    last = _last_weekly(session)
+    if last is None:
+        return None
+    return analysis_runner._local_date(last.created_at) + timedelta(days=interval_days)
 
 
 async def fetch_macro() -> dict[str, Any]:

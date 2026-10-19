@@ -130,3 +130,20 @@ def test_mark_read_on_a_missing_row_raises_lookup(session: Session) -> None:
 
     with pytest.raises(LookupError):
         notification_center.mark_read(session, uuid4())
+
+
+def test_cron_failures_read_as_plain_portuguese_first() -> None:
+    from app.services import notification_center
+    from app.services.analysis_runner import LimitError, RetryableError
+
+    text = notification_center.failure_text(
+        "Revisão semanal",
+        RetryableError("Falha transitória (rc=1): API Error: Unable to connect to API (ENOTIMP)"),
+    )
+    title = text.split("\n", 1)[0]
+    assert (
+        title
+        == "✖ Revisão semanal: sem conexão com o serviço externo. Tento de novo na próxima janela."
+    )
+    assert "ENOTIMP" in text  # the raw detail survives, below the title
+    assert "limite de uso" in notification_center.failure_text("x", LimitError("429"))

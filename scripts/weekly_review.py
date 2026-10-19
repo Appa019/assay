@@ -135,7 +135,7 @@ def main() -> int:
             print(f"Adiada: {exc}")
             return 0
         notification_center.notify(
-            f"✖ Revisão semanal falhou: {exc}",
+            notification_center.failure_text("Revisão semanal", exc),
             kind=NotificationKind.SYSTEM,
             level=NotificationLevel.ERROR,
         )
@@ -143,7 +143,7 @@ def main() -> int:
         return 1
     except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
         notification_center.notify(
-            f"✖ Revisão semanal falhou: {exc}",
+            notification_center.failure_text("Revisão semanal", exc),
             kind=NotificationKind.SYSTEM,
             level=NotificationLevel.ERROR,
         )

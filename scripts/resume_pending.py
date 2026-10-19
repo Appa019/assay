@@ -115,7 +115,7 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001 — last-resort alert, like every other cron
             logger.error("resume_pending_failed", error=str(exc))
             notification_center.notify(
-                f"✖ resume_pending falhou: {exc}",
+                notification_center.failure_text("Retomada de análises", exc),
                 kind=NotificationKind.SYSTEM,
                 level=NotificationLevel.ERROR,
             )
@@ -130,7 +130,7 @@ def main() -> int:
         except Exception as exc:  # keep the watcher alive across unexpected errors
             logger.error("resume_watch_error", error=str(exc))
             notification_center.notify(
-                f"✖ resume_pending (watch) falhou neste passe: {exc}",
+                notification_center.failure_text("Retomada de análises", exc),
                 kind=NotificationKind.SYSTEM,
                 level=NotificationLevel.ERROR,
             )

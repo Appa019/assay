@@ -205,7 +205,7 @@ def main() -> int:
         return 0
     except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish
         notification_center.notify(
-            f"✖ monthly_report falhou: {exc}",
+            notification_center.failure_text("Relatório mensal", exc),
             kind=NotificationKind.SYSTEM,
             level=NotificationLevel.ERROR,
         )
