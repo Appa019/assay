@@ -700,6 +700,8 @@ def _should_rotate(
         last = datetime.fromisoformat(updated_at)
     except ValueError:
         return False
+    if last.tzinfo is None:  # project convention: naive means UTC
+        last = last.replace(tzinfo=UTC)
     idle_s = (datetime.now(UTC) - last).total_seconds()
     return idle_s >= _CACHE_TTL_S
 

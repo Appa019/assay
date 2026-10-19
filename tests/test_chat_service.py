@@ -885,3 +885,5 @@ def test_cold_fat_session_rotates_but_cold_thin_one_resumes() -> None:
     assert not chat_service._should_rotate("s", 3, fat, fresh)
     assert not chat_service._should_rotate("s", 3, fat - 1, old)
     assert not chat_service._should_rotate("s", 3, fat, None)
+    naive_old = old.replace("+00:00", "")
+    assert chat_service._should_rotate("s", 3, fat, naive_old)  # no TypeError
