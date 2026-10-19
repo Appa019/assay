@@ -168,9 +168,9 @@ rascunho digitado e os anexos selecionados que ficam no estado do chat.
 | `sidebar.tsx` / `mobile-nav.tsx` | as duas caras da mesma navegação |
 | `portfolio-charts.tsx` | `AllocationDonut`, `EquityCurveChart`, `BenchmarkChart` (Recharts) |
 | `overview-charts.tsx` | `FlowRails`, `MandateRails`, `CategoryBars` — as visualizações próprias da home |
-| `orders-panel.tsx` | folha de ordens com executar/pular inline |
-| `analysis-flow.tsx` | acompanhamento etapa a etapa de um aporte (polling) |
-| `markdown-viewer.tsx` | renderiza memos do comitê (remark-gfm + rehype-slug) |
+| `orders-panel.tsx` | folha de ordens com executar/pular inline; ticket e stop copiáveis em formato de corretora (vírgula decimal) |
+| `analysis-flow.tsx` | um aporte em 4 estados: agendado (`scheduled_for`, sem spinner), rodando (polling), parou (`describeRunFailure`) e concluído (ordens → fechamento → atas recolhidas) |
+| `markdown-viewer.tsx` | renderiza memos do comitê (remark-gfm + rehype-slug); `maxHeight` só vale de `md` para cima |
 | `download-button.tsx` | baixa um relatório como `.md` |
 
 ## Padrões de código (obrigatórios)

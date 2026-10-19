@@ -4,6 +4,16 @@
 > atualize-o quando mudar algo estrutural. Os outros 12 descrevem como o
 > sistema funciona; este descreve como ele está **agora**.
 
+## 2026-10-19 — comitê revisado e telas do comitê (D44, D45)
+
+Prompts do comitê sem cálculo degenerado (otimizador com CDB de vol zero,
+filtros de EBITDA em banco, opções numa folha long-only), semanal medida em
+dias de calendário (rodava a cada 8), relatórios com bloco de ações
+(`Report.actions`, coluna nova migrada no boot) e o front mostrando agendado,
+ordens primeiro e falhas em português. Pendências: a rotação semanal ainda não
+vira `Order` (precisa modelar venda + compra) e o primeiro aporte depois disso
+precisa ser medido.
+
 ## 2026-10-19 — vazamentos de token fora do modelo (D43)
 
 Cache do comitê quebrava em todo `--resume` (snapshot de git), CLAUDE.md de dev

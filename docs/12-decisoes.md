@@ -913,3 +913,43 @@ O que ficou de propósito: as 5 etapas encadeadas, o effort `max`, as 12
 personas da reunião 1, DCF/Reverse DCF/CCA, os 8 cenários de stress e o
 pre-mortem. Ainda não há aporte medido depois disso; o primeiro grava
 `context_tokens` por etapa e responde quanto custou.
+
+### D45 · O comitê visto do celular: agendado não é rodando, ordem vem antes da prosa
+
+Duas avaliações independentes, uma revisão de design no Pi em viewport de
+iPhone e o detector automático, deram 17/40 nas heurísticas de Nielsen às
+telas do comitê. O visual do app passou; o fluxo, não. Correções:
+
+- **Agendado ≠ rodando.** Desde D38 o aporte espera a 1h, mas o front não
+  conhecia `scheduled_for` (nem na listagem): mostrava "Rodando" com spinner e
+  "Reunião em andamento…" por horas. Agora tem um estado próprio ("Agendado ·
+  hoje à 01:00", quando a folha fica pronta, polling de 60s), o botão diz
+  "Agendar R$ X para 1h" (o valor no botão é o recap antes de comprometer) e
+  "Rodar agora" existe, com o custo dito: ocupa o limite do consultor.
+- **Ordem antes da prosa.** No run concluído, a folha de ordens vinha depois do
+  fechamento, de 6 cards de etapa e dos botões de navegação. Ficou: ordens →
+  fechamento (documento neutro, sem o card verde) → "Atas das N reuniões"
+  recolhidas. O ticket copia com vírgula decimal (o que a corretora aceita), o
+  stop ganhou linha própria copiável e os campos de execução aceitam vírgula.
+- **Relatório é documento, com "O que fazer" em cima.** A semanal escrevia em
+  formato Telegram (preâmbulo do agente, 8-11 emojis, "•" que viravam um
+  parágrafo só). O prompt agora pede markdown sem preâmbulo nem emoji e um
+  bloco `{"acoes": [...]}` que vai para `Report.actions`. A rotação
+  "VENDER CDB → COMPRAR BTC" aparece como lista acionável antes do texto.
+  `cleanReport` limpa os relatórios antigos. As ações NÃO viram `Order`: uma
+  rotação é venda + compra, e o `Order` só conhece compra amarrada a um aporte.
+  Fazer isso direito pede outro modelo, e não cabia numa madrugada sem revisão.
+- **Falha dita em português.** "Falha transitória do Claude (rc=1): API Error…"
+  era o título do aviso. `failure_text` (backend) e `describeRunFailure` (front)
+  abrem com o que parou e o que acontece depois; o erro cru fica embaixo.
+- **Silêncio vira aviso.** O BCB fora do ar devolvia série nula sem exceção,
+  então `/api/macro` dizia `warnings: []` com quatro traços na tela. Agora
+  avisa. A página de análises diz quando vence a próxima semanal e se está
+  atrasada (`/api/cadence.next_weekly_review`).
+- **Bugs encontrados no caminho.** A data da home estava congelada no build
+  (`suppressHydrationWarning` mantém o texto pré-renderizado): mostrava "14 de
+  setembro" em 19/10. `--text-muted` reprovava contraste (3,2-3,6:1) em todo
+  lugar; subiu para L=0,53 (≥ 4,5:1 em todas as superfícies). Blockquote com
+  faixa lateral (banida no DESIGN.md), `confirm()` nativo para apagar (virou
+  dois toques), rolagem aninhada no celular e links que tiravam o usuário da
+  aba de Investimentos.
