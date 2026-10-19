@@ -105,6 +105,8 @@ export type Contribution = {
   notes: string | null;
   created_at: string;
   completed_at: string | null;
+  /** UTC-aware ISO; set while the run waits for its night slot. */
+  scheduled_for?: string | null;
   prompts: Prompt[];
 };
 
@@ -116,6 +118,7 @@ export type ContributionListItem = {
   completed_at: string | null;
   prompts_total: number;
   prompts_answered: number;
+  scheduled_for?: string | null;
 };
 
 export type MacroSnapshot = {
@@ -148,6 +151,8 @@ export type CadenceStatus = {
   last_contribution_date: string | null;
   days_since_last: number | null;
   total_contributions: number;
+  /** Local date (YYYY-MM-DD) the weekly review is due; past = overdue. */
+  next_weekly_review?: string | null;
 };
 
 /** API error carrying the HTTP status so callers can branch on 404/409. */
@@ -486,10 +491,12 @@ export const fetchCadence = async (): Promise<CadenceStatus> =>
 export const createContribution = async (
   amount_brl: number,
   notes?: string,
-  run = false
+  run = false,
+  now = false
 ): Promise<Contribution> =>
   json<Contribution>(
-    await fetch(`${API_BASE}/api/contributions?run=${run}`, {
+    // run=true schedules the committee for the night slot; now=true skips it.
+    await fetch(`${API_BASE}/api/contributions?run=${run}&now=${now}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amount_brl, notes }),
@@ -556,6 +563,17 @@ export type ReportListItem = {
 
 export type ReportStep = { title: string; response: string };
 
+/** One thing the review tells the client to do (from its machine block). */
+export type ReportAction = {
+  tipo: "comprar" | "vender" | "manter";
+  ticker: string;
+  classe?: "cdb" | "acoes_b3" | "crypto";
+  valor_brl?: number | null;
+  preco_alvo?: number | null;
+  stop?: number | null;
+  motivo?: string;
+};
+
 export type ReportRead = {
   id: string;
   kind: ReportKind;
@@ -564,6 +582,7 @@ export type ReportRead = {
   cost_usd: number;
   session_id: string | null;
   steps: ReportStep[] | null;
+  actions?: ReportAction[] | null;
   created_at: string;
 };
 

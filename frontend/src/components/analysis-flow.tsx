@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -9,28 +9,45 @@ import {
   ChevronDown,
   ChevronUp,
   Circle,
+  Clock,
   Loader2,
   Plus,
   RefreshCw,
-  Sparkles,
-  Wallet,
 } from "lucide-react";
 import type { Contribution, Prompt } from "@/lib/api";
 import { MarkdownViewer } from "@/components/markdown-viewer";
-import { formatBRL, formatDateLong, stripMachineBlocks } from "@/lib/format";
+import {
+  describeRunFailure,
+  formatBRL,
+  formatDateLong,
+  formatScheduledFor,
+  stripMachineBlocks,
+} from "@/lib/format";
 
 const POLL_INTERVAL_MS = 4000;
+// A scheduled run only needs to notice that it started.
+const SCHEDULED_POLL_MS = 60_000;
 
 export const isRunFailed = (c: Contribution): boolean =>
   c.status === "ready" && (c.notes ?? "").startsWith("[run failed");
 
+/** Waiting for its night slot: nothing ran yet and nothing is running. */
+export const isRunScheduled = (c: Contribution): boolean =>
+  Boolean(c.scheduled_for) &&
+  c.status !== "completed" &&
+  c.status !== "in_progress" &&
+  !isRunFailed(c) &&
+  c.prompts.every((p) => !p.response);
+
 type StepState = "done" | "running" | "pending";
+type RunState = "scheduled" | "running" | "failed" | "completed";
 
 /**
- * Live view of a contribution analysis: chained committee steps, expandable
- * markdown responses and the final order sheet. Polls while the run is in
- * flight; `resuming` keeps the polling alive right after a retry, before the
- * backend flips the status back to in_progress.
+ * Live view of a contribution analysis. Before the run: when it is scheduled.
+ * During: the chained committee steps filling in. After: `children` (the order
+ * sheet) first, then the closing summary, with the meeting minutes folded
+ * away. Polls while the run is in flight; `resuming` keeps the polling alive
+ * right after a retry, before the backend flips the status back to in_progress.
  */
 export const AnalysisFlow = ({
   contribution,
@@ -38,35 +55,44 @@ export const AnalysisFlow = ({
   onRetry,
   resuming = false,
   retryError = null,
+  children,
 }: {
   contribution: Contribution;
   onPoll: () => Promise<void>;
   onRetry: () => Promise<void>;
   resuming?: boolean;
   retryError?: string | null;
+  children?: ReactNode;
 }) => {
   const orderedPrompts = useMemo(
     () => [...contribution.prompts].sort((a, b) => a.prompt_order - b.prompt_order),
     [contribution.prompts]
   );
 
-  const isCompleted = contribution.status === "completed";
-  const failed = isRunFailed(contribution) && !resuming;
-  const isRunning = !isCompleted && !failed;
+  const runState: RunState =
+    contribution.status === "completed"
+      ? "completed"
+      : isRunFailed(contribution) && !resuming
+        ? "failed"
+        : isRunScheduled(contribution) && !resuming
+          ? "scheduled"
+          : "running";
+  const isRunning = runState === "running";
 
-  // Poll the backend while the run is in flight; each prompt response and the
-  // final summary fill in as the chained Claude session advances.
   useEffect(() => {
-    if (!isRunning) return;
-    const timer = setInterval(() => {
-      void onPoll();
-    }, POLL_INTERVAL_MS);
+    if (runState !== "running" && runState !== "scheduled") return;
+    const timer = setInterval(
+      () => {
+        void onPoll();
+      },
+      runState === "running" ? POLL_INTERVAL_MS : SCHEDULED_POLL_MS
+    );
     return () => clearInterval(timer);
-  }, [isRunning, onPoll]);
+  }, [runState, onPoll]);
 
   const answeredCount = orderedPrompts.filter((p) => p.response).length;
   const totalSteps = orderedPrompts.length + 1; // + fechamento
-  const doneSteps = answeredCount + (isCompleted ? 1 : 0);
+  const doneSteps = answeredCount + (runState === "completed" ? 1 : 0);
 
   // The first prompt without a response is the one currently running.
   const runningIndex = isRunning ? orderedPrompts.findIndex((p) => !p.response) : -1;
@@ -77,11 +103,17 @@ export const AnalysisFlow = ({
     return "pending";
   };
 
-  const synthesisState: StepState = isCompleted
-    ? "done"
-    : isRunning && runningIndex === -1
-      ? "running"
-      : "pending";
+  const synthesisState: StepState =
+    runState === "completed" ? "done" : isRunning && runningIndex === -1 ? "running" : "pending";
+
+  const steps = (
+    <div className="space-y-4">
+      {orderedPrompts.map((prompt, idx) => (
+        <StepCard key={prompt.id} prompt={prompt} state={stepStateFor(idx)} />
+      ))}
+      <SynthesisCard state={synthesisState} stepNumber={totalSteps} />
+    </div>
+  );
 
   return (
     <div className="max-w-5xl space-y-8 md:space-y-10">
@@ -90,83 +122,76 @@ export const AnalysisFlow = ({
           className="text-[11px] uppercase tracking-[0.18em] font-medium mb-2 break-words"
           style={{ color: "var(--text-muted)" }}
         >
-          Aporte #{contribution.id.slice(0, 8)} · {formatDateLong(contribution.created_at)}
+          Aporte · {formatDateLong(contribution.created_at)}
         </p>
         <h2
-          className="text-3xl md:text-4xl tracking-tight leading-tight"
+          className="text-3xl md:text-4xl tracking-tight leading-tight tabular"
           style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
         >
           {formatBRL(contribution.amount_brl)}
         </h2>
         {/* Wraps below md: the bar takes its own line, meta + badge the next. */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3">
-          <ProgressBar value={doneSteps} total={totalSteps} />
-          <span className="text-xs font-medium tabular" style={{ color: "var(--text-secondary)" }}>
-            {doneSteps} de {totalSteps} etapas
-          </span>
-          <StatusBadge running={isRunning} completed={isCompleted} failed={failed} />
+          {runState !== "scheduled" && (
+            <>
+              <ProgressBar value={doneSteps} total={totalSteps} />
+              <span
+                className="text-xs font-medium tabular"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {doneSteps} de {totalSteps} etapas
+              </span>
+            </>
+          )}
+          <StatusBadge state={runState} scheduledFor={contribution.scheduled_for ?? null} />
         </div>
       </header>
 
-      {isRunning && (
-        <section
-          className="p-4 md:p-5 rounded-md flex items-start gap-3"
-          style={{ background: "var(--accent-light)", border: "1px solid var(--accent)" }}
-        >
-          <Sparkles size={16} style={{ color: "var(--accent-strong)" }} className="mt-0.5 shrink-0" />
-          <div className="text-xs leading-relaxed" style={{ color: "var(--text-primary)" }}>
-            O comitê roda de forma autônoma no servidor (Opus · max · sessão única
-            encadeada). Cada reunião pode levar minutos. Pode fechar esta aba: a
-            análise continua e esta página retoma de onde estiver ao reabrir.
-          </div>
-        </section>
+      {runState === "scheduled" && contribution.scheduled_for && (
+        <Notice tone="accent">
+          <strong>Roda {formatScheduledFor(contribution.scheduled_for)}.</strong> De madrugada
+          porque o comitê divide o limite de uso com o consultor. A folha de ordens fica pronta
+          cerca de 90 minutos depois e chega um aviso no app.
+        </Notice>
       )}
 
-      {failed && (
-        <section
-          className="p-4 md:p-5 rounded-md flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4"
-          style={{ background: "var(--danger-light)", border: "1px solid var(--danger)" }}
-        >
-          <div className="flex items-start gap-3 min-w-0">
-            <AlertTriangle size={16} style={{ color: "var(--danger)" }} className="mt-0.5 shrink-0" />
-            <div
-              className="text-xs leading-relaxed min-w-0 break-words"
-              style={{ color: "var(--text-primary)" }}
+      {runState === "running" && (
+        <Notice tone="accent">
+          O comitê está reunido no servidor. Cada reunião leva de 10 a 30 minutos. Pode fechar
+          esta aba: a página retoma de onde estiver.
+        </Notice>
+      )}
+
+      {runState === "failed" && (
+        <FailureNotice notes={contribution.notes} retryError={retryError} onRetry={onRetry} />
+      )}
+
+      {runState === "completed" ? (
+        <>
+          {children}
+          {contribution.final_summary && <FinalSummary summary={contribution.final_summary} />}
+          <details className="group">
+            <summary
+              className="flex items-center justify-between cursor-pointer min-h-11 px-4 py-3 rounded-md text-sm font-medium list-none"
+              style={{
+                background: "var(--bg-card)",
+                border: "1px solid var(--border)",
+                color: "var(--text-secondary)",
+              }}
             >
-              <strong>A análise falhou.</strong>{" "}
-              <span style={{ color: "var(--text-secondary)" }}>{contribution.notes}</span>
-              {retryError && (
-                <p className="mt-1.5 font-medium" style={{ color: "var(--danger)" }}>
-                  {retryError}
-                </p>
-              )}
-            </div>
-          </div>
-          <button
-            onClick={() => void onRetry()}
-            className="flex items-center justify-center gap-2 min-h-11 w-full px-4 py-2 rounded-md text-xs font-semibold shrink-0 md:min-h-0 md:w-auto"
-            style={{ background: "var(--accent)", color: "white" }}
-          >
-            <RefreshCw size={13} />
-            Tentar novamente
-          </button>
-        </section>
+              Atas das {orderedPrompts.length} reuniões
+              <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="mt-4">{steps}</div>
+          </details>
+        </>
+      ) : (
+        steps
       )}
-
-      {isCompleted && contribution.final_summary && (
-        <FinalSummary summary={contribution.final_summary} />
-      )}
-
-      <div className="space-y-4">
-        {orderedPrompts.map((prompt, idx) => (
-          <StepCard key={prompt.id} prompt={prompt} state={stepStateFor(idx)} />
-        ))}
-        <SynthesisCard state={synthesisState} stepNumber={totalSteps} />
-      </div>
 
       <div className="flex flex-col gap-3 md:flex-row">
         <Link
-          href="/aporte"
+          href="/investimentos?aba=aportar"
           className="flex items-center justify-center gap-2 min-h-11 px-5 py-2.5 rounded-md text-sm font-semibold md:min-h-0"
           style={{ background: "var(--accent)", color: "white" }}
         >
@@ -174,34 +199,107 @@ export const AnalysisFlow = ({
           Novo aporte
         </Link>
         <Link
-          href="/relatorios"
+          href="/investimentos?aba=analises"
           className="flex items-center justify-center min-h-11 px-5 py-2.5 rounded-md text-sm font-medium md:min-h-0"
           style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)" }}
         >
-          Ver histórico
+          Ver análises
         </Link>
       </div>
     </div>
   );
 };
 
-const StatusBadge = ({
-  running,
-  completed,
-  failed,
+const Notice = ({ tone, children }: { tone: "accent"; children: ReactNode }) => (
+  <section
+    className="p-4 md:p-5 rounded-md text-sm leading-relaxed"
+    style={{
+      background: tone === "accent" ? "var(--accent-light)" : undefined,
+      color: "var(--text-primary)",
+    }}
+  >
+    {children}
+  </section>
+);
+
+const FailureNotice = ({
+  notes,
+  retryError,
+  onRetry,
 }: {
-  running: boolean;
-  completed: boolean;
-  failed: boolean;
+  notes: string | null;
+  retryError: string | null;
+  onRetry: () => Promise<void>;
 }) => {
-  const label = failed ? "Falhou" : completed ? "Concluído" : running ? "Rodando" : "Pronto";
-  const color = failed ? "var(--danger)" : completed ? "var(--success)" : "var(--accent-strong)";
+  const { message, detail } = describeRunFailure(notes);
+  return (
+    <section
+      className="p-4 md:p-5 rounded-md flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4"
+      style={{ background: "var(--danger-light)", border: "1px solid var(--danger)" }}
+    >
+      <div className="flex items-start gap-3 min-w-0">
+        <AlertTriangle size={16} style={{ color: "var(--danger)" }} className="mt-0.5 shrink-0" />
+        <div className="text-sm leading-relaxed min-w-0 break-words" style={{ color: "var(--text-primary)" }}>
+          <strong>A análise parou.</strong> {message}
+          {detail && (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs" style={{ color: "var(--text-secondary)" }}>
+                Detalhe técnico
+              </summary>
+              <p className="mt-1 text-xs font-mono" style={{ color: "var(--text-secondary)" }}>
+                {detail}
+              </p>
+            </details>
+          )}
+          {retryError && (
+            <p className="mt-1.5 font-medium" style={{ color: "var(--danger)" }}>
+              {retryError}
+            </p>
+          )}
+        </div>
+      </div>
+      <button
+        onClick={() => void onRetry()}
+        className="flex items-center justify-center gap-2 min-h-11 w-full px-4 py-2 rounded-md text-xs font-semibold shrink-0 md:min-h-0 md:w-auto"
+        style={{ background: "var(--accent)", color: "white" }}
+      >
+        <RefreshCw size={13} />
+        Retomar agora
+      </button>
+    </section>
+  );
+};
+
+const StatusBadge = ({
+  state,
+  scheduledFor,
+}: {
+  state: RunState;
+  scheduledFor: string | null;
+}) => {
+  const label =
+    state === "failed"
+      ? "Parou"
+      : state === "completed"
+        ? "Concluído"
+        : state === "scheduled"
+          ? scheduledFor
+            ? `Agendado · ${formatScheduledFor(scheduledFor)}`
+            : "Agendado"
+          : "Rodando";
+  const color =
+    state === "failed"
+      ? "var(--danger)"
+      : state === "completed"
+        ? "var(--success)"
+        : "var(--accent-strong)";
   return (
     <span
       className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] px-2.5 py-1 rounded-full"
       style={{ color, background: "var(--bg-secondary)" }}
     >
-      {running && <Loader2 size={11} className="animate-spin" />}
+      {state === "running" && <Loader2 size={11} className="animate-spin" />}
+      {state === "scheduled" && <Clock size={11} />}
       {label}
     </span>
   );
@@ -212,17 +310,14 @@ const FinalSummary = ({ summary }: { summary: string }) => (
     initial={{ opacity: 0, y: 12 }}
     animate={{ opacity: 1, y: 0 }}
     className="p-4 md:p-7 rounded-md"
-    style={{ background: "var(--success-light)", border: "1px solid var(--success)" }}
+    style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
   >
-    <div className="flex items-center gap-2.5 mb-5">
-      <Wallet size={18} style={{ color: "var(--success)" }} />
-      <h3
-        className="text-2xl tracking-tight"
-        style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
-      >
-        Onde investir e quanto
-      </h3>
-    </div>
+    <h3
+      className="text-2xl tracking-tight mb-5"
+      style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
+    >
+      Fechamento do comitê
+    </h3>
     <MarkdownViewer content={stripMachineBlocks(summary)} />
   </motion.section>
 );
@@ -246,38 +341,28 @@ const ProgressBar = ({ value, total }: { value: number; total: number }) => {
   );
 };
 
-const StepIcon = ({ state, fallback }: { state: StepState; fallback: string }) => {
-  if (state === "done")
-    return (
-      <div
-        className="flex items-center justify-center w-10 h-10 rounded-md shrink-0"
-        style={{ background: "var(--success)", color: "white" }}
-      >
-        <Check size={16} />
-      </div>
-    );
-  if (state === "running")
-    return (
-      <div
-        className="flex items-center justify-center w-10 h-10 rounded-md shrink-0"
-        style={{ background: "var(--accent-light)", color: "var(--accent-strong)" }}
-      >
-        <Loader2 size={16} className="animate-spin" />
-      </div>
-    );
-  return (
-    <div
-      className="flex items-center justify-center w-10 h-10 rounded-md text-sm font-semibold shrink-0"
-      style={{
-        background: "var(--bg-secondary)",
-        color: "var(--text-muted)",
-        fontFamily: "var(--font-heading)",
-      }}
-    >
-      {fallback}
-    </div>
-  );
-};
+const StepIcon = ({ state, fallback }: { state: StepState; fallback: string }) => (
+  <div
+    className="flex items-center justify-center w-8 h-8 rounded-md text-xs font-semibold shrink-0 tabular"
+    style={{
+      background: state === "running" ? "var(--accent-light)" : "var(--bg-secondary)",
+      color:
+        state === "done"
+          ? "var(--success)"
+          : state === "running"
+            ? "var(--accent-strong)"
+            : "var(--text-muted)",
+    }}
+  >
+    {state === "done" ? (
+      <Check size={14} />
+    ) : state === "running" ? (
+      <Loader2 size={14} className="animate-spin" />
+    ) : (
+      fallback
+    )}
+  </div>
+);
 
 const formatDuration = (seconds: number): string => {
   if (seconds < 60) return `${Math.round(seconds)}s`;
@@ -286,9 +371,12 @@ const formatDuration = (seconds: number): string => {
   return rest > 0 ? `${minutes}min ${rest}s` : `${minutes}min`;
 };
 
+const formatUSD = (value: number): string =>
+  `US$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
 const stepMeta = (prompt: Prompt): string | null => {
   const parts = [
-    prompt.cost_usd !== null ? `US$ ${prompt.cost_usd.toFixed(2)}` : null,
+    prompt.cost_usd !== null ? formatUSD(prompt.cost_usd) : null,
     prompt.duration_s !== null ? formatDuration(prompt.duration_s) : null,
     prompt.num_turns !== null ? `${prompt.num_turns} turnos` : null,
   ].filter((p): p is string => p !== null);
@@ -303,12 +391,12 @@ const StepCard = ({ prompt, state }: { prompt: Prompt; state: StepState }) => {
   return (
     <motion.article
       initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: state === "pending" ? 0.5 : 1, y: 0 }}
-      transition={{ duration: 0.3 }}
+      animate={{ opacity: state === "pending" ? 0.55 : 1, y: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
       className="rounded-md overflow-hidden"
       style={{
         background: "var(--bg-card)",
-        border: `1px solid ${state === "done" ? "var(--success)" : "var(--border)"}`,
+        border: `1px solid ${state === "running" ? "var(--accent)" : "var(--border)"}`,
       }}
     >
       {/* Below md the step is a compact vertical block: header row, then the
@@ -330,7 +418,7 @@ const StepCard = ({ prompt, state }: { prompt: Prompt; state: StepState }) => {
               {state === "running" ? "Reunião em andamento…" : prompt.description}
             </p>
             {meta && (
-              <p className="text-[11px] mt-1 tabular" style={{ color: "var(--text-muted)" }}>
+              <p className="text-xs mt-1 tabular" style={{ color: "var(--text-muted)" }}>
                 {meta}
               </p>
             )}
@@ -344,7 +432,7 @@ const StepCard = ({ prompt, state }: { prompt: Prompt; state: StepState }) => {
             style={{ color: "var(--text-secondary)", background: "var(--bg-secondary)" }}
           >
             {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            {expanded ? "Recolher" : "Ver resposta"}
+            {expanded ? "Recolher" : "Ler ata"}
           </button>
         ) : (
           state === "pending" && (
@@ -366,6 +454,12 @@ const StepCard = ({ prompt, state }: { prompt: Prompt; state: StepState }) => {
             className="overflow-hidden"
           >
             <div className="px-4 pb-5 space-y-4 md:px-7 md:pb-7">
+              <div
+                className="rounded-md p-3 md:p-5 min-w-0"
+                style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
+              >
+                <MarkdownViewer content={prompt.response} maxHeight={560} />
+              </div>
               <details>
                 <summary
                   className="cursor-pointer text-[11px] uppercase tracking-[0.16em] font-medium min-h-11 py-3.5 md:min-h-0 md:py-0"
@@ -384,12 +478,6 @@ const StepCard = ({ prompt, state }: { prompt: Prompt; state: StepState }) => {
                   {prompt.content}
                 </pre>
               </details>
-              <div
-                className="rounded-md p-3 md:p-5 min-w-0"
-                style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
-              >
-                <MarkdownViewer content={prompt.response} maxHeight={560} />
-              </div>
             </div>
           </motion.div>
         )}
@@ -401,12 +489,12 @@ const StepCard = ({ prompt, state }: { prompt: Prompt; state: StepState }) => {
 const SynthesisCard = ({ state, stepNumber }: { state: StepState; stepNumber: number }) => (
   <motion.article
     initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: state === "pending" ? 0.5 : 1, y: 0 }}
-    transition={{ duration: 0.3 }}
+    animate={{ opacity: state === "pending" ? 0.55 : 1, y: 0 }}
+    transition={{ duration: 0.25, ease: "easeOut" }}
     className="rounded-md"
     style={{
       background: "var(--bg-card)",
-      border: `1px solid ${state === "done" ? "var(--success)" : "var(--border)"}`,
+      border: `1px solid ${state === "running" ? "var(--accent)" : "var(--border)"}`,
     }}
   >
     <header className="px-4 py-4 gap-3 md:px-7 md:py-5 md:gap-4 flex items-center">

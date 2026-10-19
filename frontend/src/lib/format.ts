@@ -117,3 +117,44 @@ export const stripMachineBlocks = (text: string): string =>
     .replace(/\n*-{3,}\s*\n+```json[\s\S]*?```\s*/g, "\n")
     .replace(/```json[\s\S]*?```/g, "")
     .trim();
+
+/** "hoje à 01:00" / "amanhã à 01:00" / "21/10 à 01:00" for a scheduled run. */
+export const formatScheduledFor = (value: string): string => {
+  const when = parseLocalDate(value);
+  const hour = when.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const days = -daysSince(value);
+  const day =
+    days === 0
+      ? "hoje"
+      : days === 1
+        ? "amanhã"
+        : when.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  return `${day} à ${hour}`;
+};
+
+// The agent used to open every report talking to itself ("Memória atualizada.
+// Segue o relatório…") before a "---". Reports written since D44 start with
+// the content; this keeps the older ones readable.
+const PREAMBLE_RE = /^[^\n]{0,240}(mem[oó]ria|MEMORY|relat[oó]rio|Telegram)[^\n]{0,240}\n+(-{3,}\n+)/i;
+
+/** A committee report as a document: no machine block, no agent preamble,
+ *  and "•" bullets turned into real markdown list items. */
+export const cleanReport = (text: string): string =>
+  stripMachineBlocks(text)
+    .replace(PREAMBLE_RE, "")
+    .replace(/^[ \t]*•[ \t]*/gm, "- ")
+    .trim();
+
+/** What a failed run note means for the client, plus the raw detail. */
+export const describeRunFailure = (notes: string | null): { message: string; detail: string } => {
+  const detail = (notes ?? "").replace(/^\[run failed[^\]]*\]\s*/, "").trim();
+  const lower = detail.toLowerCase();
+  const message = /limit|limite|rate|429|quota/.test(lower)
+    ? "O plano bateu no limite de uso. A análise retoma sozinha quando o limite liberar."
+    : /authenticate|login|oauth|subscription/.test(lower)
+      ? "O login do Claude expirou no servidor. Precisa renovar no Pi para a análise voltar."
+      : /connect|transit|timed out|network|enotimp/.test(lower)
+        ? "Sem conexão com o serviço de análise. A retomada automática tenta de novo a cada 15 minutos."
+        : "A análise parou com um erro. A retomada automática tenta de novo a cada 15 minutos.";
+  return { message, detail };
+};

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, FileQuestion, Loader2 } from "lucide-react";
+import { ArrowLeft, FileQuestion } from "lucide-react";
 import {
   ApiError,
   fetchContribution,
@@ -94,12 +94,12 @@ const AporteDetailPage = () => {
           Aporte não encontrado
         </p>
         <Link
-          href="/relatorios"
+          href="/investimentos?aba=analises"
           className="inline-flex min-h-[2.75rem] items-center gap-2 mt-5 px-5 rounded-md text-sm font-semibold"
           style={{ background: "var(--accent)", color: "white" }}
         >
           <ArrowLeft size={13} />
-          Voltar ao histórico
+          Voltar às análises
         </Link>
       </div>
     );
@@ -108,13 +108,11 @@ const AporteDetailPage = () => {
   if (!contribution) {
     return (
       <div className="max-w-4xl space-y-6">
-        <div
-          className="flex items-center gap-3 text-sm"
-          style={{ color: "var(--text-muted)" }}
-        >
-          <Loader2 size={16} className="animate-spin" />
-          {loadError ? `Backend indisponível, tentando de novo… (${loadError})` : "Carregando aporte…"}
-        </div>
+        {loadError && (
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            Backend indisponível, tentando de novo… ({loadError})
+          </p>
+        )}
         <div className="animate-pulse h-40 rounded-md" style={{ background: "var(--bg-secondary)" }} />
       </div>
     );
@@ -136,16 +134,16 @@ const AporteDetailPage = () => {
         onRetry={handleRetry}
         resuming={resuming}
         retryError={retryError}
-      />
-      {orders !== null && orders.length > 0 && (
-        <div className="max-w-5xl">
+      >
+        {/* The payoff of the run: what to type at the broker, before the prose. */}
+        {orders !== null && orders.length > 0 && (
           <OrdersPanel
             orders={orders}
-            subtitle="Recomendações do fechamento: registre a execução real ou pule o que não fizer"
+            subtitle="Digite na corretora e registre a execução real, ou pule o que não fizer"
             onChanged={loadOrders}
           />
-        </div>
-      )}
+        )}
+      </AnalysisFlow>
     </div>
   );
 };

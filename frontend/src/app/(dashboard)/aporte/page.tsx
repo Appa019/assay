@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, RefreshCw, Send } from "lucide-react";
+import { AlertTriangle, Moon, RefreshCw, Zap } from "lucide-react";
 import { createContribution, type MacroSnapshot } from "@/lib/api";
 import { useMacro } from "@/hooks/use-macro";
 
@@ -34,8 +34,7 @@ export const AporteView = () => {
     setAmount(formatted);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async (now: boolean) => {
     setError(null);
     const value = parseFloat(amount.replace(/\./g, "").replace(",", "."));
     if (Number.isNaN(value) || value <= 0) {
@@ -44,14 +43,19 @@ export const AporteView = () => {
     }
     setSubmitting(true);
     try {
-      // Create + trigger the headless analysis, then hand off to the
-      // dedicated page — closing the tab there loses nothing.
-      const created = await createContribution(value, notes || undefined, true);
+      // Create + schedule (or run) the committee, then hand off to the
+      // dedicated page, which shows when it runs and fills in as it goes.
+      const created = await createContribution(value, notes || undefined, true, now);
       router.push(`/aporte/${created.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao iniciar análise");
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void submit(false);
   };
 
   return (
@@ -67,10 +71,9 @@ export const AporteView = () => {
           className="mt-3 text-sm leading-relaxed max-w-xl"
           style={{ color: "var(--text-secondary)" }}
         >
-          Informe o valor. O sistema captura o macro (BCB · Yahoo · CoinGecko),
-          fotografa sua carteira e roda as 5 reuniões do comitê + fechamento no
-          Claude Code sozinho, cada reunião encadeada na anterior. Você
-          acompanha etapa por etapa e recebe, no fim, onde investir e quanto.
+          O comitê se reúne de madrugada, à 1h, e a folha de ordens fica pronta
+          por volta das 2h30, com aviso no app. Você acorda com o que digitar na
+          corretora: ticker, quantidade, preço e stop.
         </p>
       </header>
 
@@ -131,7 +134,7 @@ export const AporteView = () => {
               id="notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="ex: aporte de bonus, foco em RF curto"
+              placeholder="ex: aporte do bônus, prefiro reforçar o que já tenho"
               // 16px on phones keeps iOS from zooming the viewport on focus.
               className="w-full min-h-12 md:min-h-0 px-4 py-3 rounded-md text-base md:text-sm outline-none transition-colors"
               style={{
@@ -156,18 +159,33 @@ export const AporteView = () => {
             )}
           </AnimatePresence>
 
-          {/* Full-width submit on phones: bottom of the card, inside thumb reach. */}
+          {/* Full-width submit on phones: bottom of the card, inside thumb reach.
+              The label repeats the amount: it is the recap before committing. */}
           <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 pt-1">
             <button
               type="submit"
               disabled={submitting || !amount}
-              className="flex items-center justify-center md:justify-start gap-2.5 w-full md:w-auto min-h-12 md:min-h-0 px-6 py-3 rounded-md text-sm font-semibold transition-opacity disabled:opacity-40"
+              className="flex items-center justify-center md:justify-start gap-2.5 w-full md:w-auto min-h-12 md:min-h-0 px-6 py-3 rounded-md text-sm font-semibold tabular transition-opacity disabled:opacity-40"
               style={{ background: "var(--accent)", color: "white" }}
             >
-              <Send size={15} />
-              {submitting ? "Iniciando..." : "Adicionar aporte e rodar análise"}
+              <Moon size={15} />
+              {submitting ? "Agendando…" : amount ? `Agendar R$ ${amount} para 1h` : "Agendar para 1h"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void submit(true)}
+              disabled={submitting || !amount}
+              className="flex items-center justify-center gap-2 w-full md:w-auto min-h-12 md:min-h-0 px-5 py-3 rounded-md text-sm font-medium transition-opacity disabled:opacity-40"
+              style={{ background: "var(--bg-secondary)", color: "var(--text-secondary)" }}
+            >
+              <Zap size={14} />
+              Rodar agora
             </button>
           </div>
+          <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
+            Rodar agora ocupa o limite de uso do plano por cerca de 90 minutos, e o
+            consultor pode ficar sem responder nesse intervalo.
+          </p>
         </form>
       </section>
 
@@ -193,10 +211,10 @@ const MacroPreview = ({
             className="text-xl tracking-tight"
             style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}
           >
-            Dados que serão injetados na análise
+            Mercado agora
           </h3>
           <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-            Capturados ao vivo · qualquer dado faltante será sinalizado aos comitês
+            Vai junto com o aporte; o comitê confere ao vivo na hora da reunião
           </p>
         </div>
         <button
@@ -212,7 +230,11 @@ const MacroPreview = ({
       </div>
 
       {macro ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        // One quiet ledger of figures instead of eight stat cards.
+        <dl
+          className="grid grid-cols-2 lg:grid-cols-4 rounded-md overflow-hidden"
+          style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
+        >
           <MacroCard label="Selic" value={macro.macro.selic} unit="% a.a." />
           <MacroCard label="IPCA 12m" value={macro.macro.ipca_12m} unit="%" />
           <MacroCard label="CDI" value={macro.macro.cdi} unit="% a.a." />
@@ -221,7 +243,7 @@ const MacroPreview = ({
           <MacroCard label="Ibov 30d" value={macro.ibovespa.month_return_pct} unit="%" signed />
           <MacroCard label="BTC Dom" value={macro.crypto_global.btc_dominance} unit="%" />
           <MacroCard label="Fear & Greed" value={macro.fear_greed_index} />
-        </div>
+        </dl>
       ) : (
         <div
           className="p-6 text-sm rounded-md"
@@ -270,22 +292,19 @@ const MacroCard = ({
       : `${prefix ?? ""}${signed && value > 0 ? "+" : ""}${value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}${unit ?? ""}`;
 
   return (
-    <div
-      className="p-3.5 md:p-4 rounded-md"
-      style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
-    >
-      <p
-        className="text-[10px] uppercase tracking-[0.16em] font-medium"
+    <div className="px-3.5 py-3 md:px-4" style={{ borderBottom: "1px solid var(--border)" }}>
+      <dt
+        className="text-[11px] uppercase tracking-[0.16em] font-medium"
         style={{ color: "var(--text-muted)" }}
       >
         {label}
-      </p>
-      <p
-        className="text-base md:text-lg font-semibold tabular mt-1.5"
+      </dt>
+      <dd
+        className="text-base font-semibold tabular mt-1"
         style={{ color: value === null ? "var(--text-muted)" : "var(--text-primary)" }}
       >
         {formatted}
-      </p>
+      </dd>
     </div>
   );
 };

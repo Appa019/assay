@@ -207,7 +207,7 @@ const OrderCard = ({
             </span>
           </div>
 
-          {pending && <Ticket lines={order.ticket} />}
+          {pending && <Ticket lines={order.ticket} stop={order.stop_price} />}
 
           {(order.target_price !== null || order.stop_price !== null) && (
             <p
@@ -291,7 +291,24 @@ const OrderCard = ({
  * of buying, so it gets the loudest treatment on the card: ticker, quantity
  * and price on one tabular line, one line per B3 order book.
  */
-const Ticket = ({ lines }: { lines: TicketLine[] }) => {
+// What a broker field accepts: pt-BR decimal comma, no thousands separator.
+const brokerNumber = (value: number, digits = 2): string =>
+  value.toLocaleString("pt-BR", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: Math.max(digits, 8),
+    useGrouping: false,
+  });
+
+/** "38,50" and "1.234,56" are what a pt-BR thumb types; "38.50" also works. */
+const parseDecimal = (raw: string): number => {
+  const value = raw.trim();
+  return parseFloat(value.includes(",") ? value.replace(/\./g, "").replace(",", ".") : value);
+};
+
+const toInput = (value: number | null): string =>
+  value === null ? "" : String(value).replace(".", ",");
+
+const Ticket = ({ lines, stop }: { lines: TicketLine[]; stop: number | null }) => {
   const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
@@ -302,19 +319,24 @@ const Ticket = ({ lines }: { lines: TicketLine[] }) => {
 
   if (lines.length === 0) return null;
 
-  const copy = async (line: TicketLine) => {
-    const text =
-      line.book === "aplicação"
-        ? `${line.ticker} ${line.price.toFixed(2)}`
-        : `${line.ticker} ${formatNumber(line.quantity)} ${line.price.toFixed(2)}`;
+  const copyText = async (key: string, text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(line.ticker);
+      setCopied(key);
     } catch {
       // Clipboard is blocked outside a secure context; the numbers are on
       // screen anyway, so a failed copy is not worth an error state.
     }
   };
+
+  const copy = (line: TicketLine) =>
+    copyText(
+      line.ticker,
+      line.book === "aplicação"
+        ? `${line.ticker} ${brokerNumber(line.price)}`
+        : `${line.ticker} ${brokerNumber(line.quantity, 0)} ${brokerNumber(line.price)}`
+    );
+  const stopKey = "__stop__";
 
   return (
     <div className="mt-3 space-y-1.5">
@@ -362,6 +384,30 @@ const Ticket = ({ lines }: { lines: TicketLine[] }) => {
           </button>
         </div>
       ))}
+      {/* The stop is typed at the broker too, so it gets a copyable line. */}
+      {stop !== null && lines[0]?.book !== "aplicação" && (
+        <div
+          className="flex items-center gap-3 rounded-md px-3 py-2"
+          style={{ border: "1px dashed var(--border)" }}
+        >
+          <span className="text-xs font-medium uppercase tracking-[0.14em]" style={{ color: "var(--danger)" }}>
+            Stop
+          </span>
+          <span className="text-sm tabular" style={{ color: "var(--text-primary)" }}>
+            {formatBRL(stop)}
+          </span>
+          <button
+            type="button"
+            onClick={() => copyText(stopKey, brokerNumber(stop))}
+            aria-label="Copiar preço do stop"
+            className="ml-auto flex items-center gap-1.5 min-h-11 px-2.5 rounded-md text-[11px] font-medium md:min-h-0 md:py-1.5"
+            style={{ color: copied === stopKey ? "var(--success)" : "var(--text-muted)" }}
+          >
+            {copied === stopKey ? <Check size={12} /> : <Copy size={12} />}
+            {copied === stopKey ? "copiado" : "copiar"}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -402,14 +448,10 @@ const ExecuteDialog = ({
       // Prefill with what we told them to buy: the common case is confirming
       // the ticket as-is, and an empty form made them retype both numbers.
       setQuantity(
-        order.suggested_quantity !== null ? String(order.suggested_quantity) : ""
+        toInput(order.suggested_quantity)
       );
       setPrice(
-        order.reference_price !== null
-          ? String(order.reference_price)
-          : order.target_price !== null
-            ? String(order.target_price)
-            : ""
+        toInput(order.reference_price ?? order.target_price)
       );
       setError(null);
       ref.current?.showModal();
@@ -418,8 +460,8 @@ const ExecuteDialog = ({
     }
   }, [order]);
 
-  const qty = parseFloat(quantity);
-  const prc = parseFloat(price);
+  const qty = parseDecimal(quantity);
+  const prc = parseDecimal(price);
   const total = !Number.isNaN(qty) && !Number.isNaN(prc) ? qty * prc : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -482,7 +524,6 @@ const ExecuteDialog = ({
             value={quantity}
             onChange={setQuantity}
             placeholder="100"
-            autoFocus
           />
           <Field
             id="exec-price"
@@ -670,9 +711,9 @@ const Field = ({
     </label>
     <input
       id={id}
-      type="number"
-      step="any"
-      min="0"
+      type="text"
+      // Decimal keypad on iOS, and the comma a pt-BR price is typed with.
+      inputMode="decimal"
       autoFocus={autoFocus}
       value={value}
       onChange={(e) => onChange(e.target.value)}
