@@ -46,6 +46,7 @@ def _set_sqlite_pragmas(dbapi_connection: Any, _record: Any) -> None:
 # Columns added after the initial schema shipped. SQLite has no migration tool
 # here and create_all() won't add columns to an existing table, so patch them in.
 _ADDED_COLUMNS: dict[str, dict[str, str]] = {
+    "report": {"actions": "JSON"},
     "contribution": {
         "claude_session_id": "TEXT",
         "run_attempts": "INTEGER NOT NULL DEFAULT 0",

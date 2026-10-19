@@ -28,6 +28,7 @@ class ReportRead(BaseModel):
     cost_usd: float
     session_id: str | None
     steps: list[dict[str, Any]] | None
+    actions: list[dict[str, Any]] | None = None
     created_at: datetime
 
 
@@ -70,5 +71,6 @@ async def get_report(report_id: UUID, session: Session = Depends(get_session)) -
         cost_usd=report.cost_usd,
         session_id=report.session_id,
         steps=report.steps,
+        actions=report.actions,
         created_at=report.created_at,
     )

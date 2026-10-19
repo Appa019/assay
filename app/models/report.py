@@ -38,5 +38,8 @@ class Report(SQLModel, table=True):
     macro_snapshot: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
     portfolio_snapshot: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
     steps: list[dict[str, Any]] | None = Field(default=None, sa_column=Column(JSON))
+    # What the review tells the client to DO (sell CDB, buy X, hold), parsed
+    # from the report's machine block so the app can show it above the prose.
+    actions: list[dict[str, Any]] | None = Field(default=None, sa_column=Column(JSON))
 
     created_at: datetime = Field(default_factory=_now_utc, index=True)

@@ -91,6 +91,7 @@ async def list_contributions(
             completed_at=contrib.completed_at,
             prompts_total=int(total or 0),
             prompts_answered=int(answered or 0),
+            scheduled_for=_utc_aware(contrib.scheduled_for),
         )
         for contrib, total, answered in session.exec(stmt).all()
     ]

@@ -52,6 +52,7 @@ class ContributionListItem(BaseModel):
     completed_at: datetime | None
     prompts_total: int
     prompts_answered: int
+    scheduled_for: datetime | None = None
 
 
 class PromptResponseCreate(BaseModel):

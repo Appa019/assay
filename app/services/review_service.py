@@ -10,6 +10,7 @@ ticker on different dates mature independently. Reviews treat each lot
 separately.
 """
 
+import json
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import uuid4
@@ -28,6 +29,7 @@ from app.services import (
     market_data_service,
     notification_center,
     notification_service,
+    order_service,
     portfolio_service,
 )
 
@@ -142,6 +144,40 @@ _MANDATE = (
 )
 
 
+# Reports are DOCUMENTS read in the app (Telegram is off since D30): the old
+# "pronto para o Telegram" format put the agent's own preamble, 8-11 emoji
+# headers and run-on "•" bullets on every page.
+_REPORT_FORMAT = (
+    "FORMATO: documento em markdown, começando DIRETO pelo conteúdo (nada de "
+    '"memória atualizada" ou "segue o relatório"). Títulos com `##`, listas '
+    "com `-` (um item por linha), números em pt-BR (1.234,56), sem emoji e sem "
+    "travessão (—)."
+)
+# Machine block the app turns into the "O que fazer" strip above the prose.
+_ACTIONS_BLOCK = (
+    'Ao FINAL, depois de uma linha "---", um bloco ```json com '
+    '{"acoes": [{"tipo": "comprar"|"vender"|"manter", "ticker": str, '
+    '"classe": "cdb"|"acoes_b3"|"crypto", "valor_brl": number|null, '
+    '"preco_alvo": number|null, "stop": number|null, "motivo": str}]} com '
+    "SÓ o que o cliente precisa executar (vender CDB para comprar X = uma linha "
+    '"vender" do CDB e uma "comprar" por ativo). Nada a fazer = '
+    '{"acoes": []}. Esse bloco é lido pelo app e não aparece no texto.'
+)
+
+
+def parse_actions_block(text: str) -> list[dict[str, Any]]:
+    """The LAST valid ``{"acoes": [...]}`` json block of a report, or []."""
+    for match in reversed(order_service._JSON_BLOCK.findall(text or "")):
+        try:
+            data = json.loads(match)
+        except json.JSONDecodeError:
+            continue
+        actions = data.get("acoes") if isinstance(data, dict) else None
+        if isinstance(actions, list):
+            return [a for a in actions if isinstance(a, dict) and a.get("ticker")]
+    return []
+
+
 def _weekly_steps(
     rows: list[dict[str, Any]], macro_ctx: dict[str, Any], today: date
 ) -> list[tuple[str, str]]:
@@ -179,8 +215,7 @@ def _weekly_steps(
     )
     synthesis = (
         "Agora escreva o RELATÓRIO SEMANAL EXECUTIVO para o cliente, em português, "
-        "enxuto e acionável (ele lê no app, no celular). Comece direto pelo "
-        "relatório, sem frase sobre memória ou arquivos. Inclua:\n"
+        f"enxuto e acionável (ele lê no app, no celular). {_REPORT_FORMAT} Inclua:\n"
         "• Macro em 3-5 linhas (o que importa agora).\n"
         "• Desempenho da carteira (resumo + destaques positivos/negativos).\n"
         "• Ações sobre lotes liberados: tabela curta Ticker | Ação (manter/vender/aumentar) | "
@@ -188,6 +223,7 @@ def _weekly_steps(
         "• ROTAÇÃO: se houver oportunidade, ordem clara 'VENDER R$ X de CDB → COMPRAR <ativo>' "
         "com preço-alvo; se não houver, diga 'manter CDB, sem rotação esta semana'.\n"
         "• Alertas e o que observar na próxima semana.\n"
+        f"{_ACTIONS_BLOCK}\n"
         "ANTES de escrever, ATUALIZE ./MEMORY.md com o que mudou. Depois entregue o relatório."
     )
     return [("Revisão semanal — análise", analysis), ("Revisão semanal — relatório", synthesis)]
@@ -211,9 +247,9 @@ def _maturity_steps(
     )
     synthesis = (
         "Escreva o aviso EXECUTIVO de maturidade para o app (lido no celular), em "
-        "português, curto, começando direto pelo aviso: "
+        f"português, curto. {_REPORT_FORMAT} "
         "para cada lote liberado, Ticker | Ação (manter/vender/aumentar) | motivo (1 linha) "
-        "| alvo. Atualize ./MEMORY.md antes de responder."
+        f"| alvo. {_ACTIONS_BLOCK} Atualize ./MEMORY.md antes de responder."
     )
     return [("Maturidade — análise", analysis), ("Maturidade — aviso", synthesis)]
 
@@ -230,7 +266,8 @@ def _persist_report(
     report = Report(
         kind=kind,
         title=title,
-        content=summary.final_summary,
+        content=order_service.strip_machine_block(summary.final_summary),
+        actions=parse_actions_block(summary.final_summary),
         cost_usd=summary.total_cost_usd,
         session_id=summary.session_id,
         macro_snapshot=macro_ctx,
@@ -295,7 +332,7 @@ def run_weekly_review(
         logger.info("weekly_review_absorbed_maturities", lots=len(maturity_keys))
     if notify:
         notification_center.notify(
-            f"🗓️ Revisão semanal do comitê ({today.isoformat()})\n\n{summary.final_summary}",
+            f"🗓️ Revisão semanal do comitê ({today.isoformat()})\n\n{report.content}",
             kind=NotificationKind.REVIEW,
         )
     logger.info("weekly_review_done", report_id=str(report.id), cost_usd=summary.total_cost_usd)
@@ -330,7 +367,7 @@ def run_maturity_review(
     if notify:
         notification_center.notify(
             f"🔓 Lotes liberados para venda · análise do comitê ({today.isoformat()})"
-            f"\n\n{summary.final_summary}",
+            f"\n\n{report.content}",
             kind=NotificationKind.REVIEW,
         )
     logger.info("maturity_review_done", report_id=str(report.id), assets=len(matured_rows))
