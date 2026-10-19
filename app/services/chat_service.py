@@ -54,6 +54,16 @@ CHAT_WORKSPACE = _PROJECT_ROOT / "storage" / "chat_workspace"
 # .mcp.json lives here on purpose: no MCP servers boot, so it stays fast.
 _AUX_WORKSPACE = _PROJECT_ROOT / "storage" / "aux_workspace"
 _SESSION_FILENAME = "session.json"
+# The CLI writes the prompt cache with a 1h TTL (``ephemeral_1h`` in usage).
+_CACHE_TTL_S = 3600
+# Built-in tools the consultant actually reaches for (measured over its
+# sessions: Bash, Edit, Read, ToolSearch, WebSearch). ToolSearch stays because
+# the MCP tools are deferred behind it. The full default set is ~10k tokens
+# more on every call.
+_CHAT_TOOLS = "Bash,Read,Edit,Write,Glob,Grep,WebSearch,WebFetch,ToolSearch"
+# Throwaway jobs (transcription, rotation summary) need no CLI persona: the
+# default system prompt alone is ~15k tokens of a coding agent's manual.
+_AUX_SYSTEM_PROMPT = "Você executa uma única tarefa de texto e responde só com o resultado pedido."
 _CHAT_LOCK_NAME = "_chat_turn.lock"
 
 
@@ -435,6 +445,9 @@ Formato: o que você NÃO vai fazer + por quê + o próximo passo concreto.
 - NUNCA use travessão (—) nas respostas ao cliente: prefira vírgula,
   dois-pontos, ponto ou o separador "·". Ele não gosta do travessão.
 - Nunca cite corretora/exchange específica — o cliente decide onde executar.
+- Grave TUDO (lançamentos, MEMORY.md) ANTES de escrever a resposta. A sua
+  ÚLTIMA mensagem é a resposta inteira ao cliente, em português; texto escrito
+  entre ferramentas não chega a ele. Não narre o que vai fazer ("deixa eu ver").
 """
 
 _SEED_CHAT_MEMORY = """\
@@ -663,16 +676,32 @@ def _save_state(session_id: str, turns: int, context_tokens: int = 0) -> None:
     )
 
 
-def _should_rotate(session_id: str | None, turns: int, context_tokens: int) -> bool:
-    """Is this chained session too old OR too fat to keep resuming?
+def _should_rotate(
+    session_id: str | None, turns: int, context_tokens: int, updated_at: str | None = None
+) -> bool:
+    """Is this chained session too old, too fat OR too cold to keep resuming?
 
     Size is the binding constraint in practice: a session crosses the token
     ceiling long before it reaches ``chat_max_turns``, and every turn after
     that pays for the whole conversation again on each iteration.
+
+    Cold: past the prompt-cache TTL the next turn re-writes the whole session
+    at the cache-write price (20x a cached read) — the 2026-10-19 "posso te
+    mandar meu extrato?" cost US$ 0.75 for 361 tokens of answer. Past half the
+    size ceiling, a fresh session reseeded with summary + tail is cheaper.
     """
     if not session_id:
         return False
-    return turns >= settings.chat_max_turns or context_tokens >= settings.chat_max_context_tokens
+    if turns >= settings.chat_max_turns or context_tokens >= settings.chat_max_context_tokens:
+        return True
+    if not updated_at or context_tokens < settings.chat_max_context_tokens // 2:
+        return False
+    try:
+        last = datetime.fromisoformat(updated_at)
+    except ValueError:
+        return False
+    idle_s = (datetime.now(UTC) - last).total_seconds()
+    return idle_s >= _CACHE_TTL_S
 
 
 def _display_state_path() -> Path:
@@ -789,6 +818,8 @@ def _rotation_summary() -> str:
             timeout=max(settings.chat_router_timeout, 120),
             cwd=_AUX_WORKSPACE,
             transcript_tag=None,
+            tools="",
+            system_prompt=_AUX_SYSTEM_PROMPT,
         )
         return (result.result or "").strip()[:3000]
     except Exception:  # noqa: BLE001 — the summary is an extra, not a dependency
@@ -804,7 +835,7 @@ def _turn_prompt(
     if not fresh:
         return f"[{stamp}] {text}"
     rotation_note = (
-        "A sessão anterior foi encerrada por tamanho — este é o mesmo cliente "
+        "A sessão anterior foi encerrada (tamanho ou pausa longa) — este é o mesmo cliente "
         "continuando a MESMA conversa de sempre. "
         if rotated
         else ""
@@ -851,7 +882,26 @@ def _run_turn_once(
         timeout=settings.chat_turn_timeout,
         cwd=workspace,
         transcript_tag=f"chat_{stamp}",
+        tools=_CHAT_TOOLS,
+        stream=True,
     )
+
+
+def _reply_text(step: StepResult) -> str:
+    """What the client should read: the final block, unless it lost the answer.
+
+    The consultant often writes the real answer, then updates MEMORY.md, then
+    signs off with one line — and the CLI's ``result`` is only that line. It
+    happened in 4 of 27 measured turns ("I'm here when you want to set that
+    reserve number."), and the client had to ask again. When the last block is
+    a fraction of an earlier one, the earlier one is the answer.
+    """
+    if len(step.texts) < 2:
+        return step.result
+    body = max(step.texts[:-1], key=len)
+    if len(step.texts[-1]) * 2 >= len(body):
+        return step.result
+    return f"{body}\n\n{step.texts[-1]}"
 
 
 def run_chat_turn(text: str) -> tuple[str, model_router.Route, StepResult]:
@@ -883,7 +933,7 @@ def run_chat_turn(text: str) -> tuple[str, model_router.Route, StepResult]:
         session_id = state.get("session_id") or None
         turns = int(state.get("turns") or 0)
         context_tokens = int(state.get("context_tokens") or 0)
-        rotated = _should_rotate(session_id, turns, context_tokens)
+        rotated = _should_rotate(session_id, turns, context_tokens, state.get("updated_at"))
         if rotated:
             logger.info("chat_session_rotating", turns=turns, context_tokens=context_tokens)
             session_id, turns = None, 0
@@ -963,7 +1013,7 @@ def run_chat_turn(text: str) -> tuple[str, model_router.Route, StepResult]:
             model=picked.model,
             tier=picked.tier.value,
         )
-        return result.result, picked, result
+        return _reply_text(result), picked, result
     finally:
         analysis_runner._release_lock_file(_chat_lock_path())
 
@@ -1594,6 +1644,8 @@ def _transcribe_attachments(paths: list[Path]) -> tuple[str, float]:
         timeout=settings.chat_vision_timeout,
         cwd=_AUX_WORKSPACE,
         transcript_tag=f"vision_{stamp}",
+        tools="Read",
+        system_prompt=_AUX_SYSTEM_PROMPT,
     )
     logger.info(
         "chat_attachment_transcribed",

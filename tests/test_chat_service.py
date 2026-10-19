@@ -862,3 +862,26 @@ def test_transcription_is_cached_across_a_retried_turn(
     assert vision_calls == 1
     assert first.cost_usd == 0.03  # turn + transcription
     assert second.cost_usd == 0.01  # turn only: the transcription was cached
+
+
+def test_reply_keeps_the_answer_written_before_the_memory_edit() -> None:
+    answer = "Opa, para um pouco. Você guardou 80% do que ganhou em setembro. " * 3
+    step = _step(result="Tô aqui. 👍")
+    step.texts = [answer, "Tô aqui. 👍"]
+    assert chat_service._reply_text(step) == f"{answer}\n\nTô aqui. 👍"
+    # A short preamble before tools ("deixa eu ver") never replaces the answer.
+    step = _step(result="resposta completa e longa")
+    step.texts = ["deixa eu ver", "resposta completa e longa"]
+    assert chat_service._reply_text(step) == "resposta completa e longa"
+
+
+def test_cold_fat_session_rotates_but_cold_thin_one_resumes() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    old = (datetime.now(UTC) - timedelta(seconds=chat_service._CACHE_TTL_S + 60)).isoformat()
+    fresh = datetime.now(UTC).isoformat()
+    fat = settings.chat_max_context_tokens // 2
+    assert chat_service._should_rotate("s", 3, fat, old)
+    assert not chat_service._should_rotate("s", 3, fat, fresh)
+    assert not chat_service._should_rotate("s", 3, fat - 1, old)
+    assert not chat_service._should_rotate("s", 3, fat, None)
