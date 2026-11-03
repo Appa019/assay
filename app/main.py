@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
 
 import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.core.database import init_db
@@ -64,6 +65,22 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type"],
 )
+
+_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+@app.middleware("http")
+async def refuse_cross_site_writes(request: Request, call_next):  # noqa: ANN001, ANN201
+    """No login here: the tailnet is the only gate. A page on any other site,
+    open in the phone's browser, could still POST here (a no-cors fetch or a
+    form skips CORS) and start a committee run or plant a push subscription.
+    Browsers stamp Sec-Fetch-Site and pages cannot forge it; the consultant's
+    curl and the scripts send none and pass."""
+    site = request.headers.get("sec-fetch-site")
+    if request.method not in _SAFE_METHODS and site not in (None, "same-origin", "none"):
+        return JSONResponse({"detail": "Pedido de outro site recusado."}, status_code=403)
+    return await call_next(request)
+
 
 app.include_router(portfolio.router)
 app.include_router(contributions.router)
