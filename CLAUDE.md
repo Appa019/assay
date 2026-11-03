@@ -35,7 +35,8 @@
 >   vivo no Pi para sempre (foi assim que specs consumidos e o ícone
 >   pré-rebrand sobreviveram lá).
 >   O `.env` e o banco do Pi são a fonte da verdade e NÃO são sobrescritos.
-> - **Detalhes de máquina, firewall e correções ARM**: `acesso-remoto-pi.md`.
+> - **Detalhes de máquina, firewall e rede**: `~/<docs-do-pi>/acesso-raspberry-pi.md`
+>   e `raspberry-pi.md` (docs do Pi, fora deste repo).
 
 Gestão de aportes (AD-HOC, sem ciclo fixo) com comitê multipersona de IA padrão
 **Goldman Sachs GIR + Morgan Stanley GIC + Bridgewater + AQR**. A cada aporte o
@@ -68,7 +69,7 @@ que ele mesmo gerencia entre ciclos), carta branca (web + Bash + criar
 ferramentas via `--dangerously-skip-permissions`), effort sempre `max`, e
 respeita a trava de venda por CLASSE (`MIN_HOLDING_DAYS` 30 nas ações,
 `MIN_HOLDING_DAYS_CRYPTO` 7 na cripto). Ao concluir, avisa no **app** (inbox +
-push); quando um lote cruza a trava da sua classe, um cron roda a análise de
+push); quando um lote cruza a trava da sua classe, um timer roda a análise de
 maturidade. Aporte é ad-hoc.
 
 ### Ciclos e mandato (2026-05)
@@ -109,8 +110,8 @@ maturidade. Aporte é ad-hoc.
   `core/database._ensure_sqlite_columns`.
 - **Retomada AUTOMÁTICA (sem você re-rodar)**: `scripts/resume_pending.py` acha
   análises automáticas incompletas (`claude_session_id` set + `final_summary`
-  null) e as retoma; roda no cron a cada 15 min (`install_cron.sh`) ou em loop
-  (`--watch [s]`). Assim, se o limite/créditos acabarem e o processo morrer, o
+  null) e as retoma; roda no timer `investimentos-resume` a cada 15 min ou em
+  loop (`--watch [s]`). Assim, se o limite/créditos acabarem e o processo morrer, o
   sistema conclui sozinho quando o limite voltar. Um **lock PID por aporte**
   (`analysis_runner._acquire_run_lock`, arquivos em `storage/analysis_runs/`)
   impede rodar em dobro com um run vivo (CLI/API). Avisa no app ao retomar.
@@ -144,7 +145,7 @@ sem Playwright.
 ### Dados & confiabilidade (2026-07)
 - **Marcação a mercado**: `price_refresh_service` atualiza `current_price` de
   TODO lote (ações via Yahoo, crypto via CoinGecko, CDB por CDI acumulado —
-  série 12 BCB × `CDB_PCT_CDI`). Roda por cron/systemd, `POST /api/portfolio/
+  série 12 BCB × `CDB_PCT_CDI`). Roda por timer systemd, `POST /api/portfolio/
   refresh` e antes das revisões.
 - **Ledger `Trade`**: toda compra/venda vira linha imutável com P&L realizado
   (`GET /api/portfolio/trades`); a venda continua removendo o `Asset`, mas o
@@ -152,8 +153,8 @@ sem Playwright.
 - **A trava é enforced no service** (`portfolio_service.sell_asset` →
   `SellLockedError` → API 409), com o prazo da classe.
 - **Snapshot diário** (`portfolio_snapshot`, upsert) → curva de patrimônio em
-  `GET /api/portfolio/history` (cron `daily_snapshot.py`).
-- **SQLite em WAL** + busy_timeout (API + crons concorrentes) e backup
+  `GET /api/portfolio/history` (timer `daily_snapshot.py`).
+- **SQLite em WAL** + busy_timeout (API + timers concorrentes) e backup
   diário com rotação (`backup_db.sh`).
 - **Locks**: por aporte E global (1 execução pesada de Claude por vez, entre
   processos), criação atômica + identidade de PID via /proc (sem reclaim por
@@ -175,17 +176,19 @@ sem Playwright.
   preço-alvo vêm de `prompt_generator._date_context` (nada de DI jan/26 morto);
   regra fiscal de dividendos é VERIFICADA ao vivo, PGBL/holding viraram
   observação fora do mandato.
-- **Alertas de falha**: todo cron avisa quando QUEBRA, não só no sucesso — via
+- **Alertas de falha**: todo timer avisa quando QUEBRA, não só no sucesso — via
   `notification_center`, que grava no inbox do app e dispara Web Push.
 - **Maturidade cede a vez à revisão semanal** (D37): se a semanal vence em ≤2
   dias, `check_cadence` NÃO abre run próprio — a semanal já julga todo lote
   liberado e marca as chaves (`mark_maturities`) ao concluir. Com trava por
   classe as datas de destravamento deixaram de coincidir, o que dobraria o
   número de runs por ciclo.
-- **systemd (preferido)**: `scripts/install_systemd.sh` instala backend +
-  frontend (Restart=always) e timers persistentes (recuperam janelas perdidas
-  com a máquina desligada). Cron continua disponível via `install_cron.sh`
-  (flock + PATH corretos).
+- **systemd (único instalador)**: `scripts/install_systemd.sh` instala
+  backend + frontend (Restart=always) e os 11 timers. Os timers recuperam
+  janelas perdidas com a máquina desligada, menos scheduled/cadence/weekly
+  (`Persistent=false`, gastam Claude). Toda unit confere o banco em
+  `ExecStartPre` antes de subir (HD ausente = tenta de novo, nunca abre banco
+  vazio).
 
 ### Produto (2026-07, camada sobre o ledger)
 - **Ordens estruturadas**: o fechamento emite bloco ```json {"orders": []}```
@@ -304,8 +307,7 @@ O consultor mora na página `/consultor`. **É UMA conversa só**, persistida no
   vira linha em `chat_message` (role · channel · status ·
   model · tier). Rotacionar a sessão do Claude NÃO apaga o histórico. Todo
   caller entra por `chat_service.enqueue()` (enfileira e volta na hora),
-  nunca `run_chat_turn` direto — é ele que persiste. (`converse()`, a porta
-  síncrona do bot, hoje só é usada pelos testes.)
+  nunca `run_chat_turn` direto — é ele que persiste.
 - **API**: `GET /api/chat` (histórico + `busy`), `POST /api/chat` (enfileira e
   volta 202 na hora — um turno leva minutos, ninguém segura HTTP), `POST
   /api/chat/reset`. O front faz polling: 2,5s ocupado, 12s ocioso (o turno
@@ -416,7 +418,7 @@ rsync -a --delete --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
   Flags úteis: `--notes`, `--contribution-id <uuid>` (re-rodar), `-y` (sem
   confirmação), `--no-notify`, `--model haiku --effort low` (teste barato).
 - `.venv/bin/python scripts/check_cadence.py`: roda análise de maturidade dos
-  lotes de ação/crypto que cruzaram a trava da classe (cron diário). Sem nag de
+  lotes de ação/crypto que cruzaram a trava da classe (timer diário). Sem nag de
   aporte (ad-hoc)
 - `.venv/bin/python scripts/weekly_review.py [--force]`: revisão semanal do
   comitê (macro + carteira + maturidade); auto-regula a 7 dias
@@ -424,10 +426,8 @@ rsync -a --delete --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
   cliente pediu e ficaram agendados para a madrugada (timer 01:00). Desarma o
   `scheduled_for` ao iniciar — daí em diante é o `resume_pending` que cuida
 - `.venv/bin/python scripts/resume_pending.py [--watch [s]]`: retoma análises de
-  aporte interrompidas (limite/queda), continuando de onde pararam; roda no cron
-  a cada 15 min
-- `scripts/install_cron.sh [hora]`: instala os crons (maturidade + revisão
-  semanal + retomada a cada 15 min; `--uninstall` remove)
+  aporte interrompidas (limite/queda), continuando de onde pararam; roda no
+  timer `investimentos-resume` a cada 15 min
 - `.venv/bin/uvicorn app.main:app --reload`: backend dev (porta 8000)
 - `cd frontend && pnpm dev`: frontend dev (porta 3000)
 - `cd frontend && pnpm lint && pnpm type-check && pnpm build`: validação
@@ -455,7 +455,7 @@ rsync -a --delete --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
     de caixa previsto)
 - `/scripts/`: run_analysis (aporte→análise),
   check_cadence, weekly_review, resume_pending (retoma análises interrompidas),
-  install_cron
+  install_systemd
 - `/storage/agent_workspace/`: workspace persistente do agente (gitignored) —
   CLAUDE.md (ordens permanentes, reescrito a cada run), MEMORY.md (memória do
   agente), tools/ (ferramentas que ele cria)
@@ -618,7 +618,7 @@ long-only de varejo e a quantidade é recalculada pelo `order_sizing`.
 
 ## Memória do projeto
 - **Documentação no repo: `docs/` — comece por `docs/README.md`.** É lá que vive
-  o entendimento completo do projeto (13 documentos). Ao mudar comportamento,
+  o entendimento completo do projeto (12 documentos + `pi-deploy.md`). Ao mudar comportamento,
   atualize o doc da área; ao consertar um bug sutil, registre em
   `docs/12-decisoes.md`; ao mudar o estado do repo, atualize
   `docs/13-estado-atual.md`.
