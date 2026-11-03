@@ -227,15 +227,6 @@ def list_orders(session: Session, *, status: OrderStatus | None = None) -> list[
     return list(session.exec(stmt).all())
 
 
-def pending_order_for_ticker(session: Session, ticker: str) -> Order | None:
-    return session.exec(
-        select(Order)
-        .where(Order.ticker == ticker.upper())
-        .where(Order.status == OrderStatus.PENDING)
-        .order_by(Order.created_at)
-    ).first()
-
-
 def execute_order(
     session: Session,
     order_id: UUID,

@@ -1660,11 +1660,6 @@ def _display_name(path: Path) -> str:
     return path.name.split("_", 1)[-1]
 
 
-def start_attachment_turn(path: Path, caption: str, channel: ChatChannel) -> None:
-    """Queue a turn about one uploaded file (the Telegram door sends one at a time)."""
-    start_attachments_turn([path], caption, channel)
-
-
 def start_attachments_turn(paths: list[Path], caption: str, channel: ChatChannel) -> None:
     """Queue ONE turn about up to MAX_ATTACHMENTS_PER_TURN uploaded files."""
     if not paths:

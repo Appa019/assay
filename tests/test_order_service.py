@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 
 from app.models.asset import Asset, AssetClass
 from app.models.contribution import Contribution, ContributionStatus
-from app.models.order import OrderStatus
+from app.models.order import Order, OrderStatus
 from app.services import order_service
 
 _SUMMARY = """\
@@ -200,11 +200,10 @@ def test_summarize_block_counts_rows_and_deviation() -> None:
     assert empty == {"rows": 0, "valid": 0, "total_brl": 0.0, "deviation_pct": 1.0}
 
 
-def test_pending_order_lookup_and_skip(session: Session) -> None:
+def test_skip_order_leaves_pending(session: Session) -> None:
     contribution = _completed_contribution(session)
     order_service.ingest_contribution_orders(session, contribution)
-    order = order_service.pending_order_for_ticker(session, "btc")
-    assert order is not None and order.ticker == "BTC"
+    order = session.exec(select(Order).where(Order.ticker == "BTC")).one()
+    assert order.status == OrderStatus.PENDING
     skipped = order_service.skip_order(session, order.id, reason="sem liquidez na exchange")
     assert skipped.status == OrderStatus.SKIPPED
-    assert order_service.pending_order_for_ticker(session, "BTC") is None

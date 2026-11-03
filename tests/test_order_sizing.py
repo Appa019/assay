@@ -128,16 +128,3 @@ def test_unpriced_order_produces_no_ticket() -> None:
         )
         == []
     )
-
-
-def test_summary_is_copy_ready() -> None:
-    lines = order_sizing.ticket_lines(
-        ticker="ITUB4",
-        asset_class=AssetClass.STOCKS,
-        amount_brl=Decimal("5449.60"),
-        quantity=Decimal("130"),
-        price=Decimal("41.92"),
-    )
-    summary = order_sizing.ticket_summary(lines)
-    assert "ITUB4 · 100 un · R$ 41,92" in summary
-    assert "ITUB4F · 30 un · R$ 41,92" in summary

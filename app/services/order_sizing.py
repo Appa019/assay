@@ -113,26 +113,3 @@ def ticket_lines(
             )
         )
     return lines
-
-
-def _fmt_qty(quantity: Decimal) -> str:
-    """Integers without a tail, crypto without trailing zero noise."""
-    if quantity == quantity.to_integral_value():
-        return str(int(quantity))
-    return format(quantity.normalize(), "f")
-
-
-def _fmt_brl(value: Decimal) -> str:
-    text = f"{value:,.2f}".replace(",", "@").replace(".", ",").replace("@", ".")
-    return f"R$ {text}"
-
-
-def ticket_summary(lines: list[TicketLine]) -> str:
-    """One-line, copy-ready rendering of the ticket. Empty when unsized."""
-    if not lines:
-        return ""
-    if lines[0].book == "aplicação":
-        return f"{lines[0].ticker} · aplicar {_fmt_brl(lines[0].price)}"
-    return "  +  ".join(
-        f"{line.ticker} · {_fmt_qty(line.quantity)} un · {_fmt_brl(line.price)}" for line in lines
-    )

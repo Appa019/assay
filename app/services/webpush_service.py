@@ -85,11 +85,6 @@ def delete_subscription(session: Session, endpoint: str) -> bool:
     return True
 
 
-def subscription_count() -> int:
-    with Session(engine) as session:
-        return len(session.exec(select(PushSubscription)).all())
-
-
 def notify(title: str, body: str, url: str = "/consultor") -> int:
     """Push to every subscribed device. Best-effort: returns the sent count.
 
