@@ -22,7 +22,7 @@ class Order(SQLModel, table=True):
     """One recommended buy from a contribution's final order sheet.
 
     Parsed from the closing step's machine-readable ``{"orders": [...]}``
-    block. Executing an order (bot ``/executei`` or the API) creates the
+    block. Executing an order (through the API) creates the
     Asset lot — inheriting the committee's thesis/target/stop — and links
     back here, which is what makes recommendation-vs-reality tracking
     (did we follow it? at what price?) possible.

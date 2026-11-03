@@ -2,7 +2,7 @@
 
 Both reuse the chained-session engine in ``analysis_runner`` (auto-resume on
 limits, persistence, single-session context). Results are stored as ``Report``
-rows (auditable, with every step) and pushed to Telegram.
+rows (auditable, with every step) and announced in the app.
 
 The sell lock is PER PURCHASE LOT and PER CLASS (stocks 30d, crypto 7d, CDB
 none): each asset row carries its own ``entry_date``, so two buys of the same
@@ -92,7 +92,7 @@ def has_reviewable_data(session: Session) -> bool:
     Cost guard for the expensive review chain: with no position, no trade
     history and no personal ledger there is literally nothing to review, and
     a full opus run would burn dollars describing an empty book. Lives here
-    (not in the callers) so every surface — cron, bot, future API — shares
+    (not in the callers) so every surface — timers, CLI, API — shares
     the same invariant.
     """
     for model in (Asset, Trade, CashflowEntry):
@@ -345,8 +345,8 @@ def run_weekly_review(
 ) -> Report | None:
     if not has_reviewable_data(session):
         # Empty book: never start the opus chain. Callers control whether the
-        # short note reaches the client via ``notify`` (the daily cron throttles
-        # it on its side; the bot's /revisao answers the user directly).
+        # short note reaches the client via ``notify`` (the daily timer throttles
+        # it on its side).
         logger.info("weekly_review_skipped_empty")
         if notify:
             notification_center.notify(

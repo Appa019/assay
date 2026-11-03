@@ -1,4 +1,4 @@
-"""Tolerant JSON state files — small persistent flags for the bot and crons.
+"""Tolerant JSON state files — small persistent flags for the timer scripts.
 
 State here is convenience (dedup flags, notification throttles), never data:
 a missing, corrupt or wrong-shaped file must NEVER break a caller. Reads fall

@@ -5,8 +5,8 @@ Self-gating: runs on the first days of the month and reports the PREVIOUS
 month once (skips if that month's report already exists; ``--force`` re-runs
 for the current month). Content: portfolio value and month delta, per-class
 allocation, trades of the month with realized P&L, analysis spend, benchmark
-excerpt and IR/DARF status. Saved as Report(kind=monthly) and sent to
-Telegram as text + a .md attachment.
+excerpt and IR/DARF status. Saved as Report(kind=monthly) and announced
+in the app.
 
     python scripts/monthly_report.py [--force]
 """

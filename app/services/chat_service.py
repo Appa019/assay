@@ -1,6 +1,6 @@
 """Real-time financial consultant chat over the Claude Code CLI.
 
-Free-text Telegram messages become turns of ONE chained Claude session (the
+Messages sent on the /consultor page become turns of ONE chained Claude session (the
 consultant remembers the whole conversation), run headless in a persistent
 workspace of its own — ``storage/chat_workspace/`` — separate from the
 committee's ``agent_workspace``:
@@ -13,7 +13,7 @@ committee's ``agent_workspace``:
   merged with the chat agent's own ``.mcp.agent.json``.
 
 The session id + turn count persist in ``session.json``, so the conversation
-survives bot/process restarts. After ``chat_max_turns`` turns the session is
+survives backend restarts. After ``chat_max_turns`` turns the session is
 rotated (fresh session, memory carries the context) to keep latency and cost
 bounded. A cross-process file lock serializes turns; the caller queues.
 """
@@ -1020,7 +1020,7 @@ def run_chat_turn(text: str) -> tuple[str, model_router.Route, StepResult]:
         analysis_runner._release_lock_file(_chat_lock_path())
 
 
-# ── Shared transcript: the website and Telegram are two doors, one conversation
+# ── Shared transcript: one conversation, persisted row by row ────────────────
 
 
 def _record(
@@ -1142,9 +1142,9 @@ def is_busy() -> bool:
     mid-turn, an OOM, a power cut — leaves the lock file behind, because the
     ``finally`` that releases it never runs. Testing mere existence would then
     409 every web message AND every ``/reset`` forever, with no way out but
-    deleting the file by hand on the Pi. Telegram would keep working the whole
-    time, since the turn runner reclaims stale locks on acquire, which makes
-    the failure look inexplicable from the outside.
+    deleting the file by hand on the Pi, while the turn runner itself kept
+    working (it reclaims stale locks on acquire), which made the failure look
+    inexplicable from the outside.
     """
     path = _chat_lock_path()
     return path.exists() and analysis_runner._lock_is_active(path)
@@ -1174,7 +1174,7 @@ _QUEUE_SPAWN_LOCK = threading.Lock()
 _queue_thread: threading.Thread | None = None
 
 # Nothing to do: wake up now and then anyway, in case a row was queued by
-# another process (the Telegram door, a script) that cannot set our Event.
+# another process (a script) that cannot set our Event.
 _QUEUE_IDLE_S = 60.0
 # A usage window can stay shut for hours, so patience for a limit is counted in
 # retries that each sleep until the announced reset. A transient failure (CLI
@@ -1184,7 +1184,7 @@ _MAX_LIMIT_ATTEMPTS = 24
 _MAX_TRANSIENT_ATTEMPTS = 3
 _TRANSIENT_BACKOFF_S = (30, 120, 300)
 _LIMIT_FALLBACK_BACKOFF_S = (300, 900, 1800, 3600)
-# Somebody else holds the cross-process turn lock (the bot, a CLI run). Not a
+# Somebody else holds the cross-process turn lock (a CLI run). Not a
 # failure and not worth an attempt — just look again shortly.
 _LOCK_BUSY_RETRY_S = 20.0
 

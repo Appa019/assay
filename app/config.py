@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     # contribution (prevents an endless paid retry loop on permanent failures).
     max_run_attempts: int = 5
 
-    # Telegram consultant chat (free-text conversation over the bot). Opus by
+    # Consultant chat (the /consultor page). Opus by
     # default for advice quality; set CHAT_MODEL=sonnet for snappier replies.
     chat_model: str = "opus"
     chat_effort: str = "medium"

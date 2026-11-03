@@ -20,7 +20,7 @@ def _now_utc() -> datetime:
 class Report(SQLModel, table=True):
     """An autonomous committee review (weekly macro+holdings, or asset maturity).
 
-    Stored for the Telegram push, the dashboard history, and as consult context
+    Stored for the app notice, the dashboard history, and as consult context
     for future contribution runs. ``steps`` keeps each chained step's output so
     the whole run is auditable.
     """
@@ -30,7 +30,7 @@ class Report(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     kind: ReportKind = Field(index=True)
     title: str = Field(max_length=200)
-    content: str = Field(sa_column=Column(Text))  # final executive report (sent to Telegram)
+    content: str = Field(sa_column=Column(Text))  # final executive report
 
     cost_usd: float = Field(default=0.0)
     session_id: str | None = Field(default=None, max_length=64)

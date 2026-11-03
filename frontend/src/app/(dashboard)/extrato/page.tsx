@@ -61,7 +61,7 @@ const daysUntil = (iso: string): number => {
 };
 
 const sourceLabel = (source: CashflowEntry["source"]): string =>
-  source === "chat" ? "consultor" : source === "bot" ? "comando no Telegram" : "site";
+  source === "chat" ? "consultor" : source === "bot" ? "bot (antigo)" : "site";
 
 /** Ranked bars for one side of the ledger, scaled against their own largest. */
 const CategoryBars = ({

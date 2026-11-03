@@ -428,7 +428,7 @@ def _baseline_mcp_servers(
     ANY extra server itself via ``.mcp.agent.json`` (see ``_effective_mcp_config``).
 
     ``workspace`` roots the per-workspace servers (memory graph) so other
-    chained runners (e.g. the Telegram consultant chat) get their own.
+    chained runners (e.g. the consultant chat) get their own.
 
     ``profile`` sizes the set to the workload. The committee gets the full
     research stack; the ``chat`` profile keeps only the financial-data servers —
@@ -496,7 +496,7 @@ def _baseline_mcp_servers(
 
 
 # Credentials the analyst subprocess has no business inheriting. The agent is
-# autonomous with full machine access — don't hand it the bot's identity or
+# autonomous with full machine access — don't hand it a leftover bot token or
 # unrelated cloud credentials that happen to be exported in the parent shell.
 _ENV_DENY_PREFIXES = ("AWS_", "GCP_", "AZURE_", "OPENAI_", "GOOGLE_API")
 _ENV_DENY_EXACT = {
@@ -1552,7 +1552,7 @@ def run_analysis(
 
     Runs headless in the persistent agent workspace (standing orders + memory
     auto-loaded), persists each prompt response as it completes, stores the
-    consolidated summary and pushes it to Telegram. Raises ``AnalysisError`` on
+    consolidated summary and announces it in the app. Raises ``AnalysisError`` on
     failure (and marks the contribution back to READY so it can be retried).
 
     A per-contribution PID lock prevents two processes (e.g. a live run and the

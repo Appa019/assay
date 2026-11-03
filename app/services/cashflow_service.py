@@ -1,10 +1,10 @@
 """Personal cashflow ledger: register and summarize expenses and income.
 
-Written primarily by the Telegram consultant (Claude registers what the user
-tells it over chat) and by the quick /gasto and /ganho bot commands. Category
+Written primarily by the consultant (Claude registers what the user tells
+it over chat) and by the API. Category
 names are normalized here — case, accents and known aliases — so the same
 real-world category can never split into two buckets depending on which door
-(consultant, classifier, bot, form) wrote it.
+(consultant, classifier, form) wrote it.
 """
 
 import unicodedata

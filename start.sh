@@ -49,7 +49,7 @@ free_port() {
   pids="$(ss -ltnp 2>/dev/null | awk -v p=":$port" 'index($4,p){print $0}' | grep -oP 'pid=\K[0-9]+' | sort -u || true)"
   for pid in $pids; do
     # Never kill an unrelated app that happens to hold the port — only our own
-    # uvicorn/next/bot (identified by the project path in the cmdline).
+    # uvicorn/next (identified by the project path in the cmdline).
     if tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -qF "$PROJECT_DIR"; then
       warn "Encerrando processo do projeto na porta $port (pid $pid)"
       kill "$pid" 2>/dev/null || true

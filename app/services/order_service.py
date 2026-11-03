@@ -122,7 +122,7 @@ def summarize_block(text: str, *, expected_total: Decimal | None = None) -> dict
     until now no machine ever verified it. Returns row counts, how many rows
     are actually ingestable, their BRL sum, and the relative deviation vs the
     expected total (None when no expectation). Powers the post-run validator
-    and the Telegram mismatch alert.
+    and the mismatch notice.
     """
     rows = parse_orders_block(text or "")
     valid = 0

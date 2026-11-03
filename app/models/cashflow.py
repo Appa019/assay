@@ -14,8 +14,8 @@ class CashflowKind(StrEnum):
 
 
 class CashflowSource(StrEnum):
-    CHAT = "chat"  # registered by the Telegram consultant (Claude)
-    BOT = "bot"  # quick /gasto and /ganho bot commands
+    CHAT = "chat"  # registered by the consultant (Claude)
+    BOT = "bot"  # old rows from the removed bot's /gasto and /ganho
     API = "api"  # direct API/frontend entry
 
 
@@ -38,7 +38,7 @@ class CashflowEntry(SQLModel, table=True):
 
     Separate from the ``Trade`` ledger on purpose — trades are portfolio
     operations; this is day-to-day personal finance (groceries, salary,
-    freelance income) that the Telegram consultant tracks over chat.
+    freelance income) that the consultant tracks over chat.
     """
 
     __tablename__ = "cashflow_entry"

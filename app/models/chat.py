@@ -35,8 +35,8 @@ class ChatMessage(SQLModel, table=True):
     """One line of the consultant conversation, whichever door it came through.
 
     The Claude session already carries the model's own context; this table
-    exists so a HUMAN can read the history — and so a conversation started on
-    Telegram shows up on the website and vice versa. Rotating the underlying
+    exists so a HUMAN can read the history (rows with channel=telegram are
+    from the removed bot). Rotating the underlying
     Claude session (every ``chat_max_turns``) does not erase it.
     """
 

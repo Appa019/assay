@@ -30,7 +30,7 @@ engine = create_engine(
 def _set_sqlite_pragmas(dbapi_connection: Any, _record: Any) -> None:
     """Per-connection PRAGMAs.
 
-    The API, the Telegram bot and three cron scripts all write to this one
+    The API and the systemd timer scripts all write to this one
     file: WAL allows concurrent readers during a write, busy_timeout makes
     writers wait instead of failing with "database is locked", and NORMAL
     sync is the recommended (safe) pairing with WAL.

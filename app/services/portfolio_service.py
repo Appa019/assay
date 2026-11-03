@@ -103,7 +103,7 @@ def holding_lock_days(asset_class: AssetClass | str) -> int:
     """How many days a lot of this class must be held before it can be sold.
 
     The lock is PER CLASS and this is its single source of truth — every
-    surface (API, bot, reviews, prompts, front-end) reads the rule from here.
+    surface (API, reviews, prompts, front-end) reads the rule from here.
     Stocks carry the client's 30-day compliance hold; crypto has no such legal
     requirement and uses a shorter one; CDB has daily liquidity and never
     locks. An unknown class falls back to the strictest lock on purpose.
@@ -142,7 +142,7 @@ def sell_asset(
 ) -> SaleResult:
     """Sell a lot (whole or partial), enforcing the per-lot holding lock here.
 
-    The lock lives HERE (not in each caller) so the API, the bot and any
+    The lock lives HERE (not in each caller) so the API and any
     future surface all obey the same rule. ``price`` is the REAL execution
     price when the caller knows it; without it the mark-to-market price is
     used. ``quantity`` sells part of the lot (the remainder keeps its

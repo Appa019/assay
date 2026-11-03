@@ -3,7 +3,7 @@
 
 Builds a deterministic summary of the month so far (balance, top spending
 categories, invested wealth — both halves of the money together) plus every
-insight the weekly push budget queued up, and sends it to Telegram.
+insight the weekly push budget queued up, and announces it in the app.
 Self-gating: skips when this ISO week's digest already went out (``--force``
 re-sends) and stays silent when the month's ledger is empty.
 

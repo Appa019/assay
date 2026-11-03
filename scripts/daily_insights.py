@@ -3,7 +3,7 @@
 
 Runs the three insight rules (run-rate balance projection, per-category
 anomaly, card-invoice-closed notice) via ``insight_service.run_daily``: at most the weekly budget of
-pushes goes straight to Telegram, the overflow queues up for the Sunday
+pushes goes straight to the app, the overflow queues up for the Sunday
 digest. Scheduled at 09:07 local on purpose — insights never ping at night.
 
     python scripts/daily_insights.py

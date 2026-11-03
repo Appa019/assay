@@ -1,7 +1,7 @@
 """Deterministic insights over the personal cashflow ledger — zero LLM.
 
-Three rules, evaluated once a day by ``scripts/daily_insights.py`` and pushed
-over Telegram. Both the decision AND the copy are plain arithmetic and
+Three rules, evaluated once a day by ``scripts/daily_insights.py`` and announced
+in the app (inbox + push). Both the decision AND the copy are plain arithmetic and
 f-strings; no model is ever consulted.
 
 1. **Run-rate balance projection** — month-to-date spend extrapolated to the
@@ -286,7 +286,7 @@ def run_daily(session: Session, *, today: date | None = None) -> dict[str, Any]:
 
     Returns ``{"date", "sent", "queued"}`` where sent/queued are lists of
     ``{"kind", "text"}``. State is persisted BEFORE notifying (check_alerts
-    pattern): a Telegram blip may drop one push but can never double-fire.
+    pattern): a delivery blip may drop one push but can never double-fire.
     """
     today = today or date.today()
     month_key = today.strftime("%Y-%m")

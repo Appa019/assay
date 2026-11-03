@@ -3,7 +3,7 @@
 
 Self-gating: only runs if 7+ days passed since the last weekly review (so it can
 be scheduled daily and still fire "a cada 7 dias"). Saves a Report (auditable,
-consultable on aportes) and sends it to Telegram.
+consultable on aportes) and announces it in the app.
 
     python scripts/weekly_review.py            # run if due
     python scripts/weekly_review.py --force     # run now
@@ -40,7 +40,7 @@ _EMPTY_SKIP_NOTE = (
 
 
 def _should_send_skip_note(state: dict, now: datetime) -> bool:
-    """Throttle the 'skipped: empty' Telegram note to the review cadence.
+    """Throttle the 'skipped: empty' note to the review cadence.
 
     The cron runs DAILY (self-gated to 7 days by the last WEEKLY report), but
     a skip writes no Report row — without this throttle an empty book would
