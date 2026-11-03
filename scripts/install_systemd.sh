@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Install systemd USER units for the whole system (preferred over cron):
-#   services : backend (uvicorn) + frontend (Next) — Restart=always. The
-#              Telegram bot unit is WRITTEN but left disabled: the client does
-#              not use Telegram (D30), and two polling bots answer twice.
+#   services : backend (uvicorn) + frontend (Next) — Restart=always. No
+#              Telegram bot unit: the client only uses the app (D30, D47), and
+#              a leftover one from older installs is removed.
 #   timers   : aportes agendados · maturidade · revisão semanal · resume
 #              (15min) · preços (6h) · snapshot diário · alertas de alvo/stop
 #              · relatório mensal · insights diários · digest semanal · backup
@@ -92,8 +92,6 @@ UNIT
 # hardcodes its creation path in the shebang and dies with exit 127 after one.
 long_service backend "Investimentos Manual — backend FastAPI" \
   "${PROJECT_ROOT}/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000"
-long_service bot "Investimentos Manual — bot do Telegram" \
-  "${PY} ${PROJECT_ROOT}/scripts/telegram_bot.py"
 # Serves the production build; bound to loopback so a shared LAN cannot reach it
 # (put a TLS front like `tailscale serve` in front for remote access).
 #
@@ -138,11 +136,11 @@ oneshot_pair insights "insights do ledger pessoal"   "${PY} ${PROJECT_ROOT}/scri
 oneshot_pair digest   "digest financeiro semanal"    "${PY} ${PROJECT_ROOT}/scripts/weekly_digest.py"  "Sun *-*-* 20:07"
 oneshot_pair backup   "backup do SQLite"             "/usr/bin/env bash ${PROJECT_ROOT}/scripts/backup_db.sh" "*-*-* 03:00"
 
+# Older installs wrote a (disabled) bot unit; converge to "no bot" (D47).
+systemctl --user disable --now "${PREFIX}-bot.service" 2>/dev/null || true
+rm -f "${UNIT_DIR}/${PREFIX}-bot.service"
+
 systemctl --user daemon-reload
-# The bot unit is installed but NOT enabled on purpose (D30): the client reads
-# every notice in the app, and a second polling bot would answer him twice.
-# Turning it on is a deliberate `systemctl --user enable --now`, never a side
-# effect of reinstalling the units.
 systemctl --user enable --now "${PREFIX}-backend.service" "${PREFIX}-frontend.service"
 # `scheduled` belongs in this loop: since D38 a contribution asked for during
 # the day is parked for the 01:00 window, so leaving its timer out meant the
@@ -155,7 +153,7 @@ done
 loginctl enable-linger "$USER" 2>/dev/null || true
 
 echo "Unidades instaladas e ativas. Úteis:"
-echo "  systemctl --user status ${PREFIX}-backend ${PREFIX}-bot"
+echo "  systemctl --user status ${PREFIX}-backend ${PREFIX}-frontend"
 echo "  systemctl --user list-timers '${PREFIX}-*'"
-echo "  journalctl --user -u ${PREFIX}-bot -f"
+echo "  journalctl --user -u ${PREFIX}-backend -f"
 echo "Se usar systemd, remova os crons equivalentes: scripts/install_cron.sh --uninstall"

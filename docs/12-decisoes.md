@@ -1001,3 +1001,24 @@ O `--resume` fica só como fallback para morte do processo ou limite de uso.
 Isso mexe no motor de retomada (`run_chain`, `_run_step_resilient`) e precisa
 de teste com um aporte real. O primeiro aporte grava `context_tokens` e
 `cost_usd` por etapa e dá a linha de base.
+
+### D47 · O bot do Telegram sai do Pi; o app cobre o que ele fazia
+Pedido do cliente na reorganização do Pi (2026-11-02): ele só usa o app. Antes
+de tirar, conferimos comando a comando o que o bot fazia e onde isso mora hoje:
+
+| Bot | No app |
+|---|---|
+| texto livre, foto e arquivo de recibo | `/consultor` (até 3 anexos por mensagem) |
+| `/gasto`, `/ganho`, `/financas` | consultor registra; `/extrato` mostra |
+| `/carteira`, `/atualizar`, `/comprei`, `/vender` | `/investimentos?aba=carteira` (cadastro, venda com a trava, refresh de preços) |
+| `/aporte` | `?aba=aportar` ou pedir ao consultor (agenda para a madrugada, D38) |
+| `/ordens`, `/executei` | painel de ordens (executar/pular) |
+| `/ir`, `/relatorios`, `/status` | `?aba=ir`, `?aba=analises`, home |
+| `/resetchat` | botão no `/consultor` |
+| avisos e alertas | inbox + Web Push (`notification_center`) |
+| `/revisao` (semanal sob demanda) | **não existe**, e não deve existir: rodar o comitê de dia drena a janela de uso do consultor; a semanal já roda sozinha de madrugada |
+
+`install_systemd.sh` deixou de escrever a unit e remove a que sobrou de
+instalações antigas. O código (`telegram_bot.py`, `telegram_setup.py`,
+espelho em `telegram_service`) ainda está no repo: apagar é o próximo passo,
+junto com o `CLAUDE.md` e o `docs/08-telegram.md`.
