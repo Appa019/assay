@@ -250,12 +250,32 @@ def test_fresh_session_is_seeded_with_recent_transcript(
             channel=ChatChannel.TELEGRAM,
             status=ChatTurnStatus.DONE,
         ),
-        # The copy of the message being answered NOW — must be dropped.
+        # The message being answered NOW and its RUNNING answer row (the real
+        # queue shape) — must not be echoed as history.
         ChatMessage(
             role=ChatRole.USER,
             content="e depois de impostos?",
             channel=ChatChannel.WEB,
             status=ChatTurnStatus.DONE,
+        ),
+        ChatMessage(
+            role=ChatRole.ASSISTANT,
+            content="",
+            channel=ChatChannel.WEB,
+            status=ChatTurnStatus.RUNNING,
+        ),
+        # Sent right after and still waiting its turn — not history yet.
+        ChatMessage(
+            role=ChatRole.USER,
+            content="e o IR do mês?",
+            channel=ChatChannel.WEB,
+            status=ChatTurnStatus.DONE,
+        ),
+        ChatMessage(
+            role=ChatRole.ASSISTANT,
+            content="",
+            channel=ChatChannel.WEB,
+            status=ChatTurnStatus.QUEUED,
         ),
     ]
     monkeypatch.setattr(chat_service, "history", lambda limit=60: fake_history)
@@ -272,6 +292,7 @@ def test_fresh_session_is_seeded_with_recent_transcript(
     assert "Consultor: Rende CDI" in prompt
     # The just-recorded copy of the current message isn't echoed as history.
     assert prompt.count("e depois de impostos?") == 1
+    assert "e o IR do mês?" not in prompt
 
 
 def test_rotation_builds_structured_summary(
@@ -696,6 +717,29 @@ def test_restart_puts_the_interrupted_turn_back_in_the_queue(
     assert job.status == ChatTurnStatus.QUEUED
     assert job.prompt == "registra 42 no mercado"
     assert job.attempts == 1
+
+
+def test_restart_does_not_kill_a_turn_that_waited_out_the_limit(
+    chat_dirs: Path, monkeypatch: pytest.MonkeyPatch, session
+) -> None:
+    """attempts also counts usage-limit waits (budget 24). A message that had
+    waited 3 times and was running during a deploy used to become FAILED."""
+    from app.models.chat import ChatChannel, ChatTurnStatus
+
+    monkeypatch.setattr(chat_service, "engine", session.get_bind())
+    monkeypatch.setattr(chat_service, "start_queue_worker", lambda: None)
+    chat_service.enqueue("e o meu saldo?", ChatChannel.WEB)
+    job = chat_service._claim_next_job()
+    assert job is not None
+    row = session.get(chat_service.ChatMessage, job[0])
+    row.attempts, row.retry_kind = 3, "limit"
+    session.add(row)
+    session.commit()
+
+    chat_service.reconcile_orphan_turns()
+    session.refresh(row)
+    assert row.status == ChatTurnStatus.QUEUED
+    assert row.retry_kind == "limit"
 
 
 # ── Cost: what keeps a chained session from getting expensive ────────────────

@@ -743,7 +743,7 @@ _TRANSCRIPT_SEED_MESSAGES = 10
 _TRANSCRIPT_SEED_MAX_CHARS = 2400
 
 
-def _transcript_tail(current_text: str) -> str:
+def _transcript_tail() -> str:
     """Recent turns from the SHARED transcript, for reseeding a fresh session.
 
     Rotation used to hand the new session only MEMORY.md — whatever was being
@@ -755,11 +755,23 @@ def _transcript_tail(current_text: str) -> str:
         msgs = history(limit=_TRANSCRIPT_SEED_MESSAGES + 4)
     except Exception:  # noqa: BLE001 — seeding is an extra, not a dependency
         return ""
-    # Drop the just-recorded copy of the message being answered right now.
-    if msgs and msgs[-1].role == ChatRole.USER and msgs[-1].content.strip() == current_text.strip():
-        msgs = msgs[:-1]
-    msgs = [m for m in msgs if m.status == ChatTurnStatus.DONE and m.content]
-    msgs = msgs[-_TRANSCRIPT_SEED_MESSAGES:]
+    # Only finished exchanges: a client message counts once its answer is DONE.
+    # That drops the message being answered right now (its answer is the
+    # RUNNING row) and the ones still queued behind it, which the new session
+    # would otherwise see twice or before their turn.
+    done = []
+    for i, m in enumerate(msgs):
+        nxt = msgs[i + 1] if i + 1 < len(msgs) else None
+        if m.role == ChatRole.USER:
+            if (
+                nxt is not None
+                and nxt.role == ChatRole.ASSISTANT
+                and nxt.status == ChatTurnStatus.DONE
+            ):
+                done.append(m)
+        elif m.status == ChatTurnStatus.DONE and m.content:
+            done.append(m)
+    msgs = done[-_TRANSCRIPT_SEED_MESSAGES:]
     if not msgs:
         return ""
     lines = []
@@ -945,7 +957,7 @@ def run_chat_turn(text: str) -> tuple[str, model_router.Route, StepResult]:
             text,
             fresh=fresh,
             rotated=rotated,
-            transcript=_transcript_tail(text) if fresh else "",
+            transcript=_transcript_tail() if fresh else "",
             summary=_rotation_summary() if rotated else "",
         )
         try:
@@ -968,7 +980,7 @@ def run_chat_turn(text: str) -> tuple[str, model_router.Route, StepResult]:
                     text,
                     fresh=True,
                     rotated=True,
-                    transcript=_transcript_tail(text),
+                    transcript=_transcript_tail(),
                     summary=_rotation_summary(),
                 ),
                 session_id=None,
@@ -1118,10 +1130,14 @@ def reconcile_orphan_turns() -> int:
             select(ChatMessage).where(ChatMessage.status == ChatTurnStatus.RUNNING)
         ).all()
         for row in rows:
-            if (row.prompt or "").strip() and (row.attempts or 0) < _MAX_TRANSIENT_ATTEMPTS:
+            # attempts also counts usage-limit waits (budget 24): a message that
+            # waited out the limit 3 times must not die on the next deploy.
+            limit = row.retry_kind == "limit"
+            budget = _MAX_LIMIT_ATTEMPTS if limit else _MAX_TRANSIENT_ATTEMPTS
+            if (row.prompt or "").strip() and (row.attempts or 0) < budget:
                 row.status = ChatTurnStatus.QUEUED
                 row.attempts = (row.attempts or 0) + 1
-                row.retry_kind = "resume"
+                row.retry_kind = "limit" if limit else "resume"
                 row.run_after = None
                 row.content = "⏳ Retomando de onde parei…"
                 requeued += 1
