@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // deploy/pi builds beside the live .next and keeps the previous one
+    ".next-build/**",
+    ".next-old/**",
   ]),
 ]);
 

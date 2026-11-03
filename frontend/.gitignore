@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# deploy/pi: build beside the live one, previous one kept for rollback
+/.next-build/
+/.next-old/

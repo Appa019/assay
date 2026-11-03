@@ -10,6 +10,9 @@ import type { NextConfig } from "next";
 const BACKEND_ORIGIN = process.env.BACKEND_ORIGIN ?? "http://127.0.0.1:8000";
 
 const nextConfig: NextConfig = {
+  // deploy/pi/check.sh builds into .next-build so the live .next keeps
+  // serving; deploy/pi/deploy.sh swaps it in. Unset = the default .next.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   reactStrictMode: true,
   poweredByHeader: false,
   rewrites: async () => [
