@@ -8,14 +8,6 @@
       "command": "npx",
       "args": ["@playwright/mcp@latest"]
     },
-    "vercel": {
-      "type": "http",
-      "url": "https://mcp.vercel.com/mcp"
-    },
-    "supabase": {
-      "type": "http",
-      "url": "https://mcp.supabase.com/mcp?project_ref=puhczamrihhjloyfjxey&read_only=true"
-    },
     "sequential-thinking": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
