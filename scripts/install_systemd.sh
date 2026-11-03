@@ -53,6 +53,10 @@ mkdir -p "$UNIT_DIR" "${PROJECT_ROOT}/storage/logs"
 DATA_DIR="$(readlink -f "${PROJECT_ROOT}/storage")"
 GUARD_PATH="${DATA_DIR}"
 [ -f "${DATA_DIR}/portfolio.db" ] && GUARD_PATH="${DATA_DIR}/portfolio.db"
+if [ "${GUARD_PATH}" = "${DATA_DIR}" ]; then
+  echo "AVISO: sem portfolio.db, as units conferem só a pasta ${DATA_DIR}." >&2
+  echo "       Rode este instalador de novo depois do primeiro boot do backend." >&2
+fi
 GUARD_LINE="ExecStartPre=/bin/sh -c 'test -e \"${GUARD_PATH}\" || { echo \"${GUARD_PATH} ausente: o HD está montado?\" >&2; exit 1; }'"
 
 long_service() { # long_service <name> <description> <command> [extra [Service] line]
