@@ -100,8 +100,8 @@ cliente perde as duas memórias e precisa reinscrever o push em todo aparelho.
     ├── deploy.sh    pull --ff-only → install → check → troca o build → health; volta sozinho
     ├── install.sh   idempotente; units via scripts/install_systemd.sh
     ├── check.sh     ruff, pytest, eslint, tsc e build em frontend/.next-build
-    ├── health.sh    saída 0 = backend, frontend, 11 timers e CLI claude ok
-    ├── backup.sh    DIR: banco + memórias + chave VAPID + estado + .env
+    ├── health.sh    0 = tudo ok · 2 = aviso (job falhou, CLI claude ausente) · 1 = quebrado
+    ├── backup.sh    DIR: banco (cópia online, origem só leitura) + memórias + chave VAPID + estado; o .env fica com o pi-backup
     └── README.md    portas, contratos, rollback
 ```
 
@@ -152,7 +152,7 @@ de máquina, não deste app.
 | `storage/router_workspace/` | Pi | apagar: triagem por LLM morreu no D31/D37 |
 | `storage/claude_session.json` | Pi, se existir | apagar: resíduo do Playwright antigo |
 | `~/assay_backup_20260905_pre_reset/` | Pi | `~/attic/` |
-| `.claude/skills/deploy/SKILL.md` (Vercel) | repo | apagar, já marcada obsoleta em `docs/13` |
+| `.claude/skills/deploy/SKILL.md` (Vercel) | repo | **feito**: não existe mais |
 | `~/investimentos_manual` em `CLAUDE.md`, `docs/09` e auto-memória (o antigo `acesso-remoto-pi.md` saiu do repo) | repo | trocar pelo caminho novo **no mesmo commit da migração** |
 | §7 e §11 de `raspberry-pi.md` | docs do Pi | atualizar: bot ativo, branch, 8–10 timers |
 

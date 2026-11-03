@@ -1,6 +1,6 @@
 # 04 · Motor de IA
 
-> Arquivo central: `app/services/analysis_runner.py` (1494 linhas). Se algo de
+> Arquivo central: `app/services/analysis_runner.py`. Se algo de
 > IA quebrou, começa aqui.
 
 ## O princípio
@@ -40,8 +40,9 @@ disco** com `CLAUDE.md`, `MEMORY.md`, ferramentas e notas.
 | `storage/agent_workspace/` | comitê (aporte, semanal, maturidade) | `opus` / effort `max` | sim, baseline completo |
 | `storage/chat_workspace/` | consultor (chat) | roteado: haiku/sonnet/opus | sim, **perfil enxuto** (`profile="chat"`: só dados financeiros + fetch + memory) |
 | `storage/classifier_workspace/` | classificador de gasto | `haiku` / `low` | **não, de propósito** |
+| `storage/aux_workspace/` | transcrição de anexos (`CHAT_VISION_*`) e resumo de rotação do chat (`CHAT_ROUTER_*`) | conforme a config | **não, de propósito** |
 
-> A **ausência** do `.mcp.json` é o que mantém os dois últimos rápidos (~5s):
+> A **ausência** do `.mcp.json` é o que mantém classifier e aux rápidos (~5s):
 > nenhum servidor MCP boota. Não "conserte" isso adicionando config.
 
 ### Anatomia do `agent_workspace/`
@@ -125,7 +126,7 @@ bot nem credencial de nuvem alheia a ele.
 
 ```python
 run_chain(steps: list[tuple[titulo, prompt]], *, run_id, model, effort,
-          step_timeout, persist=callback, on_event=callback,
+          step_timeout, step_timeouts=None, persist=callback, on_event=callback,
           resume_session_id=None, on_session_id=callback,
           step_offset=0, total_steps=None, limit_backoff=None) -> RunSummary
 ```
@@ -139,8 +140,9 @@ run_chain(steps: list[tuple[titulo, prompt]], *, run_id, model, effort,
   mostra "etapa 4/6", não "1/3").
 - Segura o **lock global** durante toda a corrente.
 
-Usado por: aporte (5 reuniões + fechamento), revisão semanal (2 etapas),
-maturidade (2 etapas).
+Usado por: aporte (5 reuniões + fechamento), revisão semanal (1 etapa) e
+maturidade (1 etapa). Desde o D46 memo e relatório saem da mesma etapa,
+separados por `_REPORT_MARKER` (`review_service._single_step`).
 
 ## Resiliência — o que acontece quando falha
 
@@ -286,8 +288,7 @@ contexto durável através da rotação e, desde 2026-08-06 (D20), a sessão nov
 **semeada com os últimos ~10 turnos da transcrição** (`_transcript_tail`, lidos
 de `chat_message`), então o assunto em andamento sobrevive à rotação de fato.
 Desde o upgrade do consultor (D24), a rotação de uma conversa longa também
-gera um **resumo estruturado** (`_rotation_summary`: haiku no workspace pelado
-do roteador, 5 seções fixas, números copiados verbatim, best-effort) injetado
+gera um **resumo estruturado** (`_rotation_summary`: haiku no `aux_workspace`, 5 seções fixas, números copiados verbatim, best-effort) injetado
 antes da cauda verbatim. A sessão renascida por `SessionNotFoundError` zera o
 contador de turnos (A35) — antes herdava o da sessão morta e rotacionava de
 novo na mensagem seguinte. O worker da fila, via `_settle()`, persiste

@@ -14,9 +14,9 @@ Base: `http://127.0.0.1:8000` (o navegador nunca fala direto — o Next reescrev
 | `GET` | `` | Resumo: `total_value`, `allocation` (valores + %), `target_allocation`, `deviation`, `assets[]` |
 | `GET` | `/assets` | Todos os lotes |
 | `POST` | `/assets` | Cria lote → também grava `Trade(buy)`. Body: `ticker`, `asset_class`, `quantity>0`, `avg_price>0`, `current_price?`, `entry_date?`, `name?` |
-| `PATCH` | `/assets/{id}` | Atualiza `name`, `quantity`, `avg_price`, `current_price`, `thesis`, `target_price`, `stop_price` |
+| `PATCH` | `/assets/{id}` | Atualiza `name`, `current_price`, `thesis`, `target_price`, `stop_price`. Quantidade e PM só mudam por compra ou venda (senão o ledger `Trade` mente) |
 | `POST` | `/assets/{id}/sell` | Vende o lote. Body OPCIONAL `{"price", "quantity"}`: `price` = preço REAL de execução (sem ele usa a marcação); `quantity` = venda PARCIAL (o resto do lote mantém `entry_date`/PM). **409** dentro da trava da classe (ação 30d · cripto 7d) · **422** quantidade > lote |
-| `DELETE` | `/assets/{id}` | Remove sem gravar venda (correção de cadastro) |
+| `DELETE` | `/assets/{id}` | Desfaz um cadastro errado: só nas primeiras 24h do lote (`DELETE_WINDOW`), e leva junto o `Trade(buy)` dele. Depois disso **409**: saída de lote antigo é venda |
 | `POST` | `/refresh` | Marca tudo a mercado. Best-effort, devolve contagens |
 | `GET` | `/history?days=365` | Snapshots diários, cronológicos (curva de patrimônio) |
 | `GET` | `/benchmark?days=365` | TWR da carteira vs CDI/IBOV/BTC, rebased 100 |
@@ -124,6 +124,19 @@ removido. iOS: exige o PWA aberto pela Tela de Início (iOS 16.4+).
 
 ---
 
+## Avisos (inbox) — `/api/notifications`
+
+| Método | Rota | O que faz |
+|---|---|---|
+| `GET` | `?limit=50&unread_only=false` | `{items, unread}`. `limit` tem teto de 200 |
+| `POST` | `/{id}/read` | Marca um aviso como lido. 404 se não existir |
+| `POST` | `/read-all` | Marca todos; devolve `{marked}` |
+
+Todo aviso do sistema (`notification_center.notify`) grava aqui antes de
+disparar o push. É o sino do app.
+
+---
+
 ## Relatórios — `/api/reports`
 
 | Método | Rota | O que faz |
@@ -152,5 +165,8 @@ removido. iOS: exige o PWA aberto pela Tela de Início (iOS 16.4+).
 - **Dinheiro:** `Decimal` no backend (`decimal_places=2`, ou 8 para
   quantidade/preço); serializado como `float` nos schemas `*Read`.
 - **Erros:** `{"detail": "mensagem em pt-BR"}`. A mensagem é mostrada ao usuário.
+- **Escrita de outro site:** `POST`/`PATCH`/`DELETE` com `Sec-Fetch-Site`
+  diferente de `same-origin`/`none` volta **403** (`app/main.py`,
+  `refuse_cross_site_writes`). O app e o `curl` do consultor passam.
 - **Novo endpoint:** router fino → service com a regra → schema Pydantic para
   entrada e saída → teste. Nunca coloque regra de negócio no router.

@@ -12,7 +12,7 @@
 ### Python
 - Type hints on all function signatures
 - Pydantic models for request/response schemas
-- Route handlers that only hit SQLite stay sync `def` (FastAPI runs them in the threadpool); `async def` when they await I/O
+- Route handlers are `async def` (house style); one that blocks for seconds on a subprocess (e.g. `POST /api/cashflow/classify`) is sync `def` so FastAPI runs it in the threadpool
 - f-strings for string formatting
 - Docstrings only on public API functions (not internal helpers)
 

@@ -35,9 +35,9 @@ nunca entra no git.
 
 | Variável | Default |
 |---|---|
-| `TARGET_FIXED_INCOME` | `0.35` |
-| `TARGET_STOCKS` | `0.40` |
-| `TARGET_CRYPTO` | `0.25` |
+| `TARGET_FIXED_INCOME` | `0.50` |
+| `TARGET_STOCKS` | `0.35` |
+| `TARGET_CRYPTO` | `0.15` |
 
 Cada um precisa estar em [0, 1] e os três **precisam somar 1.0 ± 0.01** —
 validadores em `Settings` derrubam o boot com mensagem explícita se não somarem.

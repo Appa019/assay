@@ -107,9 +107,9 @@ $(color 32 '✓ Setup concluído!')
     · Ou rode no terminal: $(color 36 './start.sh')
 
   Antes do primeiro ciclo:
-    1. Cadastre seus ativos atuais em $(color 36 '/ativos')
-    2. Em outro terminal, rode: $(color 36 'claude --dangerously-skip-permissions')
-       (Opus 4.7 + max reasoning)
-    3. Volte ao app, clique $(color 36 'Novo aporte') e siga os 3 prompts
+    1. Faça login no CLI uma vez: $(color 36 'claude')  (o comitê roda headless por ele)
+    2. Cadastre seus ativos atuais em $(color 36 'Investimentos › Carteira')
+    3. Peça o aporte ao consultor ou em $(color 36 'Investimentos › Aportar'):
+       o comitê (5 reuniões) roda na madrugada e deixa a folha de ordens
 
 BANNER

@@ -23,11 +23,11 @@ src/
 │   └── (dashboard)/
 │       ├── layout.tsx        <ValuesShell> + <PrivacyToggle> + <Sidebar> +
 │       │                     <main> + <MobileNav>
-│       ├── page.tsx          / — Visão geral (727 linhas)
+│       ├── page.tsx          / — Visão geral
 │       ├── consultor/        chat
 │       ├── extrato/          ?aba=mes (ledger + fatura) | ?aba=fluxo (previsto)
 │       ├── investimentos/    casca com 4 sub-abas na URL
-│       ├── ativos/           AtivosView (1423 linhas — o maior arquivo)
+│       ├── ativos/           AtivosView (o maior arquivo)
 │       ├── aporte/           AporteView + [id]/ (acompanhamento)
 │       ├── relatorios/       RelatoriosView
 │       ├── ir/               IrView
@@ -64,7 +64,7 @@ além do default — as rotas antigas continuam vivas para deep link.
 
 ## Design system (`globals.css`)
 
-Cool neutrals, painéis brancos, um accent teal. **Light only** — não existe
+Cool neutrals, painéis brancos, um accent indigo (`#111184`). **Light only** — não existe
 variante escura, por escolha do dono.
 
 Todos os valores em **oklch**, neutros tintados para o hue **250** (a versão
@@ -78,7 +78,7 @@ contraste + borda de 1px, **nunca por sombra**.
 | Painel (sidebar, header de tabela, code block) | `--bg-secondary` |
 | Elevado | `--bg-card` / `--bg-elevated` (`#fff`) |
 | Texto | `--text-primary` / `--text-secondary` / `--text-muted` — três degraus, não mais |
-| Accent | `--accent` / `--accent-light` / `--accent-strong` — teal, só interação e estado atual |
+| Accent | `--accent` / `--accent-light` / `--accent-strong` — indigo, só interação e estado atual |
 | Semântico | `--success` `--danger` `--warning` (+ pares `-light`) |
 | Bordas | `--border` / `--border-strong` |
 
@@ -97,8 +97,9 @@ significado sem rótulo ao lado.
 - Eyebrow de seção: 11px, uppercase, `letter-spacing: 0.18em`, `--text-muted`.
 - `clamp()` só nas figuras monetárias heroicas; o resto usa passos fixos em rem.
 
-Carregadas por `next/font/google` no `layout.tsx` — **self-hosted no build**,
-nenhuma requisição a fonte externa em runtime.
+Carregadas por `next/font/local` no `layout.tsx`, a partir dos woff2 em
+`app/fonts/` (com as licenças OFL). O build do Pi não depende do Google Fonts
+e nenhuma fonte é buscada fora em runtime.
 
 ## Regras de iOS (não negocie)
 
@@ -133,7 +134,7 @@ um painel. E só onde o carregamento passa de ~500ms.
 
 ## Camada de dados
 
-`lib/api.ts` (649 linhas) é o cliente tipado — **todo** fetch passa por lá.
+`lib/api.ts` é o cliente tipado — **todo** fetch passa por lá.
 Tipos espelham os schemas Pydantic. `ApiError` carrega status + `detail`.
 
 `API_BASE` vem de `NEXT_PUBLIC_API_BASE_URL`; **vazio é o normal** — assim as

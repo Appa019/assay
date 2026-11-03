@@ -11,8 +11,8 @@ A private money cockpit for one person. Two domains that used to be separate
 and are now one product:
 
 1. **Finanças pessoais** — day-to-day expenses and income (`CashflowEntry`).
-   Logged by the owner directly in the app, or by an AI
-   consultant that reads photographed receipts and bank statements.
+   Logged by talking to an AI consultant in the app, which also reads
+   photographed receipts and bank statements. Extrato only reads them back.
 2. **Investimentos** — an ad-hoc contribution ledger driven by an autonomous
    multi-persona AI committee. Portfolio, orders, tax, weekly reports.
 
@@ -43,7 +43,7 @@ A desktop browser is the secondary surface, used for the long-form artifacts:
 committee memos, the tax report, the full asset table.
 
 Design mobile-first and let the desktop inherit. The reverse produces a
-squeezed desktop layout, which is what exists today.
+squeezed desktop layout.
 
 ## Brand and tone
 

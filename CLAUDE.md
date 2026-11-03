@@ -438,10 +438,11 @@ rsync -a --delete --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
   - `agents_prompts/`: 5 templates Jinja2 (macro · seleção · DD ações · DD crypto · decisão)
   - `core/database.py`: SQLite + SQLModel
   - `models/`: Asset, Contribution, ContributionPrompt, Report (weekly/
-    maturity), Order, Trade, PortfolioSnapshot, CashflowEntry (gastos/ganhos),
-    CreditCard, Recurrence (compromisso mensal)
+    maturity/monthly), Order, Trade, PortfolioSnapshot, CashflowEntry
+    (gastos/ganhos), CreditCard, Recurrence (compromisso mensal), ChatMessage,
+    Notification (inbox), PushSubscription
   - `routers/`: portfolio, contributions, macro, cadence, reports, orders, tax,
-    cashflow, cards, recurrences
+    cashflow, cards, recurrences, chat, push, notifications
   - `services/`: portfolio_service, market_data_service, prompt_generator,
     contribution_service (cria aporte + renderiza prompts), analysis_runner
     (MOTOR: `run_chain` genérico encadeado + auto-resume por limite + workspace/
@@ -624,5 +625,5 @@ long-only de varejo e a quantidade é recalculada pelo `order_sizing`.
   `docs/13-estado-atual.md`.
 - Memória persistente em `~/.claude/projects/<encoded>/memory/`
 - Consulte ao retomar sessão futura para recuperar contexto
-- Salve em `feedback_lessons.md` se descobrir erros de ticker / CG id
-- Salve em `project_patterns.md` se mudar padrão de prompt que funcionou
+- Erro de ticker / id do CoinGecko ou padrão de prompt que funcionou: registre
+  em `project_errors.md` (memória) ou como decisão em `docs/12-decisoes.md`

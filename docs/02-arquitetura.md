@@ -59,12 +59,12 @@ HTTP  →  routers/      valida entrada, traduz exceção em status code. NADA M
 model não importa nada de service. Se você está escrevendo um `if` de negócio
 dentro de um router, ele está no lugar errado.
 
-Tradução de exceção usada em todo lugar:
+Tradução de exceção mais comum (cada router decide; confira o dele):
 
 | Exceção do service | Status HTTP |
 |---|---|
 | `LookupError` | 404 |
-| `ValueError` / `SellLockedError` / lock ativo | 409 |
+| `ValueError` / `SellLockedError` / `DeleteRefusedError` / lock ativo | 409 (na venda, `ValueError` de quantidade vira 422) |
 | `ClassificationError` | 422 |
 | `ChatUnavailableError` | 400 (ou 413 no upload) |
 
@@ -103,7 +103,7 @@ Tudo que fala com Claude passa por `analysis_runner._run_claude_step()`:
 analysis_runner._run_claude_step()     ← única porta para o subprocess `claude`
    ├── analysis_runner.run_chain()     ← N etapas na MESMA sessão
    │      ├── run_analysis()           (aporte: 5 reuniões + fechamento)
-   │      └── review_service           (semanal: 2 etapas · maturidade: 2 etapas)
+   │      └── review_service           (semanal: 1 etapa · maturidade: 1 etapa)
    ├── chat_service._run_turn_once()   (1 turno, workspace do consultor)
    └── classifier_service.classify()   (1 turno, haiku, workspace vazio)
 ```
@@ -138,10 +138,17 @@ Tudo aqui é **gitignored** e o do Pi é a fonte da verdade. O deploy nunca toca
 | `agent_workspace/` | Workspace do **comitê**: `CLAUDE.md` (reescrito a cada run), `MEMORY.md` (do agente), `.mcp.json` (gerado), `.mcp.agent.json` (do agente, nunca sobrescrito), `tools/`, `notes/`, `out/<contribution_id>/etapa_NN.json`, repo git |
 | `chat_workspace/` | Workspace do **consultor**: `CLAUDE.md`, `MEMORY.md` (memória fixa sobre o cliente), `session.json` (sessão + contagem de turnos), `inbox/` (fotos e arquivos recebidos) |
 | `classifier_workspace/` | Diretório **vazio de propósito** — sem `.mcp.json` é o que mantém o classificador rápido |
+| `aux_workspace/` | Também sem `.mcp.json`: transcrição de anexos e resumo de rotação do chat |
+| `webpush/` | Chave VAPID. Perder = todo aparelho inscrito deixa de receber push |
 | `analysis_runs/` | Locks PID (`<uuid>.lock`, `_global_run.lock`, `_chat_turn.lock`) + `transcripts/` (stdout/stderr bruto de cada invocação — o flight recorder) |
 | `logs/` | Logs do `start.sh` e dos jobs |
 | `notifications_state.json` | Lotes cuja maturidade já foi tratada (idempotência) |
 | `alerts_state.json` | Estado dos alertas de alvo/stop (rearma ao voltar à banda) |
+| `insights_state.json`, `weekly_review_state.json` | Dedupe dos insights e do aviso da semanal |
+
+Os `*_state.json` e o `session.json` do chat são gravados de forma atômica
+(`app/core/json_state.py`: arquivo temporário + `replace`). Arquivo ilegível
+vira estado vazio, nunca derruba o caller.
 
 ## Onde a config vive
 

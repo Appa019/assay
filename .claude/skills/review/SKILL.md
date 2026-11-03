@@ -17,7 +17,7 @@ Perform a thorough code review:
 4. **Type safety**: any types, missing null checks, unsafe casts
 5. **Error handling**: unhandled promises, missing try/catch at boundaries
 6. **Test coverage**: untested paths, missing edge cases
-7. **Patterns**: check against `project_patterns.md` for consistency
+7. **Patterns**: check against `docs/12-decisoes.md` and `CLAUDE.md` for consistency
 8. **Style**: naming quality, code duplication, unnecessary complexity
 
 Organize findings by severity: CRITICAL > WARNING > SUGGESTION.

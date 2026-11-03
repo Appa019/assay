@@ -1,8 +1,8 @@
 <div align="center">
 
-# Investimentos Manual
+# Assay
 
-**Um comitê de investimentos multipersona (IA) que transforma um aporte em uma folha de ordens acionável — rodando 100% na sua máquina.**
+**Finanças pessoais e um comitê de investimentos com IA que transforma um aporte numa folha de ordens. Roda local, num Raspberry Pi, atrás de VPN.**
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.136-009688?logo=fastapi&logoColor=white)
@@ -63,7 +63,7 @@ Dois modos:
 - **Automático (padrão)** — o agente roda tudo headless no `claude` (Opus · max
   reasoning), com carta branca de pesquisa, e entrega a recomendação no app
   (`/investimentos?aba=analises`) com aviso por push.
-- **Manual (fallback)** — o app gera os 3 prompts para você colar à mão no Claude.
+- **Manual (fallback)** — o app gera os 5 prompts para você colar à mão no Claude.
 
 ---
 
@@ -73,14 +73,14 @@ Três classes, **apenas** — o comitê não analisa nem recomenda nada fora dis
 
 | Classe | Escopo | Observação |
 |---|---|---|
-| ✅ **Renda Fixa** | 100% **CDB** (preferência ≥100% do CDI) | Liquidez diária — é o *dry powder* que a revisão semanal pode girar para oportunidades |
+| ✅ **Renda Fixa** | Só **CDB Bradesco 100% do CDI**, liquidez diária (instrumento fixo, D29/D34) | Liquidez diária — é o *dry powder* que a revisão semanal pode girar para oportunidades |
 | ✅ **Ações** | Só **equities da B3** (large/mid/small) | Análise fundamentalista + forense + técnica |
 | ✅ **Crypto** | **Agressivo**: BTC/ETH core + alts L1/L2, DeFi, AI, RWA | Alto upside com gestão de risco; exposição a USD só via stablecoin (USDC) |
 
 **Fora do mandato:** Tesouro Direto, LCI/LCA, debêntures, CRI/CRA, fundos, FIIs,
 ETFs (GOLD11/BOVA11/IVVB11), BDRs, ouro, ativos internacionais diretos.
 
-> O mandato é **nativo** dos 3 prompts: todo o universo analisado é CDB · Ações
+> O mandato é **nativo** dos 5 prompts: todo o universo analisado é CDB · Ações
 > B3 · Crypto — não há análise de classes fora do escopo, só sai do mandato em
 > linhas explícitas de veto.
 
@@ -196,15 +196,15 @@ Min Variance · Kelly fracional.
 <details>
 <summary><b>Ver todos os modelos quantitativos aplicados</b></summary>
 
-**Forensic accounting (R2):** Piotroski F-Score · Altman Z-Score · Beneish
-M-Score · Sloan accruals · Dechow F-Score · Capital Allocation Scorecard
+**Forensic accounting (prévia na R2, completa na R3):** Piotroski F-Score ·
+Altman Z-Score · Beneish M-Score · Sloan accruals · Capital Allocation Scorecard
 (Buffett-Munger) · Earnings Quality (cash conversion, accruals, SBC, leases
 IFRS 16).
 
 **Valuation triangulada (R3):** múltiplos · Reverse DCF · DCF 3-stage · CCA,
 com consenso de ≥ 3 fontes.
 
-**Crypto on-chain (R1+R2):** Realized Cap · MVRV-Z · NUPL · SOPR · Puell ·
+**Crypto on-chain (R1+R4):** Realized Cap · MVRV-Z · NUPL · SOPR · Puell ·
 Reserve Risk · HODL Waves · STH-LTH Cost Basis · CDD · Dormancy · VOCD · RHODL ·
 NVT + NVT Signal · Stock-to-Flow · Coinbase/Kimchi Premium · CME Basis · DVOL ·
 Funding Rate · Active Developers (Electric Capital).
@@ -212,11 +212,11 @@ Funding Rate · Active Developers (Electric Capital).
 **Crédito do CDB (R2):** Índice de Basileia Tier 1 · rating do emissor ·
 inadimplência (NPL) · ROE · cobertura FGC (R$ 250k/instituição) · %CDI pós-IR.
 
-**Risk quant (R3):** VaR 95%/99% · CVaR (Expected Shortfall) ·
-Marginal/Component VaR · Sharpe/Sortino/Calmar ·
-Information Ratio · Tracking Error · HHI · Effective N.
+**Risk quant (R5):** vol 90d · max drawdown 12m · beta (e beta em bear) ·
+VaR 95% · CVaR 95% (Expected Shortfall) · perda do bear dentro da trava ·
+Marginal/Component VaR · Sharpe 12m · HHI · concentração pós-aporte.
 
-**Stress test 8 cenários (R3):** risk-off severo · inflação/juros · Selic +200
+**Stress test 8 cenários (R5):** risk-off severo · inflação/juros · Selic +200
 bps · crise crypto · crash 2020-tipo · China hard landing · bull dovish · evento
 de crédito bancário (testa o FGC).
 
@@ -224,11 +224,11 @@ de crédito bancário (testa o FGC).
 da cotação viva (`order_sizing`): lote de 100 no ticker e o resto no
 fracionário.
 
-**Behavioral (R3):** 9 vieses (anchoring, loss aversion, recency, herding,
+**Behavioral (R5):** 9 vieses (anchoring, loss aversion, recency, herding,
 confirmation, overconfidence, disposition, sunk cost, endowment) + mean reversion
 de sentimento (AAII, NAAIM, CNN F&G, Put/Call, IBOV breadth).
 
-**Wealth & tax (R3):** Bucket Strategy · sequence-of-returns · holding com
+**Wealth & tax (R5):** Bucket Strategy · sequence-of-returns · holding com
 breakeven · CDB IR regressivo (22.5%→15%) · isenção R$ 20k/mês em ações · crypto
 isento até R$ 35k/mês · dividendos B3 · JCP vs dividendo · tax-loss harvesting
 (wash-sale 30d) · DARF projetado · reforma 2026.
@@ -285,7 +285,7 @@ sqlite3 storage/portfolio.db
 
 ## Requisitos
 
-- **Python 3.11+** e **Node 20+** com **pnpm** (o `install.sh` instala o que faltar)
+- **Python 3.11+** e **Node 20+** com **pnpm** (o `install.sh` instala só o pnpm, via npm)
 - **Claude Code CLI** autenticado (o agente roda o `claude` headless)
 - Acesso à internet (BCB, Yahoo Finance, CoinGecko)
 - Filesystem **ext4** — NTFS via ntfs-3g não preserva bits de execução e quebra o venv/Node

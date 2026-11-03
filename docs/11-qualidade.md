@@ -61,7 +61,9 @@ transcripts caiam em `tmp_path`.
 
 - **Type hints em toda assinatura.**
 - Pydantic nas fronteiras (request/response).
-- `async def` em todo route handler.
+- `async def` nos route handlers. Exceção: handler que bloqueia segundos
+  num subprocesso (`POST /api/cashflow/classify`) é `def`, e o FastAPI o roda
+  no threadpool.
 - f-strings.
 - Docstring só em API pública, não em helper interno.
 - Imports agrupados: stdlib → terceiros → local, com linha em branco.
@@ -106,8 +108,11 @@ e injetava 0,75 errado"). Mantenha esse nível; não polua com o óbvio.
 - React escapa sozinho; não use `dangerouslySetInnerHTML`.
 - Sem dado sensível em URL ou log.
 - **Não** reintroduza Supabase Auth/RLS: o app é single-user atrás de VPN.
-  A seção de autenticação de `.claude/rules/security.md` é herança de um
-  template e não se aplica a este projeto.
+- Sem login, a única porta é a tailnet. Uma página de outro site aberta no
+  celular ainda conseguiria mandar um POST para cá, então `app/main.py`
+  recusa com 403 toda escrita cujo `Sec-Fetch-Site` não seja `same-origin`
+  ou `none` (`refuse_cross_site_writes`). O `curl` do consultor e os scripts
+  não mandam o cabeçalho e passam.
 
 ## Skills e agentes do projeto (`.claude/`)
 

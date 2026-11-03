@@ -52,10 +52,10 @@ investir 5000" → ele confirma o valor e chama a API).
 | # | Reunião | O que produz |
 |---|---|---|
 | 1 | **Macro · Alocação Tática** (12 personas, 11 rounds) | `final_tactical_brl` (cdb/acoes_b3/crypto), `juros_e_cdb`, `setores_b3`, `digital_assets`. Curva DI como sinal de CDI; Black-Litterman + Risk Parity + HRP; pre-mortem |
-| 2 | **Universo, Filtros e Seleção** (12 personas + 2 vetos) | `selecao_acoes_b3` (5–8), `selecao_crypto` (3–5), `shortlist_cdb` (valor + credit do emissor), `sanidade_selecao`. **Não** escreve memo final |
-| 3 | **Due Diligence de Ações B3** | `shortlist_acoes_b3`: memo completo por ação — valuation triangulada (DCF 3-estágios, Reverse DCF, CCA, Precedent, LBO, SOTP), forense (Piotroski/Altman/Beneish/Sloan/Dechow), capital allocation, técnica, factor, bull/base/bear + pair trades |
+| 2 | **Universo, Filtros e Seleção** (12 personas + 2 vetos) | `selecao_acoes_b3` (até 5), `selecao_crypto` (até 4), `shortlist_cdb` (valor + credit do emissor), `sanidade_selecao`. **Não** escreve memo final |
+| 3 | **Due Diligence de Ações B3** | `shortlist_acoes_b3`: memo completo por ação — valuation triangulada (múltiplos, Reverse DCF, DCF 3-estágios, CCA; Precedent/LBO/SOTP cortados no D37), forense (Piotroski/Altman/Beneish/Sloan), capital allocation, técnica de entrada, factor, bull/base/bear. Sem pair trades (D44) |
 | 4 | **Due Diligence de Crypto** | `shortlist_crypto`: tese, tokenomics/unlocks, on-chain (MVRV-Z/NUPL/SOPR/…), derivativos, dev activity, bull/base/bear. **BTC+ETH ≥ 50%** |
-| 5 | **Investment Committee Final** (14 personas, 14 rounds) | risk overlay (VaR/CVaR/EVT/CDaR), stress em 8 cenários (incl. evento de crédito bancário), sentimento, confirma CDB, tax, compliance, cross-check do CIO, **folha de ordens** |
+| 5 | **Investment Committee Final** (12 personas, 12 rounds) | risk overlay (vol, drawdown, beta, VaR/CVaR 95; sem EVT/CDaR desde o D44), stress em 8 cenários (incl. evento de crédito bancário), sentimento, confirma CDB, tax, compliance, cross-check do CIO, **folha de ordens** |
 
 Schema JSON `version=5.0`, `escopo=BR_3_classes_cdb_acoesB3_crypto`. As reuniões
 3 e 4 podem usar subagentes (Task) por ticker, gravando memos em `./dd/`
@@ -95,8 +95,9 @@ ignora o gate).
 1. refresh de preços (marcação a mercado)
 2. market_data_service.build_full_context()
 3. review_service.run_weekly_review()
-   └─ run_chain com 2 etapas:
-      a) análise: macro + desempenho por LOTE (tese intacta/enfraquecida/
+   └─ run_chain com 1 etapa (D46), que devolve as duas partes separadas
+      por `_REPORT_MARKER`:
+      a) memo: macro + desempenho por LOTE (tese intacta/enfraquecida/
          quebrada) + recomendação por lote liberado + ROTAÇÃO DE DRY POWDER
       b) relatório executivo (o texto do aviso)
 4. Report(kind=weekly) salvo + inbox + push
@@ -171,8 +172,8 @@ Site: POST /api/chat
         ├─ _claim_next_job(): mais ANTIGO primeiro, FIFO estrito
         ├─ status → RUNNING
         ├─ run_chat_turn()
+        │    ├─ model_router.route(text) → tier/modelo (antes do lock)
         │    ├─ adquire _chat_turn.lock (serializa entre processos)
-        │    ├─ model_router.route(text) → tier/modelo
         │    ├─ _expand_attachments(): anexo → transcrição (sessão descartável)
         │    ├─ resume session.json (rotaciona em 120k tokens ou 40 turnos)
         │    └─ _run_claude_step() no chat_workspace

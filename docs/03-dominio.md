@@ -1,6 +1,6 @@
 # 03 · Domínio, dados e regras de negócio
 
-## As 10 tabelas
+## As 13 tabelas
 
 Todas em `app/models/`, SQLModel, PK `UUID`, timestamps em UTC.
 
@@ -14,7 +14,9 @@ Report          (weekly · maturity · monthly)
 CashflowEntry   (ledger pessoal: gasto/ganho)
 CreditCard      (cartão de crédito: fechamento, vencimento, padrão)
 Recurrence      (compromisso mensal: salário, aluguel, assinatura)
-ChatMessage     (transcrição do consultor)
+ChatMessage     (transcrição do consultor; a linha pendente É o job da fila)
+Notification    (inbox do app: o sino)
+PushSubscription (aparelhos inscritos no Web Push)
 ```
 
 ### `Asset` — um LOTE, não um ticker
@@ -56,6 +58,8 @@ Dois campos de resiliência:
   reinícios de processo.
 - `run_attempts` — falhas automáticas consecutivas; ao bater `MAX_RUN_ATTEMPTS`
   (5) o auto-resume desiste e avisa no app, inbox + push (evita loop pago infinito).
+  Esperar o lock global (`RunBusyError`) ou a janela de uso (`LimitError`) não
+  conta como falha: o aporte fica na fila sem gastar tentativa.
 
 `ContributionPrompt` é uma reunião: `prompt_order`, `prompt_key`, `content`
 (prompt renderizado), `response`, e telemetria (`cost_usd`, `duration_s`,

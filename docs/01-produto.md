@@ -83,7 +83,7 @@ Três classes, **apenas**:
 | **Ações** | Só equities listadas na B3 (ON/PN/UNIT). **Nada** de FII, ETF, BDR ou internacional. |
 | **Crypto** | Mandato **agressivo** ("sonhar alto"): alto upside, com gestão de risco. Exposição em USD só via stablecoin (USDC). |
 
-Alvos de alocação padrão (`.env`): RF 35% · Ações 40% · Crypto 25%. Precisam
+Alvos de alocação padrão (`.env`): RF 50% · Ações 35% · Crypto 15% (D33). Precisam
 somar 1.0 — `app/config.py` valida e explode no boot se não somarem.
 
 O mandato aparece em **quatro** lugares e precisa continuar coerente nos quatro:
@@ -112,5 +112,4 @@ de executar a folha de ordens.
   Auth, RLS, login ou sessão — foi removido de propósito.
 - **Não usa Playwright para operar corretora.** Playwright existe só como MCP de
   pesquisa do agente.
-- **Não tem nuvem.** Sem Supabase, sem Vercel para o app (o `.vercel/` no
-  frontend é resíduo antigo).
+- **Não tem nuvem.** Sem Supabase, sem Vercel para o app.
