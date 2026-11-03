@@ -2,9 +2,9 @@
 PY := .venv/bin/python
 RUFF := .venv/bin/ruff
 
-.PHONY: dev backend frontend bot lint format test check build crons systemd analyze weekly prices snapshot backup
+.PHONY: dev backend frontend lint format test check build systemd analyze weekly prices snapshot backup
 
-dev:            ## backend + frontend + bot (daily use)
+dev:            ## backend + frontend for local development
 	./start.sh
 
 backend:        ## backend only, with reload (development)
@@ -30,9 +30,6 @@ build:          ## production build of the frontend
 	cd frontend && pnpm run build
 
 check: lint test build  ## everything CI runs
-
-crons:          ## install cron schedule (legacy; prefer systemd)
-	bash scripts/install_cron.sh
 
 systemd:        ## install systemd user units + persistent timers
 	bash scripts/install_systemd.sh

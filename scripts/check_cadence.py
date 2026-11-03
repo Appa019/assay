@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Daily maturity job (idempotent — safe to run every day via cron).
+"""Daily maturity job (idempotent — the investimentos-cadence timer runs it).
 
 Newly matured stock/crypto lots (crossed their class lock) → run a committee
-maturity review (saved + sent to Telegram). Contributions are ad-hoc, so there
+maturity review (saved + announced in the app). Contributions are ad-hoc, so there
 is no scheduled aporte reminder — the recurring touchpoint is the weekly review.
 
 Cost guard: when the weekly review is about to run anyway, the maturity run is
@@ -10,8 +10,6 @@ DEFERRED instead of fired. The weekly reads every position and rules on every
 freed lot, so paying for a second committee chain days earlier buys nothing —
 and with a per-class lock (stocks 30d, crypto 7d) the unlock dates no longer
 coincide, which would otherwise double the number of maturity runs per cycle.
-
-Install with ``scripts/install_cron.sh``.
 
     python scripts/check_cadence.py
 """
