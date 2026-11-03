@@ -3,9 +3,9 @@
 > ## 📚 DOCUMENTAÇÃO COMPLETA: `docs/`
 >
 > **Comece por [`docs/README.md`](docs/README.md)** — é o índice, dá o modelo
-> mental do projeto inteiro em ~5 minutos e aponta qual dos 13 documentos abrir
+> mental do projeto inteiro em ~5 minutos e aponta qual dos 12 documentos abrir
 > para cada tipo de tarefa (arquitetura, domínio, motor de IA, fluxos, API,
-> frontend, bot, operação, config, qualidade, decisões, estado atual).
+> frontend, operação, config, qualidade, decisões, estado atual).
 >
 > Este `CLAUDE.md` é o **contrato operacional sempre carregado**: regras que
 > valem em toda sessão. O detalhe e o "por quê" moram em `docs/`.
@@ -23,10 +23,9 @@
 >   127.0.0.1:8000) · `investimentos-frontend` (Next em 127.0.0.1:3001) + 11
 >   timers (scheduled · cadence · weekly · resume · prices · snapshot · alerts
 >   · monthly · insights · digest · backup). `Linger=yes`, sobem no boot.
-> - **O bot do Telegram está PARADO e DESABILITADO** desde 2026-09-05 (D30). O
->   cliente não usa Telegram: os avisos vão para o inbox do app + Web Push. Não
->   religue sem pedido. Se religar um dia: NUNCA em duas máquinas (os dois
->   fazem polling e a resposta chega em dobro).
+> - **Não há bot do Telegram.** Parado desde 2026-09-05 (D30) e removido do
+>   código em 2026-11-02 (D47): o cliente não usa Telegram, os avisos vão para
+>   o inbox do app + Web Push.
 > - **Bind SEMPRE em 127.0.0.1.** A LAN é compartilhada com o prédio inteiro;
 >   `0.0.0.0` entrega as finanças do cliente aos vizinhos. Quem publica é o
 >   `tailscale serve`.
@@ -81,7 +80,7 @@ maturidade. Aporte é ad-hoc.
   `Asset` é um lote com seu `entry_date`) e **por CLASSE**: ação 30d (exigência
   de compliance do cliente), cripto 7d (D36). **CDB/Renda Fixa = liquidez
   diária, SEM trava** (dry powder) — excluído de `pending_maturities`, vendável
-  a qualquer hora no `/vender`. Ao um lote cruzar a trava da sua classe,
+  a qualquer hora. Ao um lote cruzar a trava da sua classe,
   `check_cadence` roda análise de maturidade → `Report(maturity)` + aviso no app.
   A regra mora em `portfolio_service.holding_lock_days` e SÓ lá — a API entrega
   `lock_days_total`/`lock_days_left` no lote e `holding_lock_days` no resumo da
@@ -134,9 +133,8 @@ maturidade. Aporte é ad-hoc.
   o workspace é repo git (versiona as ferramentas em `tools/`).
 - **Time GS/J.P. Morgan**: ordens permanentes + prompts convocam uma mesa completa
   (economista-chefe, alocação, equity B3, crypto, RF, quant, CRO, forensic, CIO).
-- **Bot desativado** (D30): `telegram_bot.py` continua no repo como superfície
-  opcional (só responde ao `TELEGRAM_CHAT_ID`), mas o serviço está parado no Pi
-  e o Telegram só recebe cópia com `TELEGRAM_MIRROR_ENABLED=true`.
+- **Sem Telegram** (D47): bot, espelho e `telegram_service` saíram do código.
+  `ChatChannel.TELEGRAM` e `CashflowSource.BOT` ficam só para ler o histórico.
 
 **Stack:** Python FastAPI + SQLModel/SQLite (backend) · Next.js 16 +
 TypeScript + Tailwind v4 (frontend) · pnpm (JS) · pip + venv (Python) ·
@@ -147,16 +145,15 @@ sem Playwright.
 - **Marcação a mercado**: `price_refresh_service` atualiza `current_price` de
   TODO lote (ações via Yahoo, crypto via CoinGecko, CDB por CDI acumulado —
   série 12 BCB × `CDB_PCT_CDI`). Roda por cron/systemd, `POST /api/portfolio/
-  refresh`, `/atualizar` no bot e antes das revisões.
+  refresh` e antes das revisões.
 - **Ledger `Trade`**: toda compra/venda vira linha imutável com P&L realizado
   (`GET /api/portfolio/trades`); a venda continua removendo o `Asset`, mas o
   histórico é permanente (base de track record e IR).
 - **A trava é enforced no service** (`portfolio_service.sell_asset` →
-  `SellLockedError` → API 409), com o prazo da classe. O bot pede confirmação em
-  2 passos no /vender.
+  `SellLockedError` → API 409), com o prazo da classe.
 - **Snapshot diário** (`portfolio_snapshot`, upsert) → curva de patrimônio em
   `GET /api/portfolio/history` (cron `daily_snapshot.py`).
-- **SQLite em WAL** + busy_timeout (API + bot + crons concorrentes) e backup
+- **SQLite em WAL** + busy_timeout (API + crons concorrentes) e backup
   diário com rotação (`backup_db.sh`).
 - **Locks**: por aporte E global (1 execução pesada de Claude por vez, entre
   processos), criação atômica + identidade de PID via /proc (sem reclaim por
@@ -214,10 +211,10 @@ sem Playwright.
   (isenções 20k ações / 35k crypto, carryforward de prejuízo, DARF mínima,
   CDB informativo retido na fonte, posição 31/12). Não substitui contador.
 - **Relatório mensal**: `monthly_report.py` (dias 1-2) → Report(monthly) +
-  aviso no app (o .md só vai junto no espelho do Telegram): patrimônio,
+  aviso no app: patrimônio,
   operações, IR do mês, custo de
   análise. `--force` gera do mês corrente.
-- **Consultor em tempo real (chat, 2026-07-28)**: qualquer texto SEM `/` no bot
+- **Consultor em tempo real (chat, 2026-07-28)**: a aba `/consultor` do site
   é uma conversa com o consultor (`app/services/chat_service.py`) — sessão
   Claude encadeada persistente (`storage/chat_workspace/session.json` sobrevive
   a reinícios; rotaciona por TAMANHO de contexto ou `CHAT_MAX_TURNS`), workspace PRÓPRIO
@@ -230,8 +227,7 @@ sem Playwright.
   que o cliente contar via `POST /api/cashflow` (source=chat), consulta
   carteira/IR/ordens pela API local e responde tickers com dados ao vivo
   (yahoo-finance/coingecko). Lock de turno próprio (`_chat_turn.lock`) — NÃO usa
-  o lock global pesado, então chat funciona mesmo com comitê rodando; fila
-  serial no bot com indicador "digitando…".
+  o lock global pesado, então chat funciona mesmo com comitê rodando.
   **Fila durável (D41, 2026-09-14)**: a linha do assistente pendente É o job
   (`status=queued` + `prompt`/`attempts`/`run_after`/`retry_kind` em
   `chat_message`), drenada por um worker único que sobe no lifespan do
@@ -242,11 +238,11 @@ sem Playwright.
   atravessando restart do Pi. Transiente = 3 tentativas; `auth` = zero
   (só humano resolve). Toda retomada prefixa `_RESUME_PREFACE` no prompt
   mandando conferir o ledger antes de gravar — a tentativa anterior pode ter
-  registrado metade. Push só na primeira espera. `/resetchat` e `POST
-  /api/chat/reset` descartam a sessão (memória fica); o reset dá 409 se houver
+  registrado metade. Push só na primeira espera. `POST
+  /api/chat/reset` descarta a sessão (memória fica); o reset dá 409 se houver
   fila.
-  Aceita **foto e arquivo** (≤20 MB): o bot, quando ligado, baixa via
-  `getFile` p/ `storage/chat_workspace/inbox/` — cupom/nota vira gasto
+  Aceita **foto e arquivo** (≤20 MB): o site grava em
+  `storage/chat_workspace/inbox/` — cupom/nota vira gasto
   registrado, extrato/fatura vira lançamentos. **Desde D42 o arquivo NÃO é
   lido dentro da conversa**: `_expand_attachments` troca o marcador
   `[[ANEXOS:...]]` por uma transcrição feita numa sessão DESCARTÁVEL
@@ -277,9 +273,8 @@ sem Playwright.
   ganhos do dia a dia, separado do ledger `Trade`. API `/api/cashflow` (POST /
   GET com `month=`+`kind=`+`wallet=` / DELETE / `GET /summary?month=YYYY-MM`
   com totais, por categoria e por carteira / `GET /wallets` saldo acumulado de
-  benefício). Bot: `/gasto <valor> [descrição #categoria] [vr|va]`,
-  `/ganho ...`, `/financas [AAAA-MM]`; categorias normalizadas p/ minúsculas;
-  fontes: chat | bot | api. **Carteiras (D28)**: `wallet` = conta | vr | va
+  benefício). Categorias normalizadas p/ minúsculas;
+  fontes: chat | api (`bot` só em linhas antigas). **Carteiras (D28)**: `wallet` = conta | vr | va
   (vocabulário FECHADO, `normalize_wallet` dobra apelidos, desconhecido →
   conta). VR/VA = benefício, só comida — NUNCA contam como sobra investível.
   **Cartão de crédito (D39)**: `CreditCard` (fechamento/vencimento/padrão) +
@@ -304,14 +299,13 @@ sem Playwright.
   `forecast_service.build_forecast` — não recalcule no front.
 
 ### Chat no site + roteador de modelo (2026-07-28)
-O consultor mora na página `/consultor`. **É UMA conversa só**: se o espelho do
-Telegram for religado um dia, as duas portas compartilham a mesma transcrição.
-- **Transcrição compartilhada** (`ChatMessage`): toda mensagem, dos dois lados e
-  das duas portas, vira linha em `chat_message` (role · channel · status ·
+O consultor mora na página `/consultor`. **É UMA conversa só**, persistida no banco.
+- **Transcrição compartilhada** (`ChatMessage`): toda mensagem, dos dois lados,
+  vira linha em `chat_message` (role · channel · status ·
   model · tier). Rotacionar a sessão do Claude NÃO apaga o histórico. Todo
-  caller entra por `chat_service.enqueue()` (site: enfileira e volta na hora)
-  ou `chat_service.converse()` (bot: síncrono), nunca `run_chat_turn` direto —
-  são esses dois que persistem.
+  caller entra por `chat_service.enqueue()` (enfileira e volta na hora),
+  nunca `run_chat_turn` direto — é ele que persiste. (`converse()`, a porta
+  síncrona do bot, hoje só é usada pelos testes.)
 - **API**: `GET /api/chat` (histórico + `busy`), `POST /api/chat` (enfileira e
   volta 202 na hora — um turno leva minutos, ninguém segura HTTP), `POST
   /api/chat/reset`. O front faz polling: 2,5s ocupado, 12s ocioso (o turno
@@ -342,8 +336,6 @@ Telegram for religado um dia, as duas portas compartilham a mesma transcrição.
   data relativa). Modelo pequeno, workspace SEM `.mcp.json` (é a ausência do
   arquivo que mantém rápido, ~5s). Devolve RASCUNHO e não grava — o usuário
   confirma no formulário, senão um erro de leitura entra no ledger calado.
-- **Bot mora no Pi** (`investimentos-bot.service`). Não rode em duas máquinas:
-  os dois fazem polling e respondem em dobro.
 
 ### Produto merged + mobile-first (2026-07-28)
 O app deixou de ser só "mesa de aportes": **finanças pessoais e investimentos
@@ -390,10 +382,10 @@ manifest. Não edite os assets à mão — rode o script.
 ```bash
 ssh pi
 export XDG_RUNTIME_DIR=/run/user/$(id -u)          # necessário via ssh não-interativo
-systemctl --user status  investimentos-backend investimentos-frontend investimentos-bot
-systemctl --user restart investimentos-backend investimentos-frontend investimentos-bot
+systemctl --user status  investimentos-backend investimentos-frontend
+systemctl --user restart investimentos-backend investimentos-frontend
 systemctl --user list-timers 'investimentos-*'
-journalctl --user -u investimentos-bot -f
+journalctl --user -u investimentos-backend -f
 sudo tailscale serve status                         # o que está publicado na VPN
 ```
 
@@ -411,7 +403,7 @@ rsync -a --delete --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
 
 ### No desktop (só desenvolvimento)
 - `./start.sh`: sobe backend + frontend locais para desenvolver (NÃO é produção;
-  sem --reload por padrão — `START_RELOAD=1` p/ dev). Não deixe o bot subir aqui.
+  sem --reload por padrão — `START_RELOAD=1` p/ dev).
 - `./install.sh`: Setup inicial (venv, deps, atalho Desktop)
 - `make check`: ruff + pytest + lint/type-check/build do frontend (o que a CI roda)
 - `.venv/bin/python -m pytest`: suíte de testes do backend (tests/)
@@ -422,11 +414,7 @@ rsync -a --delete --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
 - `.venv/bin/python scripts/run_analysis.py --amount 5000`: cria o aporte e
   roda a análise inteira no terminal, etapa por etapa (opus/max por padrão).
   Flags úteis: `--notes`, `--contribution-id <uuid>` (re-rodar), `-y` (sem
-  confirmação), `--no-telegram`, `--model haiku --effort low` (teste barato).
-- `.venv/bin/python scripts/telegram_setup.py`: detecta o chat_id (mande /start
-  ao bot antes) e grava em `.env`
-- `.venv/bin/python scripts/telegram_bot.py`: bot interativo (também sobe no
-  start.sh se Telegram configurado)
+  confirmação), `--no-notify`, `--model haiku --effort low` (teste barato).
 - `.venv/bin/python scripts/check_cadence.py`: roda análise de maturidade dos
   lotes de ação/crypto que cruzaram a trava da classe (cron diário). Sem nag de
   aporte (ad-hoc)
@@ -459,13 +447,13 @@ rsync -a --delete --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
     (MOTOR: `run_chain` genérico encadeado + auto-resume por limite + workspace/
     memória; `run_analysis` p/ aporte), review_service (revisão semanal +
     maturidade via run_chain → Report), notification_center (inbox do app +
-    Web Push + espelho opcional), telegram_service (Bot API),
+    Web Push),
     notification_service (marcos de maturidade por lote), chat_service (consultor
     turno de chat = `_run_claude_step` no chat_workspace),
     cashflow_service (ledger pessoal de gastos/ganhos),
     recurrence_service (compromissos mensais) + forecast_service (fluxo
     de caixa previsto)
-- `/scripts/`: run_analysis (aporte→análise), telegram_setup, telegram_bot,
+- `/scripts/`: run_analysis (aporte→análise),
   check_cadence, weekly_review, resume_pending (retoma análises interrompidas),
   install_cron
 - `/storage/agent_workspace/`: workspace persistente do agente (gitignored) —
@@ -509,10 +497,10 @@ rsync -a --delete --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
   stocks USA direto.
 
 ## IMPORTANT
-- NEVER commit `.env` files ou expor secrets (inclui TELEGRAM_BOT_TOKEN)
+- NEVER commit `.env` files ou expor secrets
 - NEVER voltar Supabase / Playwright / Avenue integration — projeto foi
-  simplificado intencionalmente. (Telegram + scheduler/cron foram REINTRODUZIDOS
-  a pedido do usuário em 2026-05; não são mais proibidos.)
+  simplificado intencionalmente. (scheduler/cron foram REINTRODUZIDOS a pedido do
+  usuário em 2026-05; o Telegram veio junto e saiu de novo em D47.)
 - Dois fluxos: AUTOMÁTICO (analysis_runner orquestra o `claude` CLI headless,
   encadeado, e salva tudo) e MANUAL (backend só gera prompts p/ colar à mão).
   O orquestrador roda no `storage/agent_workspace/` (CLAUDE.md + MEMORY.md
@@ -526,9 +514,7 @@ rsync -a --delete --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
 - Trava de venda por LOTE e por CLASSE: `MIN_HOLDING_DAYS` (30) nas AÇÕES —
   compliance do cliente, não encurte — e `MIN_HOLDING_DAYS_CRYPTO` (7) na
   CRYPTO. CDB/Renda Fixa = liquidez diária (vende a qualquer hora). Fonte única:
-  `portfolio_service.holding_lock_days`. O bot bloqueia `/vender` antes do prazo
-  da classe, mas libera CDB sempre
-- Bot do Telegram é PRIVADO: responde só ao `TELEGRAM_CHAT_ID` configurado
+  `portfolio_service.holding_lock_days`.
 - Os prompts são para Claude Code CLI (com WebSearch/WebFetch/Bash) —
   não para claude.ai web
 - NUNCA commitar `storage/claude_session.json` (credenciais) — está no

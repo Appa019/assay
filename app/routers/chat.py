@@ -50,7 +50,7 @@ async def upload_attachments(
 ) -> ChatState:
     """Send up to 3 photos/documents to the consultant in ONE message.
 
-    They land in the same inbox the Telegram bot writes to and become a single
+    They land in storage/chat_workspace/inbox/ and become a single
     turn — a receipt photographed front and back is one purchase, not two. Like
     a text message, it queues instead of being refused mid-turn.
     """
