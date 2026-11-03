@@ -5,7 +5,6 @@ description = "Ad-hoc contributions with a 5-meeting AI investment committee. Fu
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-q"

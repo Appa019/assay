@@ -14,7 +14,6 @@ pywebpush>=2.0.0,<3.0.0
 python-dotenv>=1.0.0,<2.0.0
 structlog>=24.4.0,<25.0.0
 pytest>=8.3.0,<9.0.0
-pytest-asyncio>=0.24.0,<1.0.0
 ruff>=0.8.0,<1.0.0
 # Build-time only: rasterises the app mark in scripts/build_icon.py.
 pillow>=11.0.0,<12.0.0
