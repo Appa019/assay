@@ -182,6 +182,10 @@ precisa depois.
    fail-fast (uma espera curta; tenta de novo no próximo pass). Avisa no
    app (inbox + push). Desiste após `MAX_RUN_ATTEMPTS` (5) falhas consecutivas.
 
+Os timers da madrugada (aporte agendado, semanal, maturidade) também rodam
+fail-fast: limite vira aviso e nova tentativa na noite seguinte, nunca horas
+de espera com o lock global preso (D50, D53).
+
 ### Locks (arquivos em `storage/analysis_runs/`)
 
 | Lock | Escopo | Por quê |

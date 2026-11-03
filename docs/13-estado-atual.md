@@ -28,6 +28,8 @@ As três perguntas foram decididas pelo Pedro em 2026-11-03 (abaixo).
 
 ## 2026-11-03 — decisões do Pedro sobre a fase 4
 
+- **Semanal e maturidade em fail-fast** (D53): limite de uso não segura mais
+  o comitê no processo; o timer avisa e tenta de novo na madrugada seguinte.
 - **Retomada só de madrugada** (D50): `investimentos-resume` roda a cada
   15 min entre 00:00 e 02:45. O aporte agendado da 01:00 não espera mais o
   reset dentro do processo: limite ou lock ocupado viram "continua na próxima

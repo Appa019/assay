@@ -119,6 +119,7 @@ def main() -> int:
             effort=args.effort,
             notify=not args.no_notify,
             on_event=_printer,
+            fail_fast_on_limit=True,
         )
         if report is None:
             # Backstop: the service re-checks the same guard (data could have
@@ -133,6 +134,17 @@ def main() -> int:
         # "another run holds the global lock" is a normal defer, not a failure.
         if isinstance(exc, analysis_runner.RunBusyError):
             print(f"Adiada: {exc}")
+            return 0
+        # Usage limit: no Report was written, so the review stays due and the
+        # timer runs it again the next night.
+        if isinstance(exc, analysis_runner.LimitError):
+            print(f"⏸ adiada: {exc}")
+            notification_center.notify(
+                "⏸ A revisão semanal parou no limite de uso.\n"
+                "Ela roda de novo sozinha na próxima madrugada.",
+                kind=NotificationKind.SYSTEM,
+                level=NotificationLevel.WARNING,
+            )
             return 0
         notification_center.notify(
             notification_center.failure_text("Revisão semanal", exc),

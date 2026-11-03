@@ -161,7 +161,8 @@ sem Playwright.
   idade). `IN_PROGRESS` órfão não trava mais o re-run (409 só com lock vivo).
 - **Retry**: contadores independentes p/ limite × transiente; reset pós-meia-
   noite tratado; `run_attempts` limita retomadas (`MAX_RUN_ATTEMPTS`, aviso ao
-  desistir); `resume_pending` roda fail-fast (re-tenta no próximo pass).
+  desistir); `resume_pending`, o aporte agendado, a semanal e a maturidade
+  rodam fail-fast (limite = tenta na próxima madrugada, D50/D53).
 - **Transcripts**: stdout/stderr brutos de cada invocação do CLI em
   `storage/analysis_runs/transcripts/` (flight recorder); custo/duração/turnos
   por etapa persistidos em `ContributionPrompt`.

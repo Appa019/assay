@@ -25,6 +25,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 from app.core.database import get_session, init_db  # noqa: E402
 from app.models.notification import NotificationKind, NotificationLevel  # noqa: E402
 from app.services import (  # noqa: E402
+    analysis_runner,
     notification_center,
     notification_service,
     review_service,
@@ -57,7 +58,22 @@ def main() -> int:
             except Exception as exc:  # noqa: BLE001 — stale prices beat no review
                 print(f"  aviso: refresh de preços falhou ({exc}).")
             macro = asyncio.run(review_service.fetch_macro())
-            review_service.run_maturity_review(session, matured, macro_ctx=macro)
+            try:
+                review_service.run_maturity_review(
+                    session, matured, macro_ctx=macro, fail_fast_on_limit=True
+                )
+            except analysis_runner.RunBusyError as exc:
+                print(f"  adiada: {exc}")  # lots stay unmarked: tomorrow's pass retries
+                return 0
+            except analysis_runner.LimitError as exc:
+                print(f"  ⏸ adiada: {exc}")
+                notification_center.notify(
+                    "⏸ A análise de maturidade parou no limite de uso.\n"
+                    "Ela roda de novo sozinha na próxima madrugada.",
+                    kind=NotificationKind.SYSTEM,
+                    level=NotificationLevel.WARNING,
+                )
+                return 0
             notification_service.mark_maturities(keys)
             print("  análise de maturidade concluída e marcada.")
         else:

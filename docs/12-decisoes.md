@@ -556,6 +556,17 @@ para a manhã. Ele roda em fail-fast, e limite ou lock ocupado viram aviso
 "continua na próxima madrugada", não falha. **Custo aceito:** um aporte que
 bate no limite termina na noite seguinte, até um dia depois.
 
+### D53 · Semanal e maturidade também em fail-fast
+Decisão do cliente (2026-11-03), mesmo motivo do D50. A revisão semanal
+(02:10) e a maturidade (01:45) esperavam o reset do limite DENTRO do processo,
+com o lock global preso, e podiam levar o comitê para a manhã. Agora os timers
+passam `fail_fast_on_limit=True`: uma nova tentativa em 2 min e, se o limite
+continuar, saem com aviso "roda de novo na próxima madrugada" (WARNING, exit
+0). Nada se perde: a semanal só grava `Report` ao concluir, então continua
+vencida; a maturidade só marca os lotes ao concluir, então o passe do dia
+seguinte os vê de novo. Lock ocupado (`RunBusyError`) também é adiamento. A CLI
+manual (`run_chain` sem a flag) segue esperando o reset.
+
 ### D51 · IR de cripto: nacional × exterior
 Decisão do cliente (2026-11-03): corrigir sem esperar o contador. O código
 tratava cripto igual a ação: 15% fixo e prejuízo compensando meses seguintes.

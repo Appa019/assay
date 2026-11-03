@@ -342,6 +342,7 @@ def run_weekly_review(
     effort: str = analysis_runner.DEFAULT_EFFORT,
     notify: bool = True,
     on_event: analysis_runner.EventCallback | None = None,
+    fail_fast_on_limit: bool = False,
 ) -> Report | None:
     if not has_reviewable_data(session):
         # Empty book: never start the opus chain. Callers control whether the
@@ -363,7 +364,14 @@ def run_weekly_review(
     _, maturity_keys = notification_service.pending_maturities(session)
     steps = _single_step(_weekly_steps(rows, macro_ctx, today))
     summary = analysis_runner.run_chain(
-        steps, run_id=str(uuid4()), model=model, effort=effort, on_event=on_event
+        steps,
+        run_id=str(uuid4()),
+        model=model,
+        effort=effort,
+        on_event=on_event,
+        # Night timers: one short retry, never hours of in-process waiting
+        # that would carry the committee past 03:00 (D50/D53).
+        limit_backoff=[120] if fail_fast_on_limit else None,
     )
     report = _persist_report(
         session,
@@ -394,13 +402,21 @@ def run_maturity_review(
     effort: str = analysis_runner.DEFAULT_EFFORT,
     notify: bool = True,
     on_event: analysis_runner.EventCallback | None = None,
+    fail_fast_on_limit: bool = False,
 ) -> Report | None:
     if not matured_rows:
         return None
     today = date.today()
     steps = _single_step(_maturity_steps(matured_rows, macro_ctx, today))
     summary = analysis_runner.run_chain(
-        steps, run_id=str(uuid4()), model=model, effort=effort, on_event=on_event
+        steps,
+        run_id=str(uuid4()),
+        model=model,
+        effort=effort,
+        on_event=on_event,
+        # Night timers: one short retry, never hours of in-process waiting
+        # that would carry the committee past 03:00 (D50/D53).
+        limit_backoff=[120] if fail_fast_on_limit else None,
     )
     report = _persist_report(
         session,
