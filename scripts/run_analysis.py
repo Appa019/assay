@@ -137,9 +137,7 @@ def _parse_args() -> argparse.Namespace:
         help="Timeout por etapa, em segundos",
     )
     parser.add_argument("-y", "--yes", action="store_true", help="Não pedir confirmação")
-    parser.add_argument(
-        "--no-telegram", action="store_true", help="Não enviar a recomendação ao Telegram"
-    )
+    parser.add_argument("--no-notify", action="store_true", help="Não avisar no app (inbox + push)")
     return parser.parse_args()
 
 
@@ -214,7 +212,7 @@ def main() -> int:
             model=args.model,
             effort=args.effort,
             step_timeout=args.step_timeout,
-            notify=not args.no_telegram,
+            notify=not args.no_notify,
             on_event=_make_event_printer(),
         )
         return 0

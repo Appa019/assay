@@ -77,7 +77,7 @@ def main() -> int:
     parser.add_argument("--force", action="store_true", help="Rodar mesmo se não vencido")
     parser.add_argument("--model", default=analysis_runner.DEFAULT_MODEL)
     parser.add_argument("--effort", default=analysis_runner.DEFAULT_EFFORT)
-    parser.add_argument("--no-telegram", action="store_true")
+    parser.add_argument("--no-notify", action="store_true", help="Não avisar no app (inbox + push)")
     args = parser.parse_args()
 
     init_db()
@@ -94,7 +94,7 @@ def main() -> int:
             print("Carteira e ledger vazios — revisão semanal pulada.")
             now = datetime.now(UTC)
             state = load_json_state(_STATE_PATH)
-            if not args.no_telegram and _should_send_skip_note(state, now):
+            if not args.no_notify and _should_send_skip_note(state, now):
                 notification_center.notify(_EMPTY_SKIP_NOTE, kind=NotificationKind.REVIEW)
                 state[_SKIP_NOTE_KEY] = now.isoformat()
                 save_json_state(_STATE_PATH, state)
@@ -117,7 +117,7 @@ def main() -> int:
             macro_ctx=macro,
             model=args.model,
             effort=args.effort,
-            notify=not args.no_telegram,
+            notify=not args.no_notify,
             on_event=_printer,
         )
         if report is None:

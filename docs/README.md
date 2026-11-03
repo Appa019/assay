@@ -3,7 +3,7 @@
 > **Você (Claude) está começando uma sessão nova.** Leia este arquivo inteiro.
 > Ele te dá o modelo mental completo em ~5 minutos e diz exatamente qual dos
 > outros documentos abrir para a tarefa que o Pedro pedir.
-> Não precisa ler os 13 arquivos de uma vez — leia este + o que a tarefa exigir.
+> Não precisa ler os 12 arquivos de uma vez — leia este + o que a tarefa exigir.
 
 ---
 
