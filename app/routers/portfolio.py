@@ -78,6 +78,8 @@ async def delete_asset(asset_id: UUID, session: Session = Depends(get_session)) 
         asset = portfolio_service.delete_asset(session, asset_id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except portfolio_service.DeleteRefusedError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return portfolio_service.to_asset_read(asset)
 
 

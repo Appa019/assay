@@ -60,6 +60,16 @@ const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
  */
 const NAIVE_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
 
+/** Reads "38,50", "1.234,5" or "38.50" (a phone keypad gives either). NaN when empty. */
+export const parseDecimal = (raw: string): number => {
+  const value = raw.trim();
+  return parseFloat(value.includes(",") ? value.replace(/\./g, "").replace(",", ".") : value);
+};
+
+/** A number as a pt-BR input value ("38,5"). */
+export const toDecimalInput = (value: number | null | undefined): string =>
+  value === null || value === undefined ? "" : String(value).replace(".", ",");
+
 export const parseLocalDate = (value: string): Date => {
   if (DATE_ONLY_RE.test(value)) {
     const [year, month, day] = value.split("-").map(Number);

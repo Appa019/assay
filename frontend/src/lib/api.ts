@@ -47,9 +47,8 @@ export type AssetCreate = {
   entry_date?: string;
 };
 
+// Quantity and average price change only through the ledger (buy, sell).
 export type AssetUpdate = Partial<Pick<Asset, "name">> & {
-  quantity?: number;
-  avg_price?: number;
   current_price?: number;
 };
 
@@ -208,10 +207,16 @@ export const updateAsset = async (
     })
   );
 
-export const sellAsset = async (id: string): Promise<SaleResult> =>
+/** price = the real execution price; quantity omitted sells the whole lot. */
+export const sellAsset = async (
+  id: string,
+  sale: { price: number; quantity?: number }
+): Promise<SaleResult> =>
   json<SaleResult>(
     await fetch(`${API_BASE}/api/portfolio/assets/${id}/sell`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sale),
     })
   );
 

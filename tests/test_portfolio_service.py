@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -149,3 +150,30 @@ def test_allocation_percentages(session: Session, stock_unlocked: Asset, cdb: As
     assert total == pytest.approx(3300.0 + 5010.0)
     assert summary.allocation.stocks_pct == pytest.approx(3300.0 / total * 100)
     assert summary.allocation.fixed_income_pct == pytest.approx(5010.0 / total * 100)
+
+
+def test_delete_undoes_a_fresh_lot_with_its_buy_trade(session: Session) -> None:
+    asset = portfolio_service.create_asset(
+        session,
+        AssetCreate(
+            ticker="ITUB4",
+            asset_class=AssetClass.STOCKS,
+            quantity=Decimal("10"),
+            avg_price=Decimal("30"),
+        ),
+    )
+    assert len(session.exec(select(Trade)).all()) == 1
+    portfolio_service.delete_asset(session, asset.id)
+    assert session.exec(select(Trade)).all() == []
+
+
+def test_delete_refuses_an_old_lot_so_the_ledger_keeps_it(
+    session: Session, stock_unlocked: Asset
+) -> None:
+    """A41: deleting a held lot left no SELL trade and skipped the lock."""
+    stock_unlocked.created_at = datetime.now(UTC) - timedelta(days=2)
+    session.add(stock_unlocked)
+    session.commit()
+    with pytest.raises(portfolio_service.DeleteRefusedError):
+        portfolio_service.delete_asset(session, stock_unlocked.id)
+    assert session.get(Asset, stock_unlocked.id) is not None

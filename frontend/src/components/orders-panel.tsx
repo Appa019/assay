@@ -17,7 +17,13 @@ import {
   type Order,
   type TicketLine,
 } from "@/lib/api";
-import { formatBRL, formatDateTime, formatNumber } from "@/lib/format";
+import {
+  formatBRL,
+  formatDateTime,
+  formatNumber,
+  parseDecimal,
+  toDecimalInput,
+} from "@/lib/format";
 
 const CLASS_LABELS: Record<AssetClass, string> = {
   fixed_income: "RF",
@@ -300,13 +306,6 @@ const brokerNumber = (value: number, digits = 2): string =>
   });
 
 /** "38,50" and "1.234,56" are what a pt-BR thumb types; "38.50" also works. */
-const parseDecimal = (raw: string): number => {
-  const value = raw.trim();
-  return parseFloat(value.includes(",") ? value.replace(/\./g, "").replace(",", ".") : value);
-};
-
-const toInput = (value: number | null): string =>
-  value === null ? "" : String(value).replace(".", ",");
 
 const Ticket = ({ lines, stop }: { lines: TicketLine[]; stop: number | null }) => {
   const [copied, setCopied] = useState<string | null>(null);
@@ -448,10 +447,10 @@ const ExecuteDialog = ({
       // Prefill with what we told them to buy: the common case is confirming
       // the ticket as-is, and an empty form made them retype both numbers.
       setQuantity(
-        toInput(order.suggested_quantity)
+        toDecimalInput(order.suggested_quantity)
       );
       setPrice(
-        toInput(order.reference_price ?? order.target_price)
+        toDecimalInput(order.reference_price ?? order.target_price)
       );
       setError(null);
       ref.current?.showModal();

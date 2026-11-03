@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -91,8 +91,30 @@ def update_asset(session: Session, asset_id: UUID, payload: AssetUpdate) -> Asse
     return asset
 
 
+# Deleting is only for undoing a registration typo; leaving a position goes
+# through sell_asset, which writes the SELL trade and enforces the lock (A41).
+DELETE_WINDOW = timedelta(hours=24)
+
+
+class DeleteRefusedError(ValueError):
+    """The lot is past the typo-correction window: sell it instead."""
+
+
 def delete_asset(session: Session, asset_id: UUID) -> Asset:
     asset = get_asset(session, asset_id)
+    # created_at is UTC: aware when fresh, naive once read back from SQLite
+    age = datetime.now(UTC).replace(tzinfo=None) - asset.created_at.replace(tzinfo=None)
+    if age > DELETE_WINDOW:
+        raise DeleteRefusedError(
+            f"{asset.ticker} foi cadastrado há mais de 24 h: para sair da posição, use Vender "
+            "(o ledger, o histórico e a trava dependem disso)."
+        )
+    # The lot never existed: its BUY trade goes with it, or the ledger and the
+    # benchmark's cash flows would keep a purchase that did not happen.
+    for trade in session.exec(
+        select(Trade).where(Trade.asset_id == asset.id, Trade.side == TradeSide.BUY)
+    ).all():
+        session.delete(trade)
     session.delete(asset)
     session.commit()
     logger.info("asset_deleted", ticker=asset.ticker)

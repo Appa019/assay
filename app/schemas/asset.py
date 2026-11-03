@@ -24,9 +24,9 @@ class AssetCreate(BaseModel):
 
 
 class AssetUpdate(BaseModel):
+    # No quantity/avg_price: those move only through a buy or a sell, so the
+    # Trade ledger, the benchmark flows and realized P&L stay true.
     name: str | None = None
-    quantity: Decimal | None = Field(default=None, gt=0)
-    avg_price: Decimal | None = Field(default=None, gt=0)
     current_price: Decimal | None = Field(default=None, ge=0)
     thesis: str | None = Field(default=None, max_length=2000)
     target_price: Decimal | None = Field(default=None, ge=0)

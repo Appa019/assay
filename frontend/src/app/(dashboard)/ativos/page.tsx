@@ -36,7 +36,9 @@ import {
   formatDate,
   formatDateTime,
   formatNumber,
+  parseDecimal,
   parseLocalDate,
+  toDecimalInput,
 } from "@/lib/format";
 
 const ASSET_CLASSES: { value: AssetClass; label: string }[] = [
@@ -126,7 +128,12 @@ export const AtivosView = () => {
   const [formData, setFormData] = useState<Partial<AssetCreate>>({
     asset_class: "stocks",
   });
+  // Typed text, parsed on submit: a numeric state rewrites "0," to "0" and
+  // "38.50" loses its separator mid-typing.
+  const [amounts, setAmounts] = useState({ quantity: "", avg_price: "", current_price: "" });
   const [editPrice, setEditPrice] = useState("");
+  const [salePrice, setSalePrice] = useState("");
+  const [saleQuantity, setSaleQuantity] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState<
@@ -152,8 +159,11 @@ export const AtivosView = () => {
   }, [loadTrades]);
 
   useEffect(() => {
-    if (sellTarget) sellDialog.current?.showModal();
-    else sellDialog.current?.close();
+    if (sellTarget) {
+      setSalePrice(toDecimalInput(sellTarget.current_price ?? sellTarget.avg_price));
+      setSaleQuantity(toDecimalInput(sellTarget.quantity));
+      sellDialog.current?.showModal();
+    } else sellDialog.current?.close();
   }, [sellTarget]);
 
   useEffect(() => {
@@ -218,13 +228,19 @@ export const AtivosView = () => {
 
   const handleBuy = async (e: React.FormEvent) => {
     e.preventDefault();
+    const quantity = parseDecimal(amounts.quantity);
+    const avgPrice = parseDecimal(amounts.avg_price);
+    const currentPrice = amounts.current_price.trim()
+      ? parseDecimal(amounts.current_price)
+      : undefined;
     if (
       !formData.ticker ||
-      !formData.quantity ||
-      !formData.avg_price ||
-      !formData.asset_class
+      !formData.asset_class ||
+      !(quantity > 0) ||
+      !(avgPrice > 0) ||
+      (currentPrice !== undefined && !(currentPrice > 0))
     ) {
-      setMessage({ type: "error", text: "Preencha todos os campos obrigatórios" });
+      setMessage({ type: "error", text: "Preencha ticker, quantidade e preço médio com números válidos" });
       return;
     }
     setSubmitting(true);
@@ -235,14 +251,15 @@ export const AtivosView = () => {
         ticker: formData.ticker,
         name: formData.name,
         asset_class: formData.asset_class,
-        quantity: formData.quantity,
-        avg_price: formData.avg_price,
-        current_price: formData.current_price,
+        quantity,
+        avg_price: avgPrice,
+        current_price: currentPrice,
         entry_date: formData.entry_date,
       };
       await createAsset(payload);
       setMessage({ type: "success", text: `${formData.ticker} adicionado à carteira` });
       setFormData({ asset_class: "stocks" });
+      setAmounts({ quantity: "", avg_price: "", current_price: "" });
       setShowBuyForm(false);
       await Promise.all([refresh(), loadTrades()]);
     } catch (err) {
@@ -257,9 +274,23 @@ export const AtivosView = () => {
 
   const handleSell = async () => {
     if (!sellTarget) return;
+    const price = parseDecimal(salePrice);
+    const quantity = parseDecimal(saleQuantity);
+    if (!(price > 0) || !(quantity > 0) || quantity > sellTarget.quantity) {
+      setMessage({
+        type: "error",
+        text: "Informe o preço executado e uma quantidade entre 0 e a do lote",
+      });
+      return;
+    }
     setSubmitting(true);
     try {
-      const result = await sellAsset(sellTarget.id);
+      // The real execution price, never the last mark: the Trade row feeds
+      // realized P&L, the track record and the IR report.
+      const result = await sellAsset(sellTarget.id, {
+        price,
+        quantity: quantity < sellTarget.quantity ? quantity : undefined,
+      });
       setLastSale(result);
       setMessage({
         type: "success",
@@ -302,7 +333,7 @@ export const AtivosView = () => {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editing) return;
-    const value = parseFloat(editPrice);
+    const value = parseDecimal(editPrice);
     if (Number.isNaN(value) || value <= 0) {
       setMessage({ type: "error", text: "Preço inválido" });
       return;
@@ -324,7 +355,12 @@ export const AtivosView = () => {
   };
 
   const handleDelete = async (asset: Asset) => {
-    if (!confirm(`Remover ${asset.ticker} da carteira?`)) return;
+    if (
+      !confirm(
+        `Remover ${asset.ticker}? Serve só para desfazer um cadastro errado das últimas 24 h; para sair da posição, use Vender.`
+      )
+    )
+      return;
     try {
       await deleteAsset(asset.id);
       await refresh();
@@ -507,34 +543,25 @@ export const AtivosView = () => {
                 <InputField
                   id="qty"
                   label="Quantidade"
-                  type="number"
-                  value={formData.quantity?.toString() ?? ""}
-                  onChange={(v) =>
-                    setFormData({ ...formData, quantity: parseFloat(v) || 0 })
-                  }
+                  decimal
+                  value={amounts.quantity}
+                  onChange={(v) => setAmounts({ ...amounts, quantity: v })}
                   placeholder="100"
                 />
                 <InputField
                   id="avg"
                   label="Preço médio (R$)"
-                  type="number"
-                  value={formData.avg_price?.toString() ?? ""}
-                  onChange={(v) =>
-                    setFormData({ ...formData, avg_price: parseFloat(v) || 0 })
-                  }
+                  decimal
+                  value={amounts.avg_price}
+                  onChange={(v) => setAmounts({ ...amounts, avg_price: v })}
                   placeholder="38,50"
                 />
                 <InputField
                   id="current"
                   label="Preço atual (opcional)"
-                  type="number"
-                  value={formData.current_price?.toString() ?? ""}
-                  onChange={(v) =>
-                    setFormData({
-                      ...formData,
-                      current_price: v ? parseFloat(v) : undefined,
-                    })
-                  }
+                  decimal
+                  value={amounts.current_price}
+                  onChange={(v) => setAmounts({ ...amounts, current_price: v })}
                   placeholder="42,10"
                 />
                 <InputField
@@ -968,18 +995,28 @@ export const AtivosView = () => {
               className="p-4 rounded-md mb-5 space-y-2"
               style={{ background: "var(--bg-secondary)" }}
             >
-              <Row label="Quantidade" value={formatNumber(sellTarget.quantity)} />
-              <Row
-                label="Preço atual"
-                value={formatBRL(sellTarget.current_price ?? sellTarget.avg_price)}
+              <InputField
+                id="sale-qty"
+                label={`Quantidade (lote: ${formatNumber(sellTarget.quantity)})`}
+                decimal
+                value={saleQuantity}
+                onChange={setSaleQuantity}
+              />
+              <InputField
+                id="sale-price"
+                label="Preço executado (R$)"
+                decimal
+                value={salePrice}
+                onChange={setSalePrice}
               />
               <div style={{ borderTop: "1px solid var(--border)" }} className="pt-2 mt-2">
                 <Row
                   label="Valor total"
-                  value={formatBRL(
-                    sellTarget.quantity *
-                      (sellTarget.current_price ?? sellTarget.avg_price)
-                  )}
+                  value={
+                    parseDecimal(saleQuantity) > 0 && parseDecimal(salePrice) > 0
+                      ? formatBRL(parseDecimal(saleQuantity) * parseDecimal(salePrice))
+                      : "–"
+                  }
                   highlight
                 />
               </div>
@@ -1023,7 +1060,7 @@ export const AtivosView = () => {
             <InputField
               id="edit-price"
               label="Preço atual (R$)"
-              type="number"
+              decimal
               value={editPrice}
               onChange={setEditPrice}
             />
@@ -1399,6 +1436,7 @@ const InputField = ({
   onChange,
   placeholder,
   type = "text",
+  decimal = false,
 }: {
   id: string;
   label: string;
@@ -1406,6 +1444,8 @@ const InputField = ({
   onChange: (v: string) => void;
   placeholder?: string;
   type?: string;
+  /** Free text with the decimal keypad: type="number" drops a typed comma. */
+  decimal?: boolean;
 }) => (
   <div>
     <label
@@ -1417,11 +1457,11 @@ const InputField = ({
     </label>
     <input
       id={id}
-      type={type}
+      type={decimal ? "text" : type}
+      inputMode={decimal ? "decimal" : undefined}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      step={type === "number" ? "any" : undefined}
       /* text-base below md: anything under 16px makes iOS zoom on focus. */
       className="w-full px-4 py-2.5 rounded-md text-sm outline-none max-md:text-base max-md:min-h-11"
       style={{
