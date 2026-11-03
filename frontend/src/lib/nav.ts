@@ -29,10 +29,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: "/investimentos", label: "Investimentos", shortLabel: "Investir", icon: TrendingUp },
 ] as const;
 
-/** All four fit the tab bar, so nothing is folded away. */
-export const PRIMARY_NAV = NAV_ITEMS;
-export const SECONDARY_NAV: readonly NavItem[] = [];
-
 // Legacy routes still served for deep links, owned by an Investimentos tab.
 const INVESTMENT_ROUTES = ["/aporte", "/relatorios", "/ativos", "/ir"];
 

@@ -187,9 +187,6 @@ const json = async <T>(res: Response): Promise<T> => {
 export const fetchPortfolio = async (): Promise<PortfolioSummary> =>
   json<PortfolioSummary>(await fetch(`${API_BASE}/api/portfolio`));
 
-export const fetchAssets = async (): Promise<Asset[]> =>
-  json<Asset[]>(await fetch(`${API_BASE}/api/portfolio/assets`));
-
 export const createAsset = async (payload: AssetCreate): Promise<Asset> =>
   json<Asset>(
     await fetch(`${API_BASE}/api/portfolio/assets`, {
@@ -516,34 +513,6 @@ export const listContributions = async (): Promise<ContributionListItem[]> =>
 export const fetchContribution = async (id: string): Promise<Contribution> =>
   json<Contribution>(await fetch(`${API_BASE}/api/contributions/${id}`));
 
-export const savePromptResponse = async (
-  contributionId: string,
-  promptKey: PromptKey,
-  response: string
-): Promise<Prompt> =>
-  json<Prompt>(
-    await fetch(
-      `${API_BASE}/api/contributions/${contributionId}/prompts/${promptKey}/response`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ response }),
-      }
-    )
-  );
-
-export const finalizeContribution = async (
-  id: string,
-  final_summary?: string
-): Promise<Contribution> =>
-  json<Contribution>(
-    await fetch(`${API_BASE}/api/contributions/${id}/finalize`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ final_summary }),
-    })
-  );
-
 export const deleteContribution = async (id: string): Promise<void> => {
   const res = await fetch(`${API_BASE}/api/contributions/${id}`, {
     method: "DELETE",
@@ -618,19 +587,6 @@ export type CashflowEntry = {
   installment_count: number | null;
   installment_group: string | null;
   created_at: string;
-};
-
-export type CashflowCreate = {
-  kind: CashflowKind;
-  amount_brl: number;
-  category?: string;
-  description?: string | null;
-  occurred_on?: string;
-  wallet?: CashflowWallet;
-  /** "none" for pix/debit/cash, a card name, or omitted for the default card. */
-  card?: string | null;
-  /** Monthly installments (1–48); amount_brl is then the TOTAL. */
-  installments?: number;
 };
 
 export type CategoryTotal = {
@@ -739,17 +695,6 @@ export const fetchCashflowSummary = async (
     await fetch(`${API_BASE}/api/cashflow/summary?month=${month}`),
   );
 
-export const createCashflowEntry = async (
-  payload: CashflowCreate,
-): Promise<CashflowEntry> =>
-  json<CashflowEntry>(
-    await fetch(`${API_BASE}/api/cashflow`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, source: "api" }),
-    }),
-  );
-
 export const deleteCashflowEntry = async (
   id: string,
 ): Promise<CashflowEntry> =>
@@ -829,7 +774,7 @@ export const deleteCard = async (id: string): Promise<CreditCard> =>
     await fetch(`${API_BASE}/api/cards/${id}`, { method: "DELETE" }),
   );
 
-// ── Consultant chat (same conversation the Telegram bot talks to) ─────────
+// ── Consultant chat ────────────────────────────────────────────────────────
 
 export type ChatRole = "user" | "assistant";
 export type ChatChannel = "telegram" | "web";
@@ -870,16 +815,6 @@ export const resetChatSession = async (): Promise<void> => {
   const res = await fetch(`${API_BASE}/api/chat/reset`, { method: "POST" });
   if (!res.ok) throw new ApiError(res.status, "Não foi possível reiniciar a sessão");
 };
-
-/** Free text → a draft ledger entry. Saves nothing; the user confirms. */
-export const classifyCashflow = async (text: string): Promise<CashflowCreate> =>
-  json<CashflowCreate>(
-    await fetch(`${API_BASE}/api/cashflow/classify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    }),
-  );
 
 /** How many files one chat message may carry (mirrors the backend cap). */
 export const MAX_CHAT_ATTACHMENTS = 3;

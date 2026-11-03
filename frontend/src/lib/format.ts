@@ -48,14 +48,6 @@ export const formatNumber = (value: number | null | undefined): string => {
     : new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 8 }).format(value);
 };
 
-export const formatPercent = (
-  value: number | null | undefined,
-  digits = 1,
-): string => {
-  if (value === null || value === undefined) return "–";
-  return `${value.toFixed(digits)}%`;
-};
-
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
