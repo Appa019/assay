@@ -100,8 +100,13 @@ long_service bot "Investimentos Manual — bot do Telegram" \
 # Invokes next directly rather than through `pnpm start`: pnpm is itself a Node
 # process that stays resident just to spawn another one, and on a 4 GB Pi that
 # wrapper costs ~110 MB for nothing.
+#
+# MemoryHigh: next-server measured ~180 MB RSS after serving every tab. Past
+# twice that the kernel reclaims and throttles it instead of letting it crowd
+# the committee (1.1 GB peak) on a 3.7 GB Pi. High, not Max: nothing is killed.
 long_service frontend "Investimentos Manual — frontend Next.js" \
-  "/usr/bin/env sh -c 'cd ${PROJECT_ROOT}/frontend && exec node_modules/.bin/next start --hostname 127.0.0.1 --port ${FRONTEND_PORT}'"
+  "/usr/bin/env sh -c 'cd ${PROJECT_ROOT}/frontend && exec node_modules/.bin/next start --hostname 127.0.0.1 --port ${FRONTEND_PORT}'" \
+  "MemoryHigh=384M"
 
 # The three jobs below are the only scheduled ones that spend Claude usage, and
 # the plan's limit is a window (~5h) shared with the consultant chat.
