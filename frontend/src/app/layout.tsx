@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "Assay",
-    // Renders the status bar over the page so the header can own the top inset.
+    // "default" keeps the status bar opaque above the page (no overlap).
     statusBarStyle: "default",
   },
 };

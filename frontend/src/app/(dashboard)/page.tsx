@@ -245,8 +245,8 @@ const DashboardPage = () => {
                 Backend indisponível
               </p>
               <p className="mt-1 text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                Nada nesta tela está atualizado. Verifique se o backend está
-                rodando (<code>./start.sh</code>).
+                Nada nesta tela está atualizado. O servidor não respondeu;
+                tente de novo em alguns minutos.
               </p>
               <p className="mt-1.5 break-words text-[11px]" style={{ color: "var(--text-muted)" }}>
                 {pError}
