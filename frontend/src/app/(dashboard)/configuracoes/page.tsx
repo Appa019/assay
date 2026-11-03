@@ -97,8 +97,6 @@ const ConfiguracoesPage = () => {
           <Var name="AGENT_EFFORT" desc="reasoning do comitê (default max)" />
           <Var name="COINGECKO_API_URL" desc="endpoint CoinGecko" />
           <Var name="COINGECKO_API_KEY" desc="opcional, se tiver Pro key" />
-          <Var name="TELEGRAM_BOT_TOKEN" desc="token do @BotFather (não commitar)" />
-          <Var name="TELEGRAM_CHAT_ID" desc="preenchido pelo telegram_setup.py" />
         </ul>
       </section>
 
@@ -124,7 +122,7 @@ const ConfiguracoesPage = () => {
             O agente roda todas as reuniões encadeadas no <code style={{ background: "var(--bg-secondary)", padding: "1px 6px", borderRadius: 3 }}>claude</code>{" "}
             headless (Opus · max): acompanhe etapa por etapa na própria tela.
           </li>
-          <li>Ao final, ele entrega onde investir e quanto; a folha de ordens também chega no Telegram.</li>
+          <li>Ao final, ele entrega onde investir e quanto, e avisa no app.</li>
           <li>Registre o que comprou em <strong>Ativos</strong> (cada compra é um lote com trava própria).</li>
         </ol>
       </section>
