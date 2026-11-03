@@ -1,21 +1,25 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
+
+// Both faces live in ./fonts (latin subset, variable weight, OFL): the build
+// must not depend on reaching Google Fonts from the Pi.
 
 // Display face: contemporary grotesque with real character in the numerals,
 // which is what the money figures are set in.
-const heading = Bricolage_Grotesque({
+const heading = localFont({
+  src: "./fonts/bricolage-grotesque-latin-wght-normal.woff2",
   variable: "--font-heading",
-  subsets: ["latin"],
+  weight: "200 800",
   display: "swap",
 });
 
 // Everything else, including all data. Wide apertures and a true tabular set,
 // so a column of figures stays aligned between refreshes.
-const body = Plus_Jakarta_Sans({
+const body = localFont({
+  src: "./fonts/plus-jakarta-sans-latin-wght-normal.woff2",
   variable: "--font-body",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: "200 800",
   display: "swap",
 });
 
