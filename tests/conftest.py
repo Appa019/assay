@@ -1,4 +1,5 @@
 import os
+import socket
 import tempfile
 from collections.abc import Iterator
 from datetime import date, timedelta
@@ -21,6 +22,37 @@ from app.core import database  # noqa: E402
 from app.models.asset import Asset, AssetClass  # noqa: E402
 
 assert "assay-tests-" in str(database.DATABASE_URL), database.DATABASE_URL
+
+
+# No test reaches the network: on the Pi a real quote or push would hit live
+# services from the production folder. Code under test sees a dead network.
+def _no_network(*_args: object, **_kwargs: object) -> None:
+    raise OSError("rede bloqueada nos testes")
+
+
+socket.socket.connect = _no_network  # type: ignore[method-assign]
+socket.socket.connect_ex = _no_network  # type: ignore[method-assign]
+socket.getaddrinfo = _no_network  # type: ignore[assignment]
+
+# storage/ is the client's data (on the Pi, a link to the external disk). A test
+# that lets a service create something there fails the whole run.
+_STORAGE = Path(__file__).resolve().parent.parent / "storage"
+_storage_before: set[str] = set()
+
+
+def _storage_entries() -> set[str]:
+    return {p.name for p in _STORAGE.iterdir()} if _STORAGE.is_dir() else set()
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    _storage_before.update(_storage_entries())
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    created = sorted(_storage_entries() - _storage_before)
+    if created:
+        print(f"\nERRO: os testes criaram em storage/: {', '.join(created)}")
+        session.exitstatus = 1
 
 
 @pytest.fixture()

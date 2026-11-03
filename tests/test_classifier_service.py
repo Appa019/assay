@@ -2,11 +2,18 @@
 sentence names, and unknown/missing wallets must degrade to "conta"."""
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from app.services import analysis_runner, classifier_service
+
+
+@pytest.fixture(autouse=True)
+def _tmp_workspace(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # classify() creates its workspace; on the Pi storage/ is the client's data disk
+    monkeypatch.setattr(classifier_service, "_WORKSPACE", tmp_path / "classifier_workspace")
 
 
 def _stub_step(monkeypatch: pytest.MonkeyPatch, payload: dict) -> None:
