@@ -178,13 +178,13 @@ precisa depois.
 3. **Automática, sem ninguém mandar** — `scripts/resume_pending.py` roda a cada
    15 min, acha análises incompletas (`pending_resumable_ids`) e retoma
    fail-fast (uma espera curta; tenta de novo no próximo pass). Avisa no
-   Telegram. Desiste após `MAX_RUN_ATTEMPTS` (5) falhas consecutivas.
+   app (inbox + push). Desiste após `MAX_RUN_ATTEMPTS` (5) falhas consecutivas.
 
 ### Locks (arquivos em `storage/analysis_runs/`)
 
 | Lock | Escopo | Por quê |
 |---|---|---|
-| `<contribution_id>.lock` | por aporte | a mesma análise nunca roda em dobro (CLI × API × bot × resume) |
+| `<contribution_id>.lock` | por aporte | a mesma análise nunca roda em dobro (CLI × API × resume) |
 | `_global_run.lock` | máquina inteira | **uma** execução pesada de Claude por vez — comitê, semanal e maturidade dividem a mesma janela de uso |
 | `_chat_turn.lock` | chat | serializa turnos. **Não usa o lock global** — chat funciona mesmo com o comitê rodando |
 
@@ -276,7 +276,7 @@ Depois de `---`, um bloco ```json {"orders": [...]}``` legível por máquina.
 ausente ou desvio > 2% dispara UM turno corretivo na MESMA sessão ("reemita o
 fechamento com a soma batendo"); a correção só substitui a original se parsear
 pelo menos tão bem. Após o ingest, linha descartada ou desvio residual vira
-alerta no Telegram ("Checagem da folha de ordens: X/Y linhas…").
+alerta no app, inbox + push ("Checagem da folha de ordens: X/Y linhas…").
 
 ## Chat do consultor
 
@@ -290,8 +290,8 @@ gera um **resumo estruturado** (`_rotation_summary`: haiku no workspace pelado
 do roteador, 5 seções fixas, números copiados verbatim, best-effort) injetado
 antes da cauda verbatim. A sessão renascida por `SessionNotFoundError` zera o
 contador de turnos (A35) — antes herdava o da sessão morta e rotacionava de
-novo na mensagem seguinte. `converse()` persiste `cost_usd`/`duration_s` na
-`ChatMessage`, e `reconcile_orphan_turns()` (startup do backend) marca como
+novo na mensagem seguinte. O worker da fila, via `_settle()`, persiste
+`cost_usd`/`duration_s` na `ChatMessage`, e `reconcile_orphan_turns()` (startup do backend) marca como
 FAILED bolhas RUNNING órfãs de um restart.
 
 - Turno fresh recebe instrução de **ler `./MEMORY.md` antes de responder**.
@@ -300,7 +300,7 @@ FAILED bolhas RUNNING órfãs de um restart.
   quando o crédito volta (D41). Só `auth` (login expirado) não é retentado.
 - `enqueue()` grava as duas pontas em `ChatMessage` e devolve na hora; quem
   roda é o worker da fila (um turno leva minutos, nenhum cliente HTTP segura
-  isso). `converse()` é o caminho síncrono que o bot usa.
+  isso). É a única porta de entrada do chat.
 - Anexos: `save_attachment` → `inbox/`, nome saneado (`safe_filename`, ASCII,
   sem traversal), 20 MB de teto. `media_turn_text` monta o prompt que manda o
   consultor ler o arquivo e agir (cupom → registra gasto; extrato → resume e

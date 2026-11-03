@@ -8,7 +8,6 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.136-009688?logo=fastapi&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-local-003B57?logo=sqlite&logoColor=white)
-![Telegram](https://img.shields.io/badge/Telegram-bot-26A5E4?logo=telegram&logoColor=white)
 ![Local-first](https://img.shields.io/badge/100%25-local%20%C2%B7%20sem%20nuvem-2ea44f)
 
 </div>
@@ -16,7 +15,8 @@
 Você informa quanto vai aportar. Um agente autônomo convoca uma **mesa de
 investimentos** (estilo Goldman Sachs GIR + Morgan Stanley GIC + Bridgewater +
 AQR), pesquisa o mercado ao vivo, debate em cinco etapas encadeadas e devolve
-**onde investir e quanto** — direto no seu Telegram. Você só registra o que comprou.
+**onde investir e quanto** — no app, com aviso no inbox e push no celular. Você
+só registra o que comprou.
 
 O universo é restrito a **três classes**: CDB, ações da B3 e crypto. Tudo roda
 local (FastAPI + SQLite + Next.js); nada de nuvem, login ou banco externo.
@@ -51,7 +51,7 @@ flowchart LR
     E --> F["4 · DD Crypto"]
     F --> G["5 · IC Final<br/>risco · ordens"]
     G --> H["Folha de ordens"]
-    H --> I(["Telegram"])
+    H --> I(["App: inbox + Web Push"])
 ```
 
 As cinco etapas rodam **numa única sessão Claude encadeada** — cada uma herda o
@@ -61,7 +61,8 @@ de ordens final é agnóstica de corretora: você decide onde executar.
 Dois modos:
 
 - **Automático (padrão)** — o agente roda tudo headless no `claude` (Opus · max
-  reasoning), com carta branca de pesquisa, e entrega a recomendação no Telegram.
+  reasoning), com carta branca de pesquisa, e entrega a recomendação no app
+  (`/investimentos?aba=analises`) com aviso por push.
 - **Manual (fallback)** — o app gera os 3 prompts para você colar à mão no Claude.
 
 ---
@@ -89,38 +90,18 @@ ETFs (GOLD11/BOVA11/IVVB11), BDRs, ouro, ativos internacionais diretos.
 
 ```bash
 ./install.sh    # primeira vez: cria venv, instala deps, cria atalho no Desktop
-./start.sh      # sobe backend + frontend (+ bot Telegram) e abre o navegador
+./start.sh      # sobe backend + frontend e abre o navegador
 ```
 
 Ou clique no atalho **Investimentos Manual** no Desktop.
 
-Configuração única do Telegram (recomendado):
-
-```bash
-# 1. defina TELEGRAM_BOT_TOKEN no .env (token do @BotFather)
-# 2. mande /start ao seu bot e capture o chat_id:
-.venv/bin/python scripts/telegram_setup.py
-# 3. instale os crons (revisão semanal + maturidade + auto-retomada):
-scripts/install_cron.sh
-```
+Isso é ambiente de desenvolvimento. Produção roda no Raspberry Pi, sob systemd
+(2 serviços + 11 timers): ver [`docs/pi-deploy.md`](docs/pi-deploy.md) e
+[`deploy/pi/README.md`](deploy/pi/README.md).
 
 ---
 
 ## Uso no dia a dia
-
-### Pelo Telegram (mais prático)
-
-Com o `./start.sh` rodando, o bot sobe junto e responde **só ao seu chat**:
-
-```
-/aporte 5000                      roda o comitê e devolve a folha de ordens aqui
-/comprei PETR4 acoes 100 38,50    registra a compra (cada compra = um lote)
-/carteira                         posições + o que já pode ser vendido (por lote)
-/vender PETR4                     vende o lote mais antigo já liberado (trava da classe)
-/revisao                          dispara a revisão semanal do comitê agora
-/relatorios                       últimos relatórios (semanais + maturidade)
-/status   ·   /ajuda
-```
 
 ### Pelo terminal
 
@@ -145,8 +126,8 @@ Com o `./start.sh` rodando, o bot sobe junto e responde **só ao seu chat**:
 
 | Ciclo | Quando | O que faz |
 |---|---|---|
-| **Aporte** | Ad-hoc (quando você quiser) | 5 etapas encadeadas → folha de ordens → Telegram |
-| **Revisão semanal** | A cada 7 dias (cron) | Macro + desempenho das posições + rotação de CDB para oportunidades |
+| **Aporte** | Ad-hoc (quando você quiser) | 5 etapas encadeadas → folha de ordens → inbox + push |
+| **Revisão semanal** | A cada 7 dias (timer `investimentos-weekly`) | Macro + desempenho das posições + rotação de CDB para oportunidades |
 | **Maturidade** | Quando um lote cruza a trava da classe (ação 30d · cripto 7d) | Comitê reavalia manter / vender / aumentar |
 
 - **Aporte roda de madrugada:** pedir um aporte agenda o comitê para 1h da
@@ -158,7 +139,7 @@ Com o `./start.sh` rodando, o bot sobe junto e responde **só ao seu chat**:
 - **Auto-resume (no processo):** se bater o limite de uso, o agente espera o reset
   e retoma a mesma etapa sozinho, na mesma sessão.
 - **Auto-retomada entre reinícios:** se o processo cair no meio (créditos/queda),
-  **o sistema retoma sozinho** — `scripts/resume_pending.py` (no cron a cada 15 min)
+  **o sistema retoma sozinho** — `scripts/resume_pending.py` (timer systemd `investimentos-resume`, a cada 15 min)
   detecta a análise incompleta e a conclui assim que o limite voltar, continuando
   exatamente de onde parou. Um lock por aporte impede rodar em dobro.
 
@@ -175,7 +156,8 @@ No modo automático o agente roda num **workspace persistente próprio**
 - **Memória própria** que ele gerencia entre ciclos (`MEMORY.md` + grafo de
   conhecimento) — teses vigentes, tickers e CoinGecko-ids validados, lições.
 - **MCPs de pesquisa** já carregados: `sequential-thinking`, `filesystem`, `fetch`,
-  `context7`, `playwright`, `memory`, `time`, `git`.
+  `context7`, `playwright`, `memory`, mais os de dados financeiros
+  (`coingecko`, `yahoo-finance`, `defillama`, `exa`).
 - **Auto-provisionamento:** precisa de um MCP novo? Ele adiciona em
   `.mcp.agent.json` e o servidor carrega no ciclo seguinte (o arquivo é dele,
   nunca é sobrescrito). Os MCPs pessoais (Gmail/Calendar/Drive) ficam **de fora**
@@ -193,10 +175,10 @@ profunda em vez de competir por espaço num único prompt gigante.
 | # | Etapa | Personas | Foco |
 |---|---|---:|---|
 | 1 | **GIC — Macro + Alocação Tática** | 12 | Top of Mind, macro BR + global, curva DI/CDB, setores B3, on-chain crypto, Black-Litterman, alocação por classe |
-| 2 | **Universo, Filtros e Seleção** | 12 + 2 | Long lists, filtros (quant + forense), seleção da shortlist (5-8 ações + 3-5 cryptos) e **CDB final** com credit analysis |
+| 2 | **Universo, Filtros e Seleção** | 12 + 2 | Long lists, filtros (quant + forense), seleção (até 5 ações + até 4 cryptos) e **CDB final** com credit analysis |
 | 3 | **Due Diligence de Ações B3** | equity desk | Memo completo por ação: tese, valuation triangulada, forense, técnica, factor, bull/base/bear |
 | 4 | **Due Diligence de Crypto** | crypto desk | Memo completo por cripto: tokenomics + unlocks, on-chain, derivativos, dev activity, bull/base/bear |
-| 5 | **Investment Committee Final** | 14 | Risco (VaR/CVaR/EVT), stress 8 cenários, sentimento, imposto e **folha de ordens** |
+| 5 | **Investment Committee Final** | 12 | Risco (VaR/CVaR), stress 8 cenários, sentimento, imposto e **folha de ordens** |
 
 Cada etapa exige **JSON estruturado** ao final, com validações obrigatórias e
 fontes datadas (URL + data), e instrui o uso de `WebSearch`/`WebFetch`/`Bash`
@@ -219,8 +201,8 @@ M-Score · Sloan accruals · Dechow F-Score · Capital Allocation Scorecard
 (Buffett-Munger) · Earnings Quality (cash conversion, accruals, SBC, leases
 IFRS 16).
 
-**Valuation triangulada (R2):** 3-stage DCF · Reverse DCF · CCA · Precedent
-Transactions · LBO check · SOTP.
+**Valuation triangulada (R3):** múltiplos · Reverse DCF · DCF 3-stage · CCA,
+com consenso de ≥ 3 fontes.
 
 **Crypto on-chain (R1+R2):** Realized Cap · MVRV-Z · NUPL · SOPR · Puell ·
 Reserve Risk · HODL Waves · STH-LTH Cost Basis · CDD · Dormancy · VOCD · RHODL ·
@@ -230,19 +212,17 @@ Funding Rate · Active Developers (Electric Capital).
 **Crédito do CDB (R2):** Índice de Basileia Tier 1 · rating do emissor ·
 inadimplência (NPL) · ROE · cobertura FGC (R$ 250k/instituição) · %CDI pós-IR.
 
-**Risk quant (R3):** VaR 95%/99% · CVaR (Expected Shortfall) · EVT tail-VaR
-(Generalized Pareto) · Marginal/Component VaR · CDaR · Sharpe/Sortino/Calmar ·
+**Risk quant (R3):** VaR 95%/99% · CVaR (Expected Shortfall) ·
+Marginal/Component VaR · Sharpe/Sortino/Calmar ·
 Information Ratio · Tracking Error · HHI · Effective N.
 
 **Stress test 8 cenários (R3):** risk-off severo · inflação/juros · Selic +200
 bps · crise crypto · crash 2020-tipo · China hard landing · bull dovish · evento
 de crédito bancário (testa o FGC).
 
-**Options (R3):** Covered Call · Protective Put · Collar · Cash-Secured Put ·
-Vertical/Calendar/Diagonal Spread · Iron Condor (com Greeks).
-
-**Execução (R3):** VWAP · TWAP · POV · Implementation Shortfall · estimativa de
-slippage · arredondamento de lote · janelas intra-day.
+**Execução:** ordem limitada, long-only de varejo. A quantidade da boleta vem
+da cotação viva (`order_sizing`): lote de 100 no ticker e o resto no
+fracionário.
 
 **Behavioral (R3):** 9 vieses (anchoring, loss aversion, recency, herding,
 confirmation, overconfidence, disposition, sunk cost, endowment) + mean reversion
@@ -263,16 +243,14 @@ Edite o `.env` (criado pelo `install.sh` a partir de `.env.example`):
 
 ```ini
 SQLITE_PATH=storage/portfolio.db
-TARGET_FIXED_INCOME=0.35      # alvo de alocação (CDB)
-TARGET_STOCKS=0.40            # alvo de alocação (Ações B3)
-TARGET_CRYPTO=0.25            # alvo de alocação (Crypto)
+TARGET_FIXED_INCOME=0.50      # alvo de alocação (CDB)
+TARGET_STOCKS=0.35            # alvo de alocação (Ações B3)
+TARGET_CRYPTO=0.15            # alvo de alocação (Crypto)
 MIN_HOLDING_DAYS=30           # trava de venda por lote das ações (compliance)
 MIN_HOLDING_DAYS_CRYPTO=7     # trava da cripto (CDB é líquido, nunca trava)
 AGENT_MODEL=opus
 AGENT_EFFORT=max
 COINGECKO_API_KEY=            # opcional (CoinGecko Pro)
-TELEGRAM_BOT_TOKEN=           # @BotFather — NUNCA commitar o valor real
-TELEGRAM_CHAT_ID=             # preenchido por scripts/telegram_setup.py
 ```
 
 Os três alvos de alocação devem somar 1.0. Reinicie o backend após editar.
@@ -281,33 +259,8 @@ Os três alvos de alocação devem somar 1.0. Reinicie o backend após editar.
 
 ## Estrutura do projeto
 
-```
-app/
-  agents_prompts/    # 5 templates Jinja2 (macro · seleção · DD ações · DD crypto · decisão)
-  core/database.py   # SQLite + SQLModel (+ migração leve de colunas)
-  models/            # Asset, Contribution, ContributionPrompt, Report
-  routers/           # portfolio, contributions, macro, cadence, reports
-  services/
-    analysis_runner.py   # MOTOR: roda o claude headless, encadeado, com resume
-    review_service.py    # revisão semanal + maturidade
-    contribution_service.py / prompt_generator.py / market_data_service.py
-    portfolio_service.py / telegram_service.py / notification_service.py
-scripts/
-  run_analysis.py    # aporte → análise (terminal, etapa por etapa)
-  resume_pending.py  # retoma análises interrompidas (cron / --watch)
-  weekly_review.py · check_cadence.py · telegram_bot.py · telegram_setup.py
-  install_cron.sh
-frontend/
-  src/app/(dashboard)/
-    page.tsx         # dashboard + último aporte
-    aporte/          # fluxo de aporte (auto-run, etapa por etapa)
-    ativos/          # CRUD da carteira (por lote)
-    relatorios/      # histórico de aportes + relatórios do agente
-    configuracoes/   # leitura do .env
-storage/
-  portfolio.db       # SQLite (auto-criado)
-  agent_workspace/   # workspace persistente do agente (CLAUDE.md, MEMORY.md, tools/)
-```
+Mapa de pastas, processos e serviços em
+[`docs/02-arquitetura.md`](docs/02-arquitetura.md).
 
 ---
 

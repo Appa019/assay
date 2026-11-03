@@ -129,10 +129,13 @@ está commitada, senão todo check deixaria o checkout sujo.
 O código resolve todos os caminhos relativos a `storage/` (banco, workspaces do
 comitê e do consultor, chave do push, estado dos jobs). Então **não precisa de
 `DATA_DIR` no código**: `storage` vira link simbólico para a pasta do HD, e o
-gerador põe `RequiresMountsFor=<destino real de storage>` em todo serviço. Se o
-HD não montar (o `pi-ops` monta com `nofail`), as units não sobem, em vez de
-subir num ponto de montagem vazio do SD onde o `init_db` criaria um banco novo.
-Com `storage` pasta comum, a linha aponta para a raiz e não muda nada.
+gerador põe em toda unit um `ExecStartPre` que confere o banco
+(`<destino real de storage>/portfolio.db`; na primeira instalação, a pasta).
+Se o HD não montar (o `pi-ops` monta com `nofail`), o backend e o frontend
+tentam de novo a cada 5 s até o HD voltar, e o timer só pula aquela rodada.
+Nunca sobem num ponto de montagem vazio do SD, onde o `init_db` criaria um
+banco novo. `RequiresMountsFor` foi descartado: no systemd `--user` o gerente
+não monta nada, e uma dependência que falhou não é tentada de novo.
 
 O que continua no SD e escreve: `~/.claude/projects/` (sessões do CLI, uma
 linha por turno). Se o `pi-ops` quiser tirar isso do cartão, é um link em nível
@@ -143,14 +146,14 @@ de máquina, não deste app.
 | Item | Onde | Ação |
 |------|------|------|
 | `investimentos-bot.service` | Pi | o `install.sh` desabilita e apaga (D47) |
-| `telegram_bot.py`, `telegram_setup.py`, espelho em `telegram_service`, `docs/08-telegram.md` | repo | apagar num commit próprio, junto com o `CLAUDE.md` |
-| `scripts/install_cron.sh` | repo | apagar: systemd é o caminho, o crontab do Pi não tem nada dele |
+| `telegram_bot.py`, `telegram_setup.py`, espelho em `telegram_service`, `docs/08-telegram.md` | repo | **feito** em `0dd0f09` (D47) |
+| `scripts/install_cron.sh` | repo | **feito** na limpeza de 2026-11-02: systemd é o caminho, o crontab do Pi não tem nada dele |
 | `.git` velho (agosto) | Pi | some com a pasta nova (clone limpo) |
 | `storage/router_workspace/` | Pi | apagar: triagem por LLM morreu no D31/D37 |
 | `storage/claude_session.json` | Pi, se existir | apagar: resíduo do Playwright antigo |
 | `~/assay_backup_20260905_pre_reset/` | Pi | `~/attic/` |
 | `.claude/skills/deploy/SKILL.md` (Vercel) | repo | apagar, já marcada obsoleta em `docs/13` |
-| `~/investimentos_manual` em `CLAUDE.md`, `docs/09`, `acesso-remoto-pi.md` e auto-memória | repo | trocar pelo caminho novo **no mesmo commit da migração** |
+| `~/investimentos_manual` em `CLAUDE.md`, `docs/09` e auto-memória (o `acesso-remoto-pi.md` não cita a pasta) | repo | trocar pelo caminho novo **no mesmo commit da migração** |
 | §7 e §11 de `raspberry-pi.md` | docs do Pi | atualizar: bot ativo, branch, 8–10 timers |
 
 ## 5. Migração (fase 2, com o Pi online)
@@ -249,8 +252,9 @@ no backup serve de comprovante para o cliente, não de memória para o Claude.
 7. **Firewall:** o acesso pelo tailnet depende da regra `iifname "tailscale0"
    accept` do `panel-guard`. Se o firewall migrar para o `pi-ops`, essa regra
    vai junto.
-8. **`RequiresMountsFor` em unit `--user`** não foi testado no Pi: confirmar
-   com o HD desligado que as units ficam paradas.
+8. **Guarda do HD** (`ExecStartPre` que confere o banco) passou no
+   `systemd-analyze verify` e num teste com a pasta ausente, mas não no Pi:
+   confirmar com o HD desligado que o backend fica tentando e volta sozinho.
 
 ## 8. Achados da revisão (corrigidos neste branch)
 

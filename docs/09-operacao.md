@@ -13,7 +13,6 @@
 | Acesso remoto | `https://<host-do-pi>.<tailnet>.ts.net` — **VPN Tailscale privada**, nada exposto na internet. Só aparelhos logados na conta do Pedro enxergam |
 | Backend | uvicorn em `127.0.0.1:8000` |
 | Frontend | Next em `127.0.0.1:3001` (a 3000 é do painel de casa) |
-| Bot | polling, sem porta |
 | Publicação | `tailscale serve` (é o único que escuta fora do loopback) |
 | Bônus no mesmo Pi | Home Assistant em `:8443`, painel de casa em `:3000` |
 
@@ -28,14 +27,18 @@ Detalhes de rede, SSH, firewall e túnel: **`acesso-remoto-pi.md`**.
 ssh pi
 export XDG_RUNTIME_DIR=/run/user/$(id -u)     # necessário via ssh não-interativo
 
-systemctl --user status  investimentos-backend investimentos-frontend investimentos-bot
-systemctl --user restart investimentos-backend investimentos-frontend investimentos-bot
+systemctl --user status  investimentos-backend investimentos-frontend
+systemctl --user restart investimentos-backend investimentos-frontend
 systemctl --user list-timers 'investimentos-*'
-journalctl --user -u investimentos-bot -f
+journalctl --user -u investimentos-backend -f
 sudo tailscale serve status                   # o que está publicado na VPN
 ```
 
 ## Deploy (desktop → Pi)
+
+**Hoje: `rsync` (até a migração). Depois: `deploy/pi/deploy.sh`** — ver
+[`pi-deploy.md`](pi-deploy.md) e [`deploy/pi/README.md`](../deploy/pi/README.md).
+Enquanto a migração não acontece:
 
 ```bash
 # --delete: o que saiu do repo tem que sair do Pi. Rode antes com -n -v.
@@ -47,7 +50,7 @@ rsync -a --delete --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
 
 # no Pi:
 cd ~/investimentos_manual/frontend && pnpm install && pnpm build
-systemctl --user restart investimentos-backend investimentos-frontend investimentos-bot
+systemctl --user restart investimentos-backend investimentos-frontend
 ```
 
 **O `.env` e o banco do Pi são a fonte da verdade e NÃO são sobrescritos.**
@@ -62,10 +65,12 @@ bash scripts/install_systemd.sh                         # instalar/atualizar (fr
 bash scripts/install_systemd.sh --uninstall             # remover
 ```
 
-Instala 3 serviços (`Restart=always`; o do bot fica **desabilitado**, D30) +
-11 timers. Todos com `Persistent=true`:
-uma máquina desligada na hora agendada **recupera a janela no boot** — cron
-simples pula em silêncio. `loginctl enable-linger` mantém tudo vivo após logout.
+Instala 2 serviços (`Restart=always`) + 11 timers. Os timers usam
+`Persistent=true` (máquina desligada na hora agendada **recupera a janela no
+boot**), menos `scheduled`, `cadence` e `weekly`, que são `Persistent=false`:
+recuperar no boot rodaria o comitê no meio do dia. Uma unit de bot deixada por
+instalação antiga é desligada e apagada. `loginctl enable-linger` mantém tudo
+vivo após logout.
 
 O `PATH` das units inclui `~/.local/node/bin` e `~/.local/bin` porque no Pi o
 Node veio de tarball (fora do apt) e o `claude`/`uvx` moram em `~/.local/bin`.
@@ -93,9 +98,6 @@ Os três primeiros gastam Claude e ficam na madrugada (nada começa depois das
 | `-snapshot` | 18:45 diário | `daily_snapshot.py` |
 | `-digest` | domingo 20:07 | `weekly_digest.py` |
 
-Alternativa legada: `scripts/install_cron.sh [hora]` (mesmos jobs, com `flock` e
-PATH corrigido). **Não use os dois ao mesmo tempo.**
-
 ## Desenvolvimento no desktop
 
 ```bash
@@ -105,8 +107,6 @@ make dev                           # idem
 make backend / make frontend       # separados
 make check                         # o que a CI roda
 ```
-
-⚠️ **Não deixe o bot subir no desktop.** Dois pollings = resposta em dobro.
 
 Comandos manuais úteis:
 
@@ -124,7 +124,7 @@ bash scripts/backup_db.sh
 ## Backup
 
 `backup_db.sh` usa a API de backup online do SQLite pelo Python do `.venv`
-(consistente sob WAL, mesmo com API e bot escrevendo). Sem fallback para `cp`:
+(consistente sob WAL, mesmo com API e timers escrevendo). Sem fallback para `cp`:
 copiar um banco em WAL perde tudo que ainda não passou do `-wal` para o arquivo
 principal. Mantém **14** backups diários em `storage/backups/`.
 

@@ -1,8 +1,27 @@
 # 13 · Estado atual
 
-> **Fotografia de 2026-09-14.** Este é o documento que envelhece —
-> atualize-o quando mudar algo estrutural. Os outros 12 descrevem como o
+> **Fotografia de 2026-11-02.** Este é o documento que envelhece —
+> atualize-o quando mudar algo estrutural. Os outros 11 descrevem como o
 > sistema funciona; este descreve como ele está **agora**.
+
+## 2026-11-02 — bot removido, contrato de deploy e limpeza do repo
+
+- **Bot do Telegram removido do código** (D47, `0dd0f09`): `telegram_bot.py`,
+  `telegram_setup.py`, o espelho do `notification_center` e
+  `chat_service.converse()`. Avisos vão para o inbox do app + Web Push; o chat
+  entra só por `enqueue()`, pelo `/consultor`. `ChatChannel.TELEGRAM` e
+  `CashflowSource.BOT` ficam só para ler linhas antigas.
+- **Deploy do Pi com contrato**: `deploy/pi/` (install, deploy, check, health,
+  backup) para o guardião do Pi. O plano de migração, com dados no HD e
+  riscos, está em [`pi-deploy.md`](pi-deploy.md). Até a migração, o deploy
+  segue por `rsync` (`09-operacao.md`).
+- **Fontes self-hosted** com `next/font/local` (`47cd298`): o build não
+  depende mais do Google Fonts.
+- **`sqlmodel` limitado a `<0.0.45`** (A45): a 0.0.45 recusa datetime sem
+  fuso.
+- **Limpeza do repo**: código morto removido (funções, helpers de API e
+  exports que ninguém chamava, dependência `zod`, sobras do create-next-app) e
+  `scripts/install_cron.sh` apagado. O systemd é o único instalador.
 
 ## 2026-10-19 — comitê revisado e telas do comitê (D44, D45)
 
@@ -132,7 +151,7 @@ workspaces efêmeros, chaves VAPID (é preciso reassinar o push em
 
 | Item | Valor |
 |---|---|
-| Branch | `feat/consultor-upgrade` (sobre `feat/state-of-art-overhaul`; `main` é a principal) |
+| Branch | `main` |
 | Versão backend | `0.4.0` (`app/main.py`, `pyproject.toml`) |
 | Versão frontend | `0.3.0` (`frontend/package.json`) — desalinhada, cosmético |
 | Testes | **384 passando** (191 → 193 auth/entitlement → 204 sizing de ordem → 221 roteador + inbox → 227 mandato do CDB → 231 trava por classe → 252 corte de custo → 325 cartão de crédito → 384 fila do consultor + rotação por contexto) |
@@ -144,7 +163,8 @@ Missão de melhoria do assessor: diagnóstico do código + conversas de produç�
 do Pi + pesquisa de estado da arte com verificação adversarial. **Achado
 central: o consultor nunca tinha sido usado** (0 linhas em `chat_message`,
 MEMORY.md intocado) — por isso metade da entrega é ativação, não feature.
-Detalhes em `CONSULTOR_UPGRADE_REPORT.md` (raiz) e docs/12 (D23–D27, A35–A38).
+Detalhes em docs/12 (D23–D27, A35–A38); o backlog que sobrou está em
+"Backlog" abaixo.
 
 - **Chat**: contador de turnos zerado no renascimento de sessão (A35); custo/
   duração persistidos na `ChatMessage` (A36); bolha "Pensando…" órfã
@@ -213,7 +233,20 @@ acionável foi corrigido na mesma data — detalhes em `12-decisoes.md`
 | 5 | `README.md` desatualizado | ver tabela acima |
 | 6 | Banco zerado por decisão do cliente (2026-09-05) | esperado, não é dívida. Backup íntegro pré-reset em `~/assay_backup_20260905_pre_reset/` |
 | 7 | `delete_asset` apaga lote sem `Trade` nem trava de 30d (A41) | buraco silencioso no track record; sem risco agora (banco vazio), corrigir antes de acumular histórico |
-| 8 | Superfícies só-do-bot sem equivalente no app | o bot está desabilitado; se faltar algo (`/atualizar`, `/ir`), promover para a interface |
+
+## Backlog (não implementado, com o gatilho para fazer)
+
+Herdado do upgrade do consultor (2026-08-06).
+
+| Item | Por que ficou | Gatilho |
+|---|---|---|
+| Golden set + juiz haiku + `make eval` | não havia conversa real para curar | ~1 mês de uso real |
+| Verificador determinístico pós-resposta (lançamento citado × ledger) | valor baixo sem volume de conversas | primeiro mês de uso |
+| Busca FTS5 na transcrição (`GET /api/chat/search`) exposta nas ordens | o valor cresce com o histórico | transcrição com alguns meses |
+| Fallback de cotação yfinance → brapi → Stooq | protege a marcação a mercado; medir 429 antes | primeiro 429 do Yahoo nos timers |
+| Consolidação offline de memória (da transcrição crua) | `MEMORY.md` ainda pequeno | memória > ~8k chars |
+| `client_ref` idempotente no `POST /api/cashflow` | a dedup de 120s cobre o caso comum | primeiro gasto duplicado real |
+| `tools/fundamentus.py` + `tools/sgs.py` seedados no comitê | ganho do comitê, fora do escopo do consultor | próximo ciclo de aporte |
 
 ## Linha do tempo (o que aconteceu, em ordem)
 

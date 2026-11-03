@@ -28,23 +28,13 @@ Roda em push para `main` e em todo PR. Dois jobs paralelos:
 
 ## Testes
 
-**68 testes, 12 arquivos** (+ `conftest.py`). Todos passando em 2026-08-05.
-Config em `pyproject.toml`: `asyncio_mode = "auto"`, `pythonpath = ["."]`.
+Um arquivo `tests/test_<módulo>.py` por serviço ou router, mais `conftest.py`.
+Config em `pyproject.toml`: `asyncio_mode = "auto"`, `pythonpath = ["."]`. O
+número muda a cada PR, então não fica escrito aqui; para contar:
 
-| Arquivo | Testes | Cobre |
-|---|---:|---|
-| `test_analysis_runner.py` | 13 | classificação de erro, parse de "resets at", backoff, locks (pid + identidade), resume, transcripts, config de MCP |
-| `test_chat_service.py` | 11 | turno, rotação de sessão, transcrição compartilhada, anexos, limites |
-| `test_cashflow_service.py` | 8 | lançamento, resumo mensal, histórico, **deduplicação de 120s** |
-| `test_portfolio_service.py` | 7 | trava de venda por lote, P&L realizado, alocação, snapshot |
-| `test_order_service.py` | 6 | parse do bloco json, dialetos de campo, ingestão idempotente, execução herdando tese |
-| `test_bot_media.py` | 6 | extração de mídia, nome seguro, tipos não suportados |
-| `test_telegram_service.py` | 5 | markdown→HTML, tabela→`<pre>`, chunking |
-| `test_tax_service.py` | 4 | isenções, compensação de prejuízo, DARF mínima |
-| `test_prompt_generator.py` | 4 | contexto de datas dinâmico (tenores DI, trimestres) |
-| `test_market_data.py` | 2 | normalização de percentual |
-| `test_contributions_api.py` | 1 | criação + delete com FK |
-| `test_database.py` | 1 | micro-migração `_ADDED_COLUMNS` |
+```bash
+.venv/bin/python -m pytest --collect-only -q 2>/dev/null | tail -1
+```
 
 ### Fixtures (`conftest.py`)
 
@@ -106,7 +96,7 @@ e injetava 0,75 errado"). Mantenha esse nível; não polua com o óbvio.
 - ⚠️ **NUNCA mencione Claude** em mensagem de commit, no código ou como
   co-author. Sem exceção.
 - Nunca comite `.env`, `storage/`, `node_modules/`, `.venv/`.
-- Branch atual: `feat/state-of-art-overhaul`. Principal: `main`.
+- Branch principal: `main`.
 
 ## Segurança
 
@@ -114,7 +104,7 @@ e injetava 0,75 errado"). Mantenha esse nível; não polua com o óbvio.
 - Valide toda entrada na fronteira (Pydantic no FastAPI, tipos no front).
 - ORM parametrizado (SQLModel/SQLAlchemy) — sem SQL string montada à mão.
 - React escapa sozinho; não use `dangerouslySetInnerHTML`.
-- Sem dado sensível em URL ou log (o token do Telegram é redigido).
+- Sem dado sensível em URL ou log.
 - **Não** reintroduza Supabase Auth/RLS: o app é single-user atrás de VPN.
   A seção de autenticação de `.claude/rules/security.md` é herança de um
   template e não se aplica a este projeto.
@@ -126,7 +116,6 @@ e injetava 0,75 errado"). Mantenha esse nível; não polua com o óbvio.
 | `rules/code-style.md`, `rules/frontend-design.md`, `rules/security.md` | regras carregadas automaticamente |
 | `skills/review` | code review criteriosa da codebase |
 | `skills/push` | pipeline completo + commit + push |
-| `skills/deploy` | ⚠️ obsoleta — deploya para Vercel, que não é mais o alvo |
 | `agents/code-reviewer.md` | reviewer crítico que consulta a memória do projeto antes de revisar |
 | `settings.json` | hooks: formatação automática em Write/Edit + reviewer crítico no `Stop`. Todos apontam para a memória em `-01-investimentos-financas-app` (corrigido em 2026-08-05) |
 

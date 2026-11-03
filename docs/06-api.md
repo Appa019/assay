@@ -55,7 +55,7 @@ Base: `http://127.0.0.1:8000` (o navegador nunca fala direto — o Next reescrev
 
 | Método | Rota | O que faz |
 |---|---|---|
-| `POST` | `` | Registra gasto/ganho. Body: `kind` (`expense`\|`income`), `amount_brl>0`, `category` (min., default `outros`), `description?`, `occurred_on?` (default hoje), `source` (`chat`\|`bot`\|`api`), `wallet?` (`conta`\|`vr`\|`va`, default `conta`; apelidos como "Vale Refeição" são dobrados), `card?` (omitido = cartão padrão p/ gasto em conta; `none`/`pix`/`debito`/`dinheiro` = sem cartão; nome = cartão cadastrado, desconhecido → **422**), `installments?` (1–48; N linhas, `amount_brl` = total, devolve a parcela 1). Resposta traz `card_id`, `card_name`, `installment_no/count/group`. **Idêntico em 120s → devolve o existente** |
+| `POST` | `` | Registra gasto/ganho. Body: `kind` (`expense`\|`income`), `amount_brl>0`, `category` (min., default `outros`), `description?`, `occurred_on?` (default hoje), `source` (`chat`\|`api`; `bot` só existe em linhas antigas, de antes do D47), `wallet?` (`conta`\|`vr`\|`va`, default `conta`; apelidos como "Vale Refeição" são dobrados), `card?` (omitido = cartão padrão p/ gasto em conta; `none`/`pix`/`debito`/`dinheiro` = sem cartão; nome = cartão cadastrado, desconhecido → **422**), `installments?` (1–48; N linhas, `amount_brl` = total, devolve a parcela 1). Resposta traz `card_id`, `card_name`, `installment_no/count/group`. **Idêntico em 120s → devolve o existente** |
 | `POST` | `/classify` | Texto livre → **rascunho** `CashflowCreate` (com `wallet`). **Não grava.** 422 se não achou valor |
 | `GET` | `?month=YYYY-MM&kind=&wallet=&card_id=&limit=100` | Lançamentos. `month` malformado → 422 |
 | `GET` | `/summary?month=YYYY-MM` | `income_brl`, `expense_brl`, `net_brl`, `entries`, `card_expense_brl`, `by_category[]`, `by_wallet[]` |
@@ -117,8 +117,8 @@ limite de uso voltar, que pode levar horas.
 | `DELETE` | `/subscriptions` | Body `{endpoint}`. Remove o aparelho. 404 se não existir |
 | `POST` | `/test` | Dispara um push real para todos os aparelhos; devolve `{sent}` |
 
-Produtor atual: resposta do consultor concluída (ou falha) em turno iniciado
-pelo SITE — turnos do Telegram já entregam a resposta como mensagem. Payload
+Produtores: todo aviso do `notification_center` (que grava no inbox antes) e
+a resposta (ou falha) de todo turno do consultor. Payload
 criptografado de ponta a ponta (RFC 8291); endpoint que responder 404/410 é
 removido. iOS: exige o PWA aberto pela Tela de Início (iOS 16.4+).
 

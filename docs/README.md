@@ -3,7 +3,7 @@
 > **Você (Claude) está começando uma sessão nova.** Leia este arquivo inteiro.
 > Ele te dá o modelo mental completo em ~5 minutos e diz exatamente qual dos
 > outros documentos abrir para a tarefa que o Pedro pedir.
-> Não precisa ler os 12 arquivos de uma vez — leia este + o que a tarefa exigir.
+> Não precisa ler todos de uma vez — leia este + o que a tarefa exigir.
 
 ---
 
@@ -53,8 +53,8 @@ de IA (subprocess headless, não é chamada de API).
         │  (grátis, sem chave)  │              │  em workspaces isolados  │
         └───────────────────────┘              └──────────────────────────┘
                                                   │        │        │
-                                       agent_workspace  chat_ws  router/classifier_ws
-                                       (comitê, opus)  (consultor) (haiku, rápido)
+                                       agent_workspace  chat_ws  classifier_ws
+                                       (comitê, opus)  (consultor) (modelo pequeno)
 ```
 
 **A regra que explica quase tudo:** o sistema não chama a API da Anthropic. Ele
@@ -72,7 +72,7 @@ Se você quebrar uma destas, quebrou o produto:
 
 | # | Regra | Onde é aplicada |
 |---|---|---|
-| 1 | **O Pi é produção.** O desktop só escreve código. Nunca rode o bot em duas máquinas (polling duplicado = resposta em dobro). | `docs/09-operacao.md` |
+| 1 | **O Pi é produção.** O desktop só escreve código (timers em duas máquinas = comitê em dobro). | `docs/09-operacao.md` |
 | 2 | **Bind sempre em `127.0.0.1`.** A LAN é compartilhada com o prédio. Quem publica é o `tailscale serve`. | `scripts/install_systemd.sh` |
 | 3 | **Trava de venda por LOTE e por CLASSE: ação 30d (compliance), cripto 7d.** CDB tem liquidez diária (é o dry powder). | `portfolio_service.holding_lock_days` |
 | 4 | **Mandato de 3 classes:** Renda Fixa = só CDB Bradesco 100% CDI liquidez diária (instrumento único e fixo) · Ações = só equities B3 (sem FII/ETF/BDR) · Crypto = agressivo. | ordens permanentes + todos os prompts |
@@ -86,16 +86,17 @@ Se você quebrar uma destas, quebrou o produto:
 |---|---|
 | **[01-produto.md](01-produto.md)** | precisar entender *por que* o produto é assim, para quem, e o que ele deliberadamente NÃO faz |
 | **[02-arquitetura.md](02-arquitetura.md)** | for mexer em qualquer coisa — é o mapa do repositório, camada por camada, arquivo por arquivo |
-| **[03-dominio.md](03-dominio.md)** | for mexer em dados: 9 tabelas, regras de negócio, P&L, ledgers, IR |
+| **[03-dominio.md](03-dominio.md)** | for mexer em dados: 13 tabelas, regras de negócio, P&L, ledgers, IR |
 | **[04-motor-ia.md](04-motor-ia.md)** | for mexer no `analysis_runner`, chat, roteador de modelo, MCPs, locks ou resiliência |
 | **[05-fluxos.md](05-fluxos.md)** | quiser ver um fluxo ponta a ponta (aporte, revisão semanal, registrar gasto, executar ordem…) |
 | **[06-api.md](06-api.md)** | for consumir ou alterar um endpoint HTTP |
 | **[07-frontend.md](07-frontend.md)** | for mexer em qualquer `.tsx` — rotas, design system, regras de iOS |
-| **[09-operacao.md](09-operacao.md)** | for fazer deploy, debugar produção, mexer em systemd/cron/backup |
+| **[09-operacao.md](09-operacao.md)** | for fazer deploy, debugar produção, mexer em systemd/timers/backup |
 | **[10-configuracao.md](10-configuracao.md)** | precisar saber o que cada variável do `.env` faz |
 | **[11-qualidade.md](11-qualidade.md)** | for commitar: testes, CI, lint, convenções de código |
 | **[12-decisoes.md](12-decisoes.md)** | pensar "por que diabos isso é assim?" — é o registro de decisões e armadilhas |
 | **[13-estado-atual.md](13-estado-atual.md)** | quiser saber o que está em andamento agora, o que está desatualizado e as dívidas conhecidas |
+| **[pi-deploy.md](pi-deploy.md)** | for mexer no deploy do Pi: o contrato `deploy/pi/` (com `deploy/pi/README.md`), a migração e os riscos |
 
 Documentos que **já existiam** e continuam valendo (não os duplique):
 
@@ -117,7 +118,7 @@ Documentos que **já existiam** e continuam valendo (não os duplique):
 | "adiciona um campo no ativo" | `03-dominio.md` §migrações (SQLite não tem Alembic aqui) |
 | "adiciona um endpoint" | `06-api.md` + `02-arquitetura.md` §camadas |
 | "o consultor está caro / lento" | `04-motor-ia.md` §roteador de modelo |
-| "deploy para o Pi" | `09-operacao.md` §deploy |
+| "deploy para o Pi" | `pi-deploy.md` + `deploy/pi/README.md` (`09-operacao.md` §deploy enquanto a migração não acontece) |
 | "por que o preço está zerado?" | `03-dominio.md` §marcação a mercado |
 | "quero um relatório novo" | `05-fluxos.md` §revisão semanal (é o molde) |
 
@@ -132,7 +133,7 @@ make check      # ruff + pytest + lint/type-check/build do frontend — é o que
 - Commits em inglês, Conventional Commits, **atômicos**.
 - **Zero menção a Claude** em mensagem, código ou co-author.
 - Nada de secrets. `.env` nunca entra.
-- Backend: `.venv/bin/python -m pytest` (68 testes, todos passando em 2026-08-05).
+- Backend: `.venv/bin/python -m pytest`.
 - Frontend: `cd frontend && pnpm lint && pnpm type-check && pnpm build`.
 
 Detalhes em `11-qualidade.md`.

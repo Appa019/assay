@@ -14,7 +14,7 @@ Report          (weekly · maturity · monthly)
 CashflowEntry   (ledger pessoal: gasto/ganho)
 CreditCard      (cartão de crédito: fechamento, vencimento, padrão)
 Recurrence      (compromisso mensal: salário, aluguel, assinatura)
-ChatMessage     (transcrição do consultor, telegram + web)
+ChatMessage     (transcrição do consultor)
 ```
 
 ### `Asset` — um LOTE, não um ticker
@@ -55,7 +55,7 @@ Dois campos de resiliência:
 - `claude_session_id` — a sessão encadeada do Claude, para retomar entre
   reinícios de processo.
 - `run_attempts` — falhas automáticas consecutivas; ao bater `MAX_RUN_ATTEMPTS`
-  (5) o auto-resume desiste e avisa no Telegram (evita loop pago infinito).
+  (5) o auto-resume desiste e avisa no app, inbox + push (evita loop pago infinito).
 
 `ContributionPrompt` é uma reunião: `prompt_order`, `prompt_key`, `content`
 (prompt renderizado), `response`, e telemetria (`cost_usd`, `duration_s`,
@@ -79,7 +79,7 @@ que preço".
 ### `Report`
 
 Saída das rodadas autônomas: `weekly` · `maturity` · `monthly`. Guarda
-`content` (o texto que vai pro Telegram), `cost_usd`, `session_id`, snapshots e
+`content` (o texto do aviso), `cost_usd`, `session_id`, snapshots e
 `steps` (cada etapa encadeada, auditável).
 
 ### `PortfolioSnapshot`
@@ -91,7 +91,8 @@ benchmark. `assets` guarda o detalhe por ativo em JSON para auditar o dia depois
 
 Separado do `Trade` de propósito: trade é operação de carteira, isto é vida
 (mercado, aluguel, salário). `kind` = `expense`|`income`; `category`
-normalizada para minúsculas; `source` = `chat`|`bot`|`api`.
+normalizada para minúsculas; `source` = `chat`|`api` (`bot` só aparece em
+linhas antigas, de antes da remoção do bot em D47).
 
 **Carteiras (`wallet`, 2026-08-06):** todo lançamento diz de qual pote o
 dinheiro saiu/entrou — `conta` (banco/pix/cartão, padrão), `vr`
@@ -159,7 +160,8 @@ pagamento. `DELETE` só sem lançamentos (409).
 
 ### `ChatMessage` — transcrição compartilhada
 
-Toda mensagem, dos dois lados e das **duas portas** (Telegram e site). Guarda
+Toda mensagem, dos dois lados, do site (`channel=telegram` só existe em linhas
+antigas, de antes do D47). Guarda
 `channel`, `status` (`queued`/`running`/`done`/`failed`), `model` e `tier`
 escolhidos pelo roteador, custo e duração.
 
@@ -169,9 +171,8 @@ A tabela é **também a fila** (D41): a linha do assistente pendente É o job, c
 pelo limite de uso atravessa restart e é respondida quando o crédito volta.
 
 > **Regra crítica:** todo caller entra por `chat_service.enqueue(text, channel)`
-> (site: enfileira e volta na hora) ou `chat_service.converse(text, channel)`
-> (bot: síncrono, porque precisa devolver o texto na resposta do Telegram) —
-> **nunca** `run_chat_turn` direto, que não persiste nada.
+> (enfileira e volta na hora) — **nunca** `run_chat_turn` direto, que não
+> persiste nada.
 > Rotacionar a sessão do Claude não apaga esta tabela. O reset ("nova
 > sessão") também não: ele grava um corte em `display_state.json` e
 > `history()` só devolve o que veio depois — a tela recomeça em branco
@@ -198,7 +199,7 @@ dinheiro: 7 dias, o suficiente para a revisão semanal ver o lote uma vez antes
 de ele destravar (D36).
 
 Aplicada **no service** (`sell_asset` levanta `SellLockedError` → API 409), não
-em cada caller. O bot pede confirmação em dois passos antes de vender. Nenhuma
+em cada caller. O app pede confirmação antes de vender. Nenhuma
 outra camada recalcula a regra: `AssetRead` já traz `lock_days_total` /
 `lock_days_left` e o `PortfolioSummary` traz `holding_lock_days` por classe.
 
@@ -217,8 +218,8 @@ ficaria 0% para sempre.
 | Crypto | CoinGecko (id resolvido por busca quando o ticker não é id) |
 | CDB | CDI diário acumulado (série BCB **12**) desde `entry_date` × `CDB_PCT_CDI` |
 
-Roda via timer (a cada 6h), `POST /api/portfolio/refresh`, `/atualizar` no bot,
-e antes de todo snapshot/revisão.
+Roda via timer (a cada 6h), `POST /api/portfolio/refresh` (botão de atualizar
+na aba Carteira) e antes de todo snapshot/revisão.
 
 ⚠️ Série BCB **4389** é o CDI anualizado (% a.a.). A **4391** é mensal e já
 injetou um ~0,75 errado nos prompts. Não troque.
@@ -275,7 +276,7 @@ Coberto por `tests/test_database.py`.
 
 ## PRAGMAs do SQLite (`core/database.py`)
 
-Aplicados por conexão, porque API + bot + 8 crons escrevem no mesmo arquivo:
+Aplicados por conexão, porque API + 11 timers escrevem no mesmo arquivo:
 
 ```sql
 PRAGMA journal_mode=WAL      -- leitor concorrente durante escrita

@@ -11,7 +11,7 @@ A private money cockpit for one person. Two domains that used to be separate
 and are now one product:
 
 1. **Finanças pessoais** — day-to-day expenses and income (`CashflowEntry`).
-   Logged by the owner directly, by quick Telegram commands, or by an AI
+   Logged by the owner directly in the app, or by an AI
    consultant that reads photographed receipts and bank statements.
 2. **Investimentos** — an ad-hoc contribution ledger driven by an autonomous
    multi-persona AI committee. Portfolio, orders, tax, weekly reports.
@@ -48,8 +48,9 @@ squeezed desktop layout, which is what exists today.
 ## Brand and tone
 
 Editorial and quiet. Closer to a well-set financial newspaper than to a
-fintech app. Serif display type over sans body, warm paper rather than white,
-one cold accent for interaction. Numbers are the loudest thing on screen; the
+fintech app. Bricolage Grotesque (sans) for display figures over Plus Jakarta
+Sans body, cool neutrals tinted toward hue 250 with pure white panels, one deep
+indigo accent for interaction. Numbers are the loudest thing on screen; the
 chrome around them is nearly silent.
 
 Portuguese (pt-BR) throughout the interface. Direct, technical, no filler and
