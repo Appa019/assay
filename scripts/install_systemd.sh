@@ -43,22 +43,31 @@ command -v systemctl >/dev/null 2>&1 || { echo "systemctl não encontrado." >&2;
 
 mkdir -p "$UNIT_DIR" "${PROJECT_ROOT}/storage/logs"
 # storage/ may be a symlink to the external disk (pi-ops mounts it with nofail).
-# Every service then requires that mount: without it the app would start on the
-# empty mount point on the SD card and init_db would create a fresh database.
-# On a plain folder this is just the root filesystem, a no-op.
+# Without the disk the app would start on the empty mount point on the SD card
+# and init_db would create a fresh database. RequiresMountsFor= does not help in
+# a --user unit (the user manager cannot start system mounts, and a failed
+# dependency is never retried), so every unit checks for the data itself before
+# starting: long services keep retrying until the disk is back, a timer just
+# skips that round. Guard on the database when it exists (an empty mount point
+# still passes a directory test), else on the folder (first install).
 DATA_DIR="$(readlink -f "${PROJECT_ROOT}/storage")"
+GUARD_PATH="${DATA_DIR}"
+[ -f "${DATA_DIR}/portfolio.db" ] && GUARD_PATH="${DATA_DIR}/portfolio.db"
+GUARD_LINE="ExecStartPre=/bin/sh -c 'test -e \"${GUARD_PATH}\" || { echo \"${GUARD_PATH} ausente: o HD está montado?\" >&2; exit 1; }'"
 
 long_service() { # long_service <name> <description> <command> [extra [Service] line]
   local extra="${4:+$'\n'$4}"
   cat > "${UNIT_DIR}/${PREFIX}-$1.service" <<UNIT
 [Unit]
 Description=$2
-RequiresMountsFor=${DATA_DIR}
+# Retry forever: the guard below fails until the disk is back.
+StartLimitIntervalSec=0
 
 [Service]
 WorkingDirectory=${PROJECT_ROOT}
 Environment=${PATH_LINE}
 Environment=PYTHONUNBUFFERED=1
+${GUARD_LINE}
 ExecStart=$3${extra}
 Restart=always
 RestartSec=5
@@ -72,13 +81,13 @@ oneshot_pair() { # oneshot_pair <name> <description> <command> <on_calendar> [pe
   cat > "${UNIT_DIR}/${PREFIX}-$1.service" <<UNIT
 [Unit]
 Description=$2
-RequiresMountsFor=${DATA_DIR}
 
 [Service]
 Type=oneshot
 WorkingDirectory=${PROJECT_ROOT}
 Environment=${PATH_LINE}
 Environment=PYTHONUNBUFFERED=1
+${GUARD_LINE}
 ExecStart=$3
 UNIT
   cat > "${UNIT_DIR}/${PREFIX}-$1.timer" <<UNIT
