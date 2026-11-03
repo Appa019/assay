@@ -138,30 +138,11 @@ class Settings(BaseSettings):
     # TTL (seconds) for the cached macro/market context (/api/macro).
     market_cache_ttl: int = 120
 
-    # Telegram bot. The app (inbox + Web Push) is the delivery channel now;
-    # this stays as an opt-in mirror, off unless TELEGRAM_MIRROR_ENABLED=true.
-    telegram_bot_token: str = ""
-    telegram_chat_id: str = ""
-    telegram_mirror_enabled: bool = False
-
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }
-
-    @property
-    def telegram_enabled(self) -> bool:
-        """Credentials present AND the mirror explicitly turned on."""
-        return bool(
-            self.telegram_mirror_enabled and self.telegram_bot_token and self.telegram_chat_id
-        )
-
-    @property
-    def telegram_configured(self) -> bool:
-        """Credentials present, regardless of the mirror switch. Used by the
-        bot script itself, which is a surface, not a notification channel."""
-        return bool(self.telegram_bot_token and self.telegram_chat_id)
 
     @field_validator("target_fixed_income", "target_stocks", "target_crypto")
     @classmethod

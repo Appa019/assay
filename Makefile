@@ -13,8 +13,6 @@ backend:        ## backend only, with reload (development)
 frontend:       ## frontend only (development)
 	cd frontend && pnpm dev
 
-bot:            ## Telegram bot in the foreground
-	$(PY) scripts/telegram_bot.py
 
 lint:           ## Python + frontend linters
 	$(RUFF) check app/ scripts/ tests/

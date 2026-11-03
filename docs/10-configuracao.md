@@ -51,7 +51,7 @@ validadores em `Settings` derrubam o boot com mensagem explícita se não somare
 | `AGENT_MODEL` | `opus` | Modelo do comitê |
 | `AGENT_EFFORT` | `max` | **Sempre `max` no fluxo automático** |
 | `AGENT_STEP_TIMEOUT` | `2400` | Teto (s) por etapa do subprocess. Opus/max com pesquisa ao vivo é lento — dê folga |
-| `MAX_RUN_ATTEMPTS` | `5` | Falhas automáticas consecutivas antes do auto-resume desistir (e avisar no Telegram). Impede loop pago infinito |
+| `MAX_RUN_ATTEMPTS` | `5` | Falhas automáticas consecutivas antes do auto-resume desistir (e avisar no app). Impede loop pago infinito |
 
 ## Consultor (chat)
 
@@ -88,13 +88,8 @@ validadores em `Settings` derrubam o boot com mensagem explícita se não somare
 
 ## Telegram
 
-| Variável | Default | O que faz |
-|---|---|---|
-| `TELEGRAM_BOT_TOKEN` | *(vazio)* | Do @BotFather. **NUNCA comite** |
-| `TELEGRAM_CHAT_ID` | *(vazio)* | Preenchido por `scripts/telegram_setup.py` (código de 6 dígitos). O bot só responde a este chat |
-
-`settings.telegram_enabled` é `True` só quando os dois estão preenchidos; sem
-isso todas as notificações viram no-op silencioso.
+Saiu com o bot (D47). `TELEGRAM_*` que sobrar num `.env` antigo é ignorado
+(`extra="ignore"`); os avisos vão para o inbox do app e o Web Push.
 
 ## MCPs premium (todos opcionais)
 

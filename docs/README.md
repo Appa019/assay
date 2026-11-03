@@ -19,11 +19,11 @@ login, não tem nuvem, não tem segundo usuário — e nunca vai ter.
 O diferencial: um **agente autônomo Claude Code headless** que roda um comitê
 multipersona de investimentos (5 reuniões encadeadas, nível Goldman Sachs /
 J.P. Morgan) e devolve uma folha de ordens. Além dele, um **consultor
-financeiro em chat** (mesma conversa no Telegram e no site) que registra gastos,
+financeiro em chat** (na aba `/consultor` do site) que registra gastos,
 responde sobre mercado e dispara aportes.
 
 Stack: **FastAPI + SQLModel/SQLite** (backend) · **Next.js 16 + TypeScript +
-Tailwind v4** (frontend) · **Telegram Bot API** · **Claude Code CLI** como motor
+Tailwind v4** (frontend) · **Web Push** · **Claude Code CLI** como motor
 de IA (subprocess headless, não é chamada de API).
 
 ---
@@ -37,8 +37,8 @@ de IA (subprocess headless, não é chamada de API).
                       │          Extrato · Investimentos         │
                       └──────────────────────────────────────────┘
                                         │
-   Telegram bot ───────────────────────▶│◀── crons/timers (8 jobs)
-   (mesma conversa do /consultor)       │
+                                        │◀── timers systemd (11 jobs)
+                                        │
                                         ▼
                       ┌──────────────────────────────────────────┐
                       │        FastAPI  127.0.0.1:8000           │
@@ -91,7 +91,6 @@ Se você quebrar uma destas, quebrou o produto:
 | **[05-fluxos.md](05-fluxos.md)** | quiser ver um fluxo ponta a ponta (aporte, revisão semanal, registrar gasto, executar ordem…) |
 | **[06-api.md](06-api.md)** | for consumir ou alterar um endpoint HTTP |
 | **[07-frontend.md](07-frontend.md)** | for mexer em qualquer `.tsx` — rotas, design system, regras de iOS |
-| **[08-telegram.md](08-telegram.md)** | for mexer no bot: 16 comandos, chat, anexos |
 | **[09-operacao.md](09-operacao.md)** | for fazer deploy, debugar produção, mexer em systemd/cron/backup |
 | **[10-configuracao.md](10-configuracao.md)** | precisar saber o que cada variável do `.env` faz |
 | **[11-qualidade.md](11-qualidade.md)** | for commitar: testes, CI, lint, convenções de código |
@@ -116,7 +115,6 @@ Documentos que **já existiam** e continuam valendo (não os duplique):
 | "muda a cor / layout / fonte" | `07-frontend.md` + `DESIGN.md` |
 | "o comitê travou / não terminou o aporte" | `04-motor-ia.md` §resiliência + `09-operacao.md` §runbook |
 | "adiciona um campo no ativo" | `03-dominio.md` §migrações (SQLite não tem Alembic aqui) |
-| "adiciona um comando no bot" | `08-telegram.md` |
 | "adiciona um endpoint" | `06-api.md` + `02-arquitetura.md` §camadas |
 | "o consultor está caro / lento" | `04-motor-ia.md` §roteador de modelo |
 | "deploy para o Pi" | `09-operacao.md` §deploy |

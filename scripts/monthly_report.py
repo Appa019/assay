@@ -35,7 +35,6 @@ from app.services import (  # noqa: E402
     portfolio_service,
     price_refresh_service,
     tax_service,
-    telegram_service,
 )
 
 
@@ -193,14 +192,6 @@ def main() -> int:
             session.add(report)
             session.commit()
         notification_center.notify(content, kind=NotificationKind.REVIEW)
-        if telegram_service.is_enabled():
-            # The .md attachment only exists on the Telegram mirror; in the app
-            # the full report is already readable in /investimentos?aba=analises.
-            telegram_service.send_document(
-                f"relatorio_{start.strftime('%Y_%m')}.md",
-                content.encode("utf-8"),
-                caption=title,
-            )
         print(f"{title} salvo e enviado.")
         return 0
     except Exception as exc:  # noqa: BLE001 — a broken cron must alert, not vanish

@@ -40,7 +40,6 @@ storage/logs/
 storage/backups/
 storage/cron_locks/
 storage/alerts_state.json
-storage/telegram_bot.pid
 
 # Logs
 *.log

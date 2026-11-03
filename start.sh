@@ -109,20 +109,6 @@ for i in $(seq 1 90); do
   fi
 done
 
-# ── 6.5 Telegram bot (opcional) ──────────────────────────────────
-# Só sobe se TELEGRAM_CHAT_ID estiver preenchido no .env (rode
-# scripts/telegram_setup.py uma vez para configurar).
-BOT_PID=""
-if [ -f .env ] && grep -qE '^TELEGRAM_CHAT_ID=.+' .env; then
-  info "Iniciando bot do Telegram"
-  .venv/bin/python scripts/telegram_bot.py > "$LOG_DIR/telegram_bot.log" 2>&1 &
-  BOT_PID=$!
-  echo "$BOT_PID" > "$LOG_DIR/telegram_bot.pid"
-  ok "Bot do Telegram rodando"
-else
-  warn "Telegram não configurado — pulei o bot (rode scripts/telegram_setup.py)"
-fi
-
 # ── 7. Browser ───────────────────────────────────────────────────
 URL="http://localhost:$FRONTEND_PORT"
 if command -v xdg-open >/dev/null 2>&1; then
@@ -149,12 +135,10 @@ cleanup() {
   warn "Encerrando..."
   kill "$FRONTEND_PID" 2>/dev/null || true
   kill "$BACKEND_PID" 2>/dev/null || true
-  [ -n "$BOT_PID" ] && kill "$BOT_PID" 2>/dev/null || true
   sleep 1
   kill -9 "$FRONTEND_PID" 2>/dev/null || true
   kill -9 "$BACKEND_PID" 2>/dev/null || true
-  [ -n "$BOT_PID" ] && kill -9 "$BOT_PID" 2>/dev/null || true
-  rm -f "$LOG_DIR/backend.pid" "$LOG_DIR/frontend.pid" "$LOG_DIR/telegram_bot.pid"
+  rm -f "$LOG_DIR/backend.pid" "$LOG_DIR/frontend.pid"
   ok "Tudo encerrado."
 }
 trap cleanup INT TERM EXIT

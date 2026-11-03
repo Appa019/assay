@@ -118,7 +118,6 @@ Comandos manuais úteis:
 .venv/bin/python scripts/refresh_prices.py
 .venv/bin/python scripts/daily_snapshot.py
 .venv/bin/python scripts/resume_pending.py [--watch [s]]
-.venv/bin/python scripts/telegram_setup.py      # pareia o bot (código de 6 dígitos)
 bash scripts/backup_db.sh
 ```
 
@@ -147,11 +146,6 @@ Para restaurar: pare os serviços, copie o backup por cima de
 5. `ls storage/analysis_runs/*.lock` — há um lock vivo? `_lock_is_active` valida
    pid + starttime. Um lock de processo morto é ignorado automaticamente.
 6. Retomar: `.venv/bin/python scripts/run_analysis.py --contribution-id <uuid>`.
-
-### "O bot respondeu duas vezes"
-
-Está rodando em duas máquinas. Confira o desktop (`pgrep -af telegram_bot`) e o
-Pi (`systemctl --user status investimentos-bot`). Mate o do desktop.
 
 ### "P&L está zerado / preço não atualiza"
 

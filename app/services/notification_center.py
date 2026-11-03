@@ -11,8 +11,8 @@ Delivery is fan-out with one durable leg:
    ordinary ways (permission revoked, phone offline, VAPID rotated, no device
    subscribed yet) and a dropped buzz must never mean a lost alert.
 2. **Web Push** — best effort, so the phone buzzes without the app open.
-3. **Telegram** — only when explicitly enabled. Off by default now; the code
-   stays so the channel can come back with one setting.
+
+The Telegram mirror is gone with the bot (D47).
 
 Nothing here raises. A notification is a side effect of work that already
 succeeded, and it must never be the reason that work reports failure.
@@ -23,7 +23,6 @@ from __future__ import annotations
 import structlog
 from sqlmodel import Session, col, func, select
 
-from app.config import settings
 from app.core.database import engine
 from app.models.notification import Notification, NotificationKind, NotificationLevel
 
@@ -113,14 +112,6 @@ def notify(
             webpush_service.notify(title, body[:_PUSH_BODY_CHARS], url=target)
         except Exception:  # noqa: BLE001
             logger.warning("notification_push_failed", exc_info=True)
-
-    if settings.telegram_mirror_enabled:
-        try:
-            from app.services import telegram_service
-
-            telegram_service.notify(text)
-        except Exception:  # noqa: BLE001
-            logger.warning("notification_telegram_failed", exc_info=True)
 
     logger.info("notification_sent", kind=kind.value, level=level.value, title=title[:60])
     return record

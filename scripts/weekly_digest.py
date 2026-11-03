@@ -22,7 +22,7 @@ from sqlmodel import Session  # noqa: E402
 
 from app.core.database import engine, init_db  # noqa: E402
 from app.models.notification import NotificationKind, NotificationLevel  # noqa: E402
-from app.services import insight_service, notification_center, telegram_service  # noqa: E402
+from app.services import insight_service, notification_center  # noqa: E402
 
 
 def main() -> int:
@@ -53,10 +53,8 @@ def main() -> int:
         print("Ledger do mês vazio — sem digest.")
         return 0
     # Success side-effects stay OUTSIDE the failure path above: only a real
-    # delivery (or Telegram intentionally disabled, e.g. on the desktop)
-    # drains the queue and stamps the week.
-    delivered = notification_center.notify(text, kind=NotificationKind.LEDGER) is not None
-    if delivered or not telegram_service.is_enabled():
+    # delivery (the inbox row was written) drains the queue and stamps the week.
+    if notification_center.notify(text, kind=NotificationKind.LEDGER) is not None:
         insight_service.mark_digest_sent()
     print(text)
     return 0

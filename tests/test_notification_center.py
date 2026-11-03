@@ -3,7 +3,6 @@
 import pytest
 from sqlmodel import Session, select
 
-from app.config import settings
 from app.models.notification import Notification, NotificationKind, NotificationLevel
 from app.services import notification_center
 
@@ -68,23 +67,6 @@ def test_push_receives_a_trimmed_body(
     assert title == "Título"
     assert len(body) <= 180
     assert url == "/investimentos?aba=analises"
-
-
-def test_telegram_stays_silent_unless_the_mirror_is_on(
-    session: Session, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The client does not use Telegram; nothing may reach it by default."""
-    from app.services import telegram_service
-
-    calls: list[str] = []
-    monkeypatch.setattr(telegram_service, "notify", lambda t: calls.append(t) or True)
-    monkeypatch.setattr(settings, "telegram_mirror_enabled", False)
-    notification_center.notify("qualquer coisa")
-    assert calls == []
-
-    monkeypatch.setattr(settings, "telegram_mirror_enabled", True)
-    notification_center.notify("agora espelha")
-    assert calls == ["agora espelha"]
 
 
 def test_a_failed_push_still_leaves_the_inbox_row(
