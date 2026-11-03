@@ -158,7 +158,7 @@ const ConsultorPage = () => {
 
   return (
     <div className="flex flex-col" style={{ minHeight: "calc(100dvh - 8rem)" }}>
-      <header className="flex items-start justify-between gap-3">
+      <header className="flex items-start justify-between gap-3 pr-[6.75rem] md:pr-0">
         <div className="min-w-0">
           <h2
             className="text-[1.7rem] md:text-3xl leading-tight"
@@ -172,11 +172,12 @@ const ConsultorPage = () => {
           onClick={() => void reset()}
           disabled={busy || queued > 0}
           title="Começa uma sessão nova. A memória sobre você continua."
-          className="flex min-h-[2.75rem] shrink-0 items-center gap-2 rounded-md border px-3.5 text-[13px] font-medium disabled:opacity-40"
+          className="flex min-h-[2.75rem] min-w-[2.75rem] shrink-0 items-center justify-center gap-2 rounded-md border px-3 text-[13px] font-medium disabled:opacity-40 sm:px-3.5"
           style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
         >
           <RotateCcw size={14} strokeWidth={1.9} />
-          Nova sessão
+          {/* Icon-only on phones: the floating privacy/bell buttons take the right edge. */}
+          <span className="sr-only sm:not-sr-only">Nova sessão</span>
         </button>
       </header>
 
@@ -230,7 +231,7 @@ const ConsultorPage = () => {
       </div>
 
       <div
-        className="sticky bottom-0 mt-6 pt-3"
+        className="sticky bottom-[calc(3.4rem+env(safe-area-inset-bottom))] md:bottom-0 mt-6 pt-3"
         style={{ background: "var(--bg-primary)" }}
       >
         {error && (
@@ -315,7 +316,7 @@ const ConsultorPage = () => {
                 ? "Quer dizer algo sobre os arquivos?"
                 : attachments.length === 1
                   ? "Quer dizer algo sobre o arquivo?"
-                  : "Pergunte, registre um gasto, peça um aporte…"
+                  : "Fale com o consultor…"
             }
             aria-label="Mensagem"
             className="min-h-[2.75rem] w-full min-w-0 resize-none rounded-md border bg-transparent px-3.5 py-3 text-base outline-none"

@@ -487,7 +487,7 @@ const ExecuteDialog = ({
     <dialog
       ref={ref}
       onClose={onClose}
-      className="p-5 md:p-7 rounded-md max-w-md w-[calc(100%-2rem)] m-4 md:m-0 md:w-full backdrop:bg-black/40"
+      className="p-5 md:p-7 rounded-md max-w-md w-[calc(100%-2rem)] m-auto backdrop:bg-black/40"
       style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
     >
       {order && (
@@ -616,7 +616,7 @@ const SkipDialog = ({
     <dialog
       ref={ref}
       onClose={onClose}
-      className="p-5 md:p-7 rounded-md max-w-md w-[calc(100%-2rem)] m-4 md:m-0 md:w-full backdrop:bg-black/40"
+      className="p-5 md:p-7 rounded-md max-w-md w-[calc(100%-2rem)] m-auto backdrop:bg-black/40"
       style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
     >
       {order && (

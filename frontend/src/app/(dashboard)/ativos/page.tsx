@@ -31,7 +31,6 @@ import {
 } from "@/lib/api";
 import { usePortfolio } from "@/hooks/use-portfolio";
 import {
-  daysSince,
   formatBRL,
   formatDate,
   formatDateTime,
@@ -219,7 +218,7 @@ export const AtivosView = () => {
         case "total_value":
           return dir * (a.quantity * priceA - b.quantity * priceB);
         case "lock":
-          return dir * (daysSince(a.entry_date) - daysSince(b.entry_date));
+          return dir * (a.lock_days_left - b.lock_days_left);
         default:
           return 0;
       }
@@ -969,7 +968,7 @@ export const AtivosView = () => {
       <dialog
         ref={sellDialog}
         onClose={() => setSellTarget(null)}
-        className="p-7 rounded-md max-w-md w-full backdrop:bg-black/40 max-md:p-5 max-md:max-h-[85dvh] max-md:overflow-y-auto"
+        className="m-auto p-7 rounded-md max-w-md w-[calc(100%-2rem)] backdrop:bg-black/40 max-md:p-5 max-md:max-h-[85dvh] max-md:overflow-y-auto"
         style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
       >
         {sellTarget && (
@@ -1046,7 +1045,7 @@ export const AtivosView = () => {
       <dialog
         ref={editDialog}
         onClose={() => setEditing(null)}
-        className="p-7 rounded-md max-w-md w-full backdrop:bg-black/40 max-md:p-5 max-md:max-h-[85dvh] max-md:overflow-y-auto"
+        className="m-auto p-7 rounded-md max-w-md w-[calc(100%-2rem)] backdrop:bg-black/40 max-md:p-5 max-md:max-h-[85dvh] max-md:overflow-y-auto"
         style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
       >
         {editing && (
