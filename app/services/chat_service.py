@@ -817,7 +817,7 @@ def _rotation_summary() -> str:
             resume_session_id=None,
             model=settings.chat_router_model,
             effort=settings.chat_router_effort,
-            timeout=max(settings.chat_router_timeout, 120),
+            timeout=settings.chat_router_timeout,
             cwd=_AUX_WORKSPACE,
             transcript_tag=None,
             tools="",
@@ -872,15 +872,15 @@ def _run_turn_once(
     *,
     session_id: str | None,
     workspace: Path,
-    model: str | None = None,
-    effort: str | None = None,
+    model: str,
+    effort: str,
 ) -> StepResult:
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
     return analysis_runner._run_claude_step(
         prompt,
         resume_session_id=session_id,
-        model=model or settings.chat_model,
-        effort=effort or settings.chat_effort,
+        model=model,
+        effort=effort,
         timeout=settings.chat_turn_timeout,
         cwd=workspace,
         transcript_tag=f"chat_{stamp}",

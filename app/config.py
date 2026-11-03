@@ -58,10 +58,8 @@ class Settings(BaseSettings):
     # contribution (prevents an endless paid retry loop on permanent failures).
     max_run_attempts: int = 5
 
-    # Consultant chat (the /consultor page). Opus by
-    # default for advice quality; set CHAT_MODEL=sonnet for snappier replies.
-    chat_model: str = "opus"
-    chat_effort: str = "medium"
+    # Consultant chat (the /consultor page). The model and effort of each turn
+    # come from the router tiers below.
     # Per-turn subprocess ceiling (seconds) — one chat answer, not a committee run.
     chat_turn_timeout: int = 900
     # Rotate the chained chat session after this many turns; MEMORY.md carries
@@ -113,7 +111,7 @@ class Settings(BaseSettings):
     # Small model for auxiliary steps (the chat's rotation summary).
     chat_router_model: str = "haiku"
     chat_router_effort: str = "low"
-    chat_router_timeout: int = 60
+    chat_router_timeout: int = 120
 
     # Contributions run at night by default. The committee is the heaviest job
     # here (~90 min) and the plan's usage limit is a rolling window shared with

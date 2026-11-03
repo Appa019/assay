@@ -57,8 +57,6 @@ validadores em `Settings` derrubam o boot com mensagem explícita se não somare
 
 | Variável | Default | O que faz |
 |---|---|---|
-| `CHAT_MODEL` | `opus` | Usado quando o roteador está **desligado** |
-| `CHAT_EFFORT` | `medium` | idem |
 | `CHAT_TURN_TIMEOUT` | `900` | Teto (s) de **um** turno de chat |
 | `CHAT_MAX_TURNS` | `40` | Rotaciona a sessão encadeada depois de N turnos. O `MEMORY.md` carrega o contexto durável através da rotação |
 | `CHAT_MAX_CONTEXT_TOKENS` | `120000` | Rotaciona quando UMA chamada do modelo lê esse tanto de contexto. É o teto que pega na prática — o de turnos nunca chegou a valer (D42) |
@@ -69,7 +67,7 @@ validadores em `Settings` derrubam o boot com mensagem explícita se não somare
 | Variável | Default | O que faz |
 |---|---|---|
 | `CHAT_ROUTER_ENABLED` | `true` | `false` fixa todo turno no tier DEEP (comportamento pré-roteador) |
-| `CHAT_ROUTER_MODEL` / `_EFFORT` / `_TIMEOUT` | `haiku` / `low` / `60` | Modelo dos passos auxiliares (resumo de rotação da sessão) |
+| `CHAT_ROUTER_MODEL` / `_EFFORT` / `_TIMEOUT` | `haiku` / `low` / `120` | Modelo dos passos auxiliares (resumo de rotação da sessão) |
 | `CHAT_FAST_MODEL` / `_EFFORT` | `haiku` / `low` | Saudação e lançamento no ledger |
 | `CHAT_LOOKUP_MODEL` / `_EFFORT` | `sonnet` / `low` | Consulta factual: saldo, preço, ordens pendentes, extrato (D37) |
 | `CHAT_DEEP_MODEL` / `_EFFORT` | `opus` / `medium` | Decisão de investimento, análise de ativo, macro, risco, tributação — e tudo o que não for provadamente os dois de cima |

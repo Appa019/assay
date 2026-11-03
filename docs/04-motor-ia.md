@@ -336,7 +336,7 @@ consulta FACTUAL (≤160 chars):           → LOOKUP  sonnet/low
   frase de recuperação (quanto tenho,
   qual o preço, ordens pendentes…)
   E nenhuma palavra de julgamento
-tudo o mais                              → DEEP    opus/high
+tudo o mais                              → DEEP    opus/medium (D42)
 CHAT_ROUTER_ENABLED=false                → DEEP sempre
 ```
 

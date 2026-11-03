@@ -225,8 +225,8 @@ sem Playwright.
   cada turno) + MEMORY.md (memória FIXA sobre o cliente, gerida pelo próprio
   agente) + MCPs em **perfil enxuto** (`profile="chat"`: dados financeiros +
   fetch + memory, ∪ `.mcp.agent.json` do chat, `--strict-mcp-config` — o
-  baseline completo do comitê NÃO carrega no chat, é latência; D23). Modelo/effort próprios: `CHAT_MODEL` (opus) /
-  `CHAT_EFFORT` (medium desde D42) / `CHAT_TURN_TIMEOUT` (900s). Ele registra gastos/ganhos
+  baseline completo do comitê NÃO carrega no chat, é latência; D23). Modelo/effort por turno vêm do roteador (abaixo;
+  deep = opus/medium desde D42), teto `CHAT_TURN_TIMEOUT` (900s). Ele registra gastos/ganhos
   que o cliente contar via `POST /api/cashflow` (source=chat), consulta
   carteira/IR/ordens pela API local e responde tickers com dados ao vivo
   (yahoo-finance/coingecko). Lock de turno próprio (`_chat_turn.lock`) — NÃO usa
@@ -317,7 +317,7 @@ O consultor mora na página `/consultor`. **É UMA conversa só**, persistida no
   gasto/ganho ("gastei 42 no mercado") e saudação; `lookup` = sonnet/low para
   CONSULTA FACTUAL do que o app já tem (saldo, preço, ordens pendentes,
   extrato) — precisa casar frase de recuperação, NÃO ter anexo (📎) e não ter
-  nenhuma palavra de julgamento; `deep` = opus/high para TODO o resto. **Na
+  nenhuma palavra de julgamento; `deep` = opus/medium (D42) para TODO o resto. **Na
   dúvida, opus.** O tier `lookup` foi medido contra as 80 mensagens reais do
   histórico e não pegou nenhuma (D37): ele existe pelo caso natural futuro, NÃO
   como economia prometida. O custo do chat está no contexto por chamada. Ficam de fora do caminho rápido de propósito: verbo no
