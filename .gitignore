@@ -11,7 +11,7 @@ secrets/
 __pycache__/
 *.py[cod]
 *$py.class
-.venv/
+.venv
 venv/
 *.egg-info/
 .pytest_cache/
@@ -31,15 +31,8 @@ out/
 Thumbs.db
 
 # Local data
-storage/*.db
-storage/*.db-journal
-storage/*.db-wal
-storage/*.db-shm
-storage/*.bak-*
-storage/logs/
-storage/backups/
-storage/cron_locks/
-storage/alerts_state.json
+# A dir on the desktop, a symlink to /mnt/hd/investimentos on the Pi: no trailing slash.
+/storage
 
 # Logs
 *.log
@@ -52,16 +45,6 @@ coverage/
 # Claude Code
 .claude/settings.local.json
 .playwright-mcp/
-storage/claude_session.json
-storage/analysis_runs/
-storage/agent_workspace/
-storage/notifications_state.json
-storage/chat_workspace/
-storage/webpush/
-storage/router_workspace/
-storage/classifier_workspace/
-storage/bot_state.json
-storage/insights_state.json
 
 # subagent-driven-development scratch (ledger, briefs, review packages)
 .superpowers/
