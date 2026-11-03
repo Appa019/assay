@@ -67,9 +67,9 @@
       {
         "hooks": [
           {
-            "type": "agent",
-            "prompt": "You are a critical code reviewer. Do the following checks from the project root:\n\n1. Run `.venv/bin/ruff check app/ scripts/` — report any errors\n2. Run `cd frontend && pnpm run lint && pnpm run type-check` — report ESLint/TypeScript errors\n3. Run `.venv/bin/python -m pytest -x -q` if a tests/ directory exists — report failures\n4. Read the memory file at ~/.claude/projects/-home-<usuario>-01-investimentos-financas-app/memory/project_errors.md (create it if missing) — check if any documented errors are being repeated in the current changes\n5. If you find a NEW error or bug pattern, append it to project_errors.md with format:\n   ### [date] Error description\n   - **Cause:** what caused it\n   - **Fix:** how it was resolved\n   - **Prevention:** how to avoid in future\n\nReport 'PASS' if everything is clean, or list specific issues found. Be critical and thorough.",
-            "timeout": 120
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/stop-check.sh",
+            "timeout": 600
           }
         ]
       }
