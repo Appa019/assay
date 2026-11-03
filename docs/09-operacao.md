@@ -67,7 +67,7 @@ bash scripts/install_systemd.sh --uninstall             # remover
 
 Instala 2 serviços (`Restart=always`) + 11 timers. Os timers usam
 `Persistent=true` (máquina desligada na hora agendada **recupera a janela no
-boot**), menos `scheduled`, `cadence` e `weekly`, que são `Persistent=false`:
+boot**), menos `scheduled`, `cadence`, `weekly` e `resume`, que são `Persistent=false`:
 recuperar no boot rodaria o comitê no meio do dia. Uma unit de bot deixada por
 instalação antiga é desligada e apagada. `loginctl enable-linger` mantém tudo
 vivo após logout.
@@ -90,7 +90,7 @@ Os três primeiros gastam Claude e ficam na madrugada (nada começa depois das
 | `-cadence` | 01:45 diário | `check_cadence.py` |
 | `-weekly` | 02:10 diário (auto-gated a 7d) | `weekly_review.py` |
 | `-backup` | 03:00 diário | `backup_db.sh` |
-| `-resume` | a cada 15 min | `resume_pending.py` |
+| `-resume` | a cada 15 min, 00:00–02:45 | `resume_pending.py` |
 | `-prices` | a cada 6h (:15) | `refresh_prices.py` |
 | `-insights` | 09:07 diário | `daily_insights.py` |
 | `-alerts` | 11/15/19:05 | `check_alerts.py` |

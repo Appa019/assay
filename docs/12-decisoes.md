@@ -545,6 +545,17 @@ recusava com um lockfile sujo pelo check. Na saída 75 nada reinicia. O
 75 já tinha trocado pacotes na `.venv` viva com o comitê rodando. Cada caminho
 tem teste em `tests/test_deploy_sh.py`; a versão antiga falha 7 deles.
 
+### D50 · A retomada também obedece à madrugada
+Decisão do cliente (2026-11-03). O `investimentos-resume` rodava a cada
+15 min o dia todo: um aporte cortado pelo limite de uso voltava à tarde e
+gastava a janela que o consultor divide com o comitê. Agora roda só de
+00:00 a 02:45, a cada 15 min, com `Persistent=false`, e nada começa depois
+das 03:00 (a REGRA do `install_systemd.sh`). O aporte agendado da 01:00 também
+deixou de esperar o reset dentro do processo, porque isso levava o comitê
+para a manhã. Ele roda em fail-fast, e limite ou lock ocupado viram aviso
+"continua na próxima madrugada", não falha. **Custo aceito:** um aporte que
+bate no limite termina na noite seguinte, até um dia depois.
+
 ### D33 · Mandato mais defensivo: RF 50% · Ações 35% · Crypto 15%
 Em 2026-09-05 o cliente fixou **renda fixa em 50%** e deixou o resto a critério
 técnico. O alvo sai de 35/40/25 para **50/35/15**: o dry powder deixa de ser o

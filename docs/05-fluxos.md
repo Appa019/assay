@@ -39,7 +39,7 @@ investir 5000" → ele confirma o valor e chama a API).
    ├─ status volta para ready (retentável)
    ├─ causa APENDADA em notes
    ├─ run_attempts += 1  → aos 5, avisa no app e para de tentar
-   └─ resume_pending.py retoma no próximo pass de 15 min
+   └─ resume_pending.py retoma no próximo pass da madrugada (00:00–02:45)
 ```
 
 **Onde ver progresso:** `GET /api/contributions/{id}` (o front faz polling em
@@ -236,7 +236,7 @@ Os 11 timers de `scripts/install_systemd.sh` (unit `investimentos-<nome>.timer`)
 | 01:00 diário | `scheduled` · `run_scheduled.py` — aportes agendados para a madrugada (D38) | sim, quando há aporte agendado |
 | 01:45 diário | `cadence` · `check_cadence.py` — maturidade de lotes | sim, se houver lote maduro |
 | 02:10 diário | `weekly` · `weekly_review.py` — auto-gated a 7 dias | sim, quando dispara |
-| a cada 15 min | `resume` · `resume_pending.py` — retoma análises interrompidas | sim, quando há o que retomar |
+| a cada 15 min, 00:00–02:45 | `resume` · `resume_pending.py` — retoma análises interrompidas | sim, quando há o que retomar |
 | a cada 6h (:15) | `prices` · `refresh_prices.py` — marcação a mercado | **não** |
 | 18:45 diário | `snapshot` · `daily_snapshot.py` — ponto da curva de patrimônio | **não** |
 | 11/15/19:05 | `alerts` · `check_alerts.py` — alvo/stop cruzados | **não** |

@@ -33,7 +33,7 @@ comparei com as 25 `investimentos-*` do backup: **zero diferença**.
 | `-cadence` | timer | enabled | 01:45 · `check_cadence.py` (gasta Claude) |
 | `-weekly` | timer | enabled | 02:10 · `weekly_review.py` (gasta Claude, gate 7 d) |
 | `-backup` | timer | enabled | 03:00 · `backup_db.sh` |
-| `-resume` | timer | enabled | a cada 15 min · `resume_pending.py` |
+| `-resume` | timer | enabled | a cada 15 min, 00:00–02:45 · `resume_pending.py` |
 | `-prices` | timer | enabled | 00/06/12/18:15 · `refresh_prices.py` |
 | `-insights` | timer | enabled | 09:07 · `daily_insights.py` |
 | `-alerts` | timer | enabled | 11/15/19:05 · `check_alerts.py` |

@@ -178,7 +178,7 @@ precisa depois.
    respostas antigas** (`_clear_stale_responses`) — senão uma retomada futura
    contaria etapas que a nova sessão nunca viu.
 3. **Automática, sem ninguém mandar** — `scripts/resume_pending.py` roda a cada
-   15 min, acha análises incompletas (`pending_resumable_ids`) e retoma
+   15 min entre 00:00 e 02:45 (D50), acha análises incompletas (`pending_resumable_ids`) e retoma
    fail-fast (uma espera curta; tenta de novo no próximo pass). Avisa no
    app (inbox + push). Desiste após `MAX_RUN_ATTEMPTS` (5) falhas consecutivas.
 

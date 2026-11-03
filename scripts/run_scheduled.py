@@ -104,8 +104,20 @@ def main() -> int:
                     notify=True,
                     push_on_finish=False,  # 2am: inbox yes, phone ringing no
                     on_event=_printer,
+                    # Waiting in-process for the reset would carry the committee
+                    # into the morning (THE RULE in install_systemd.sh); the
+                    # night-only resume timer finishes it the next night.
+                    fail_fast_on_limit=True,
                 )
                 print(f"✓ concluído (US$ {summary.total_cost_usd:.2f})")
+            except (analysis_runner.LimitError, analysis_runner.RunBusyError) as exc:
+                print(f"⏸ adiado: {exc}")
+                notification_center.notify(
+                    f"⏸ Aporte agendado {cid} parou no limite de uso ou na fila do comitê.\n"
+                    "Ele continua sozinho na próxima madrugada, de onde parou.",
+                    kind=NotificationKind.SYSTEM,
+                    level=NotificationLevel.WARNING,
+                )
             except analysis_runner.AnalysisError as exc:
                 failures += 1
                 print(f"✖ falhou: {exc}")

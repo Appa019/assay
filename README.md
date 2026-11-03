@@ -139,7 +139,7 @@ Isso é ambiente de desenvolvimento. Produção roda no Raspberry Pi, sob system
 - **Auto-resume (no processo):** se bater o limite de uso, o agente espera o reset
   e retoma a mesma etapa sozinho, na mesma sessão.
 - **Auto-retomada entre reinícios:** se o processo cair no meio (créditos/queda),
-  **o sistema retoma sozinho** — `scripts/resume_pending.py` (timer systemd `investimentos-resume`, a cada 15 min)
+  **o sistema retoma sozinho** — `scripts/resume_pending.py` (timer systemd `investimentos-resume`, a cada 15 min entre 00:00 e 02:45)
   detecta a análise incompleta e a conclui assim que o limite voltar, continuando
   exatamente de onde parou. Um lock por aporte impede rodar em dobro.
 

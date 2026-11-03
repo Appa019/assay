@@ -144,14 +144,18 @@ long_service frontend "Investimentos Manual — frontend Next.js" \
 # the aporte is ad-hoc and the weekly is 7-day gated), the short ones defer to
 # the next night, which is harmless and already handled.
 #
-# Persistent=false on these three ONLY: catching up a missed night at boot
+# Persistent=false on these four ONLY: catching up a missed night at boot
 # would start the committee in the middle of the day, which THE RULE forbids.
 # A missed night waits for the next one: the scheduled aporte stays scheduled,
 # the weekly stays due, a matured lot stays pending.
+#
+# resume also obeys THE RULE (client's decision, 2026-11-03): an interrupted
+# analysis is picked up only between 00:00 and 02:45, every 15 min. An aporte
+# cut by the usage limit therefore finishes the next night, up to a day late.
 oneshot_pair scheduled "aportes agendados"          "${PY} ${PROJECT_ROOT}/scripts/run_scheduled.py"  "*-*-* 01:00" false
 oneshot_pair cadence  "maturidade dos lotes"        "${PY} ${PROJECT_ROOT}/scripts/check_cadence.py"  "*-*-* 01:45" false
 oneshot_pair weekly   "revisão semanal do comitê"    "${PY} ${PROJECT_ROOT}/scripts/weekly_review.py"  "*-*-* 02:10" false
-oneshot_pair resume   "retomada de análises"         "${PY} ${PROJECT_ROOT}/scripts/resume_pending.py" "*:0/15"
+oneshot_pair resume   "retomada de análises"         "${PY} ${PROJECT_ROOT}/scripts/resume_pending.py" "*-*-* 00..02:00/15:00" false
 oneshot_pair prices   "marcação a mercado"           "${PY} ${PROJECT_ROOT}/scripts/refresh_prices.py" "*-*-* 00/6:15"
 oneshot_pair snapshot "snapshot diário da carteira"  "${PY} ${PROJECT_ROOT}/scripts/daily_snapshot.py" "*-*-* 18:45"
 oneshot_pair alerts   "alertas de alvo/stop"         "${PY} ${PROJECT_ROOT}/scripts/check_alerts.py"   "*-*-* 11,15,19:05"

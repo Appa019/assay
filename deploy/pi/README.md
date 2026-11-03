@@ -23,7 +23,7 @@ voltar, e o timer pula aquela rodada. Nada sobe no cartão SD com banco vazio.
 Recuse o diff que:
 
 - faça qualquer serviço escutar fora de `127.0.0.1` (`--host`, `--hostname`);
-- ligue `Persistent=true` nos timers `scheduled`, `cadence` ou `weekly`
+- ligue `Persistent=true` nos timers `scheduled`, `cadence`, `weekly` ou `resume`
   (`scripts/install_systemd.sh`): eles gastam o limite de uso do Claude, que é
   dividido com o chat do cliente, e não podem rodar de dia ao religar o Pi;
 - encurte `MIN_HOLDING_DAYS` (30 dias, trava de venda de ações exigida pelo

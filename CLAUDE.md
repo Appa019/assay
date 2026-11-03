@@ -110,7 +110,7 @@ maturidade. Aporte é ad-hoc.
   `core/database._ensure_sqlite_columns`.
 - **Retomada AUTOMÁTICA (sem você re-rodar)**: `scripts/resume_pending.py` acha
   análises automáticas incompletas (`claude_session_id` set + `final_summary`
-  null) e as retoma; roda no timer `investimentos-resume` a cada 15 min ou em
+  null) e as retoma; roda no timer `investimentos-resume` a cada 15 min SÓ de madrugada (00:00–02:45, D50) ou em
   loop (`--watch [s]`). Assim, se o limite/créditos acabarem e o processo morrer, o
   sistema conclui sozinho quando o limite voltar. Um **lock PID por aporte**
   (`analysis_runner._acquire_run_lock`, arquivos em `storage/analysis_runs/`)
@@ -427,7 +427,7 @@ rsync -a --delete --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
   `scheduled_for` ao iniciar — daí em diante é o `resume_pending` que cuida
 - `.venv/bin/python scripts/resume_pending.py [--watch [s]]`: retoma análises de
   aporte interrompidas (limite/queda), continuando de onde pararam; roda no
-  timer `investimentos-resume` a cada 15 min
+  timer `investimentos-resume` a cada 15 min entre 00:00 e 02:45 (D50)
 - `.venv/bin/uvicorn app.main:app --reload`: backend dev (porta 8000)
 - `cd frontend && pnpm dev`: frontend dev (porta 3000)
 - `cd frontend && pnpm lint && pnpm type-check && pnpm build`: validação
