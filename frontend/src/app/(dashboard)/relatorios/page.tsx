@@ -111,6 +111,7 @@ export const RelatoriosView = () => {
       return;
     }
     setExpandedId(id);
+    setError(null);
     if (details[id]) return;
     try {
       const detail = await fetchContribution(id);
@@ -221,8 +222,16 @@ export const RelatoriosView = () => {
                 }}
               >
                 <header
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={expanded}
                   className="px-4 py-4 md:px-6 flex flex-col gap-3 md:gap-0 md:flex-row md:items-center md:justify-between cursor-pointer"
                   onClick={() => void handleExpand(item.id)}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+                    e.preventDefault();
+                    void handleExpand(item.id);
+                  }}
                 >
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2 md:gap-5">
                     <div>
@@ -302,6 +311,10 @@ export const RelatoriosView = () => {
                   >
                     {detail ? (
                       <DetailView contribution={detail} />
+                    ) : error ? (
+                      <p className="text-sm" style={{ color: "var(--danger)" }}>
+                        {error}
+                      </p>
                     ) : (
                       <div
                         className="animate-pulse h-24 rounded"
@@ -371,8 +384,16 @@ const AgentReports = ({ reports }: { reports: ReportListItem[] }) => {
               }}
             >
               <header
+                role="button"
+                tabIndex={0}
+                aria-expanded={open}
                 className="px-4 md:px-5 py-3.5 flex items-center justify-between gap-3 md:gap-0 cursor-pointer"
                 onClick={() => void toggle(r.id)}
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+                  e.preventDefault();
+                  void toggle(r.id);
+                }}
               >
                 <div className="flex items-center gap-3 min-w-0">
                   {r.kind === "weekly" ? (
