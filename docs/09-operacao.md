@@ -38,9 +38,11 @@ sudo tailscale serve status                   # o que está publicado na VPN
 ## Deploy (desktop → Pi)
 
 ```bash
-rsync -a --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
+# --delete: o que saiu do repo tem que sair do Pi. Rode antes com -n -v.
+rsync -a --delete --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
   --exclude '__pycache__' --exclude '*.pyc' --exclude 'storage' \
   --exclude '.env' --exclude '.env.local' --exclude 'frontend/.env.local' \
+  --exclude '.git' \
   ./ pi:~/investimentos_manual/
 
 # no Pi:
@@ -56,11 +58,12 @@ de `/api/*` é assado no build, não lido no start.
 ## systemd (preferido)
 
 ```bash
-FRONTEND_PORT=3001 bash scripts/install_systemd.sh      # instalar/atualizar
+bash scripts/install_systemd.sh                         # instalar/atualizar (frontend na 3001)
 bash scripts/install_systemd.sh --uninstall             # remover
 ```
 
-Instala 3 serviços (`Restart=always`) + 8 timers. Todos com `Persistent=true`:
+Instala 3 serviços (`Restart=always`; o do bot fica **desabilitado**, D30) +
+11 timers. Todos com `Persistent=true`:
 uma máquina desligada na hora agendada **recupera a janela no boot** — cron
 simples pula em silêncio. `loginctl enable-linger` mantém tudo vivo após logout.
 
@@ -71,18 +74,24 @@ O frontend roda `node_modules/.bin/next start` **direto**, sem `pnpm start`: o
 pnpm é outro processo Node que fica residente só para gerar o filho, e num Pi de
 4 GB esse wrapper custava ~110 MB à toa.
 
-### Os 8 timers
+### Os 11 timers
+
+Os três primeiros gastam Claude e ficam na madrugada (nada começa depois das
+03:00, para não drenar a janela de uso que o consultor divide com eles).
 
 | Unit | Quando | Script |
 |---|---|---|
-| `-cadence` | 09:00 diário | `check_cadence.py` |
-| `-weekly` | 09:30 diário (auto-gated a 7d) | `weekly_review.py` |
+| `-scheduled` | 01:00 diário | `run_scheduled.py` |
+| `-cadence` | 01:45 diário | `check_cadence.py` |
+| `-weekly` | 02:10 diário (auto-gated a 7d) | `weekly_review.py` |
+| `-backup` | 03:00 diário | `backup_db.sh` |
 | `-resume` | a cada 15 min | `resume_pending.py` |
 | `-prices` | a cada 6h (:15) | `refresh_prices.py` |
-| `-snapshot` | 18:45 diário | `daily_snapshot.py` |
+| `-insights` | 09:07 diário | `daily_insights.py` |
 | `-alerts` | 11/15/19:05 | `check_alerts.py` |
 | `-monthly` | dias 1–2, 10:00 | `monthly_report.py` |
-| `-backup` | 03:00 diário | `backup_db.sh` |
+| `-snapshot` | 18:45 diário | `daily_snapshot.py` |
+| `-digest` | domingo 20:07 | `weekly_digest.py` |
 
 Alternativa legada: `scripts/install_cron.sh [hora]` (mesmos jobs, com `flock` e
 PATH corrigido). **Não use os dois ao mesmo tempo.**
@@ -115,9 +124,10 @@ bash scripts/backup_db.sh
 
 ## Backup
 
-`backup_db.sh` usa `sqlite3 .backup` (consistente sob WAL, mesmo com API e bot
-escrevendo), com fallback para `cp`. Mantém **14** backups diários em
-`storage/backups/`.
+`backup_db.sh` usa a API de backup online do SQLite pelo Python do `.venv`
+(consistente sob WAL, mesmo com API e bot escrevendo). Sem fallback para `cp`:
+copiar um banco em WAL perde tudo que ainda não passou do `-wal` para o arquivo
+principal. Mantém **14** backups diários em `storage/backups/`.
 
 Para restaurar: pare os serviços, copie o backup por cima de
 `storage/portfolio.db` (apague `-wal` e `-shm`), suba de novo.
