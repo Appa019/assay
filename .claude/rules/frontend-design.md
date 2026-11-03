@@ -6,13 +6,13 @@ If yes — REDESIGN. Every interface must feel intentionally designed, not stati
 
 ### Typography
 - NEVER use Inter, Roboto, Arial, Open Sans, Space Grotesk, or system defaults
-- Choose distinctive, characterful fonts from Google Fonts or Fontshare
+- Choose distinctive, characterful fonts and self-host them with `next/font/local` (the Pi build must not depend on Google Fonts)
 - Use fluid type scales with clamp() for responsive sizing
 - Strong visual hierarchy — clear distinction between headings, body, captions
 
 ### Color & Theme
 - ALL colors as CSS variables using oklch() or color-mix()
-- Tint neutrals toward brand hue — never pure #000 or #fff
+- Tint neutrals toward brand hue — never pure #000 (pure white is allowed here: the client prefers `#fff` cards, see DESIGN.md)
 - NEVER: purple-to-blue gradients, cyan-on-dark, neon-on-dark, gradient text
 - NEVER use any gradients — commit to solid, intentional colors
 - Sharp accent colors with purpose, not decoration

@@ -2,7 +2,7 @@
 
 ### TypeScript / JavaScript
 - TypeScript strict mode — no `any`, no `@ts-ignore`
-- Named exports only — never `export default`
+- Named exports only — `export default` only where Next.js requires it (page, layout, error, route files)
 - `const`/`let` only — never `var`
 - Arrow functions for callbacks, `function` declarations for top-level
 - `async`/`await` — never raw `.then()` chains
@@ -12,7 +12,7 @@
 ### Python
 - Type hints on all function signatures
 - Pydantic models for request/response schemas
-- `async def` for all route handlers
+- Route handlers that only hit SQLite stay sync `def` (FastAPI runs them in the threadpool); `async def` when they await I/O
 - f-strings for string formatting
 - Docstrings only on public API functions (not internal helpers)
 
