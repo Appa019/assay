@@ -109,9 +109,19 @@ const AporteDetailPage = () => {
     return (
       <div className="max-w-4xl space-y-6">
         {loadError && (
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            Backend indisponível, tentando de novo… ({loadError})
-          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              Backend indisponível ({loadError}).
+            </p>
+            <button
+              type="button"
+              onClick={() => void reload()}
+              className="min-h-[2.75rem] rounded-md border px-4 text-sm font-medium"
+              style={{ borderColor: "var(--border)", color: "var(--accent)" }}
+            >
+              Tentar de novo
+            </button>
+          </div>
         )}
         <div className="animate-pulse h-40 rounded-md" style={{ background: "var(--bg-secondary)" }} />
       </div>
