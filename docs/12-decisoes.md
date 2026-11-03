@@ -428,6 +428,13 @@ teste para o celular do cliente, e apagaria a inscrição que respondesse
 404/410. O `conftest.py` agora aponta `SQLITE_PATH` para um arquivo temporário
 antes de qualquer import do app e confere isso com um `assert`.
 
+### A44 · Relatório de maturidade sem aviso desde que o Telegram desligou
+Achado ao remover o bot (2026-11-02). `check_cadence.py` chamava
+`run_maturity_review(..., notify=settings.telegram_enabled)`, uma sobra de
+quando o aviso era a mensagem do Telegram. Com o espelho desligado (D30), o
+relatório era salvo mas não ia para o inbox nem para o push: o cliente só o
+via se abrisse `?aba=analises`. Agora usa o padrão do serviço (`notify=True`).
+
 ### D33 · Mandato mais defensivo: RF 50% · Ações 35% · Crypto 15%
 Em 2026-09-05 o cliente fixou **renda fixa em 50%** e deixou o resto a critério
 técnico. O alvo sai de 35/40/25 para **50/35/15**: o dry powder deixa de ser o

@@ -24,7 +24,6 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from app.config import settings  # noqa: E402
 from app.core.database import get_session, init_db  # noqa: E402
 from app.models.notification import NotificationKind, NotificationLevel  # noqa: E402
 from app.services import (  # noqa: E402
@@ -39,8 +38,6 @@ _MATURITY_DEFER_DAYS = 2.0
 
 
 def main() -> int:
-    # No Telegram? Still run: the Report is saved and consulted by future
-    # aportes — only the push notification is skipped.
     init_db()
     gen = get_session()
     session = next(gen)
@@ -62,9 +59,7 @@ def main() -> int:
             except Exception as exc:  # noqa: BLE001 — stale prices beat no review
                 print(f"  aviso: refresh de preços falhou ({exc}).")
             macro = asyncio.run(review_service.fetch_macro())
-            review_service.run_maturity_review(
-                session, matured, macro_ctx=macro, notify=settings.telegram_enabled
-            )
+            review_service.run_maturity_review(session, matured, macro_ctx=macro)
             notification_service.mark_maturities(keys)
             print("  análise de maturidade concluída e marcada.")
         else:
