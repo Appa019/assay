@@ -21,11 +21,11 @@
   --accent-strong: oklch(0.24 0.16 268.6);
   --border: oklch(0.905 0.005 250);
   --border-strong: oklch(0.83 0.008 250);
-  --success: oklch(0.58 0.14 155);
+  --success: oklch(0.51 0.13 155);
   --success-light: oklch(0.95 0.04 155);
-  --danger: oklch(0.56 0.19 22);
+  --danger: oklch(0.54 0.19 22);
   --danger-light: oklch(0.955 0.035 22);
-  --warning: oklch(0.72 0.15 70);
+  --warning: oklch(0.53 0.12 70); /* text-safe: >=4.5:1 on bg-secondary and -light */
   --warning-light: oklch(0.96 0.06 70);
 }
 

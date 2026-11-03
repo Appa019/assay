@@ -167,6 +167,9 @@ export const NotificationsBell = ({
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", stiffness: 320, damping: 34 }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="notifications-title"
               className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md flex flex-col"
               style={{
                 background: "var(--bg-card)",
@@ -180,6 +183,7 @@ export const NotificationsBell = ({
                 style={{ borderColor: "var(--border)" }}
               >
                 <h2
+                  id="notifications-title"
                   className="text-2xl tracking-tight"
                   style={{
                     fontFamily: "var(--font-heading)",
@@ -203,6 +207,8 @@ export const NotificationsBell = ({
                   <button
                     type="button"
                     onClick={() => setOpen(false)}
+                    // Focus lands inside the panel so Escape and Tab work at once.
+                    autoFocus
                     aria-label="Fechar"
                     className="flex items-center justify-center min-h-11 min-w-11 rounded-md md:min-h-0 md:min-w-0 md:p-1.5"
                     style={{ color: "var(--text-muted)" }}
@@ -241,7 +247,7 @@ export const NotificationsBell = ({
               <Link
                 href="/configuracoes"
                 onClick={() => setOpen(false)}
-                className="box-content flex items-center gap-2 px-5 min-h-12 pb-[env(safe-area-inset-bottom)] border-t text-[13px] font-medium shrink-0"
+                className="flex items-center gap-2 px-5 min-h-12 border-t text-[13px] font-medium shrink-0"
                 style={{ borderColor: "var(--border)", color: "var(--accent)" }}
               >
                 <Settings size={15} />
