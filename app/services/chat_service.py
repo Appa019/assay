@@ -1458,9 +1458,12 @@ def save_attachment(filename: str, data: bytes) -> Path:
     if len(data) > MAX_ATTACHMENT_BYTES:
         raise ChatUnavailableError("Arquivo grande demais (limite de 20 MB).")
     INBOX.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+    # Microseconds: one upload carries several files, and the iPhone names them
+    # all image.jpg. "xb" never overwrites a file that is already there.
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%f")
     path = INBOX / f"{stamp}_{safe_filename(filename)}"
-    path.write_bytes(data)
+    with path.open("xb") as fh:
+        fh.write(data)
     return path
 
 

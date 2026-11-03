@@ -889,3 +889,16 @@ def test_cold_fat_session_rotates_but_cold_thin_one_resumes() -> None:
     assert not chat_service._should_rotate("s", 3, fat, None)
     naive_old = old.replace("+00:00", "")
     assert chat_service._should_rotate("s", 3, fat, naive_old)  # no TypeError
+
+
+def test_same_named_uploads_keep_both_files(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Front and back of a receipt both arrive as image.jpg in one upload."""
+    monkeypatch.setattr(chat_service, "INBOX", tmp_path / "inbox")
+    first = chat_service.save_attachment("image.jpg", b"front")
+    second = chat_service.save_attachment("image.jpg", b"back")
+    assert first != second
+    assert first.read_bytes() == b"front"
+    assert second.read_bytes() == b"back"
+    assert chat_service._display_name(first) == "image.jpg"
