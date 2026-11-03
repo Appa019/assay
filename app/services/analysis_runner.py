@@ -776,6 +776,10 @@ def _claude_bin() -> str:
     )
 
 
+class RunBusyError(AnalysisError):
+    """Another heavy run holds the lock: a normal defer, never a failure."""
+
+
 class RetryableError(AnalysisError):
     """A step failed transiently; retrying (after a wait) may succeed."""
 
@@ -1175,8 +1179,12 @@ def _run_step_resilient(
                 schedule, attempt = _TRANSIENT_BACKOFF, transient_attempts
             if attempt >= len(schedule):
                 raise
-            # For usage limits, wait until the announced reset; else backoff.
-            reset_wait = _seconds_until_reset(str(exc)) if is_limit else None
+            # For usage limits, wait until the announced reset; else backoff. A
+            # caller's own short schedule (cron fail-fast) is never stretched to
+            # hours of waiting while holding the global lock.
+            reset_wait = (
+                _seconds_until_reset(str(exc)) if is_limit and limit_backoff is None else None
+            )
             wait = reset_wait if reset_wait is not None else schedule[attempt]
             if is_limit:
                 limit_attempts += 1
@@ -1244,7 +1252,7 @@ def run_chain(
     total = total_steps if total_steps is not None else step_offset + len(steps)
 
     if not _acquire_global_run_lock(run_id):
-        raise AnalysisError(
+        raise RunBusyError(
             "Outra execução do comitê já está em andamento nesta máquina — "
             "aguarde-a terminar (uma execução pesada por vez)."
         )
@@ -1567,7 +1575,7 @@ def run_analysis(
         raise AnalysisError(f"Contribution {contribution_id} not found")
 
     if not _acquire_run_lock(contribution_id):
-        raise AnalysisError(f"Já existe uma execução ativa para o aporte {contribution_id}.")
+        raise RunBusyError(f"Já existe uma execução ativa para o aporte {contribution_id}.")
     try:
         return _run_analysis_locked(
             session,
@@ -1790,11 +1798,16 @@ def _run_analysis_locked(
         # Leave finished prompt responses in place but mark the run retryable.
         # APPEND to notes — they hold the user's own text, never overwrite it.
         contribution.status = ContributionStatus.READY
-        failure_line = f"[run failed @ {datetime.now(UTC).isoformat()}] {exc}"
-        contribution.notes = (
-            f"{contribution.notes}\n{failure_line}" if contribution.notes else failure_line
-        )
-        contribution.run_attempts = (contribution.run_attempts or 0) + 1
+        # Waiting on another run or on the usage window is not a failure: it
+        # keeps the auto-run marker (>= 1) but never walks toward giving up.
+        deferred = isinstance(exc, RunBusyError | LimitError)
+        if not isinstance(exc, RunBusyError):
+            failure_line = f"[run failed @ {datetime.now(UTC).isoformat()}] {exc}"
+            contribution.notes = (
+                f"{contribution.notes}\n{failure_line}" if contribution.notes else failure_line
+            )
+        attempts = contribution.run_attempts or 0
+        contribution.run_attempts = max(attempts, 1) if deferred else attempts + 1
         session.add(contribution)
         session.commit()
         _emit(on_event, "run_error", contribution_id=str(contribution_id), error=str(exc))

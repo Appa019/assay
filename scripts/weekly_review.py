@@ -131,7 +131,7 @@ def main() -> int:
         return 0
     except analysis_runner.AnalysisError as exc:
         # "another run holds the global lock" is a normal defer, not a failure.
-        if "em andamento" in str(exc):
+        if isinstance(exc, analysis_runner.RunBusyError):
             print(f"Adiada: {exc}")
             return 0
         notification_center.notify(

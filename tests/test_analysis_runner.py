@@ -474,6 +474,78 @@ def test_pending_resumable_covers_pre_step_failures_but_not_manual(
     assert gave_up.id not in ids
 
 
+def test_waiting_for_a_busy_lock_never_gives_up_on_a_contribution(
+    session: Session, isolated_runner_dirs: Path
+) -> None:
+    """resume_pending passes every 15 min while a ~90 min weekly review holds
+    the global lock. Each pass used to count as a failure, so the aporte was
+    abandoned ("Desisti") in about 75 min without ever failing."""
+    contribution = Contribution(
+        amount_brl=Decimal("1000"),
+        status=ContributionStatus.READY,
+        claude_session_id="sess-1",
+        run_attempts=1,
+    )
+    session.add(contribution)
+    session.commit()
+    from app.models.contribution import ContributionPrompt
+
+    session.add(
+        ContributionPrompt(
+            contribution_id=contribution.id,
+            prompt_order=1,
+            prompt_key="macro",
+            title="Reunião 1",
+            description="d",
+            content="prompt 1",
+        )
+    )
+    session.commit()
+    assert ar._acquire_global_run_lock("weekly")  # the long run holding the lock
+    try:
+        for _ in range(settings.max_run_attempts + 2):
+            with pytest.raises(ar.RunBusyError):
+                ar.run_analysis(session, contribution.id, notify=False, fail_fast_on_limit=True)
+    finally:
+        ar._release_global_run_lock()
+
+    session.refresh(contribution)
+    assert contribution.run_attempts == 1
+    assert contribution.id in ar.pending_resumable_ids(session)
+    assert "run failed" not in (contribution.notes or "")
+
+
+def test_fail_fast_limit_never_waits_until_the_announced_reset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A cron pass with a short schedule must not sleep for hours holding the
+    global lock just because the CLI announced a reset time."""
+    waits: list[float] = []
+    monkeypatch.setattr(ar, "_sleep", waits.append)
+    monkeypatch.setattr(ar, "_seconds_until_reset", lambda _text: 5 * 3600)
+
+    def limited(*_args: object, **_kwargs: object) -> None:
+        raise ar.LimitError("usage limit reached, resets 6am")
+
+    monkeypatch.setattr(ar, "_run_claude_step", limited)
+    with pytest.raises(ar.LimitError):
+        ar._run_step_resilient(
+            "p",
+            title="t",
+            step=1,
+            total=1,
+            resume_session_id=None,
+            model="haiku",
+            effort="low",
+            timeout=10,
+            cwd=Path("."),
+            transcript_tag=None,
+            on_event=None,
+            limit_backoff=[120],
+        )
+    assert waits == [120]
+
+
 def test_auth_failure_is_classified_as_auth_not_transient() -> None:
     """ "Failed to authenticate" used to fall through to RetryableError and the
     chat told the user to resend — pointless until someone renews the login."""
