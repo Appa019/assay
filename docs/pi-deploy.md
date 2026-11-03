@@ -188,6 +188,15 @@ de máquina, não deste app.
 9. **Subir:** `deploy/pi/install.sh` e depois `deploy/pi/deploy.sh` (primeiro
    build). `tailscale serve` não muda (`/ → 127.0.0.1:3001`).
 10. **Backup diário:** o `pi-ops` passa a chamar `deploy/pi/backup.sh <dir>`.
+11. **Legado (depois de tudo verde):** em `~/apps/investimentos`, rodar
+    `.venv/bin/python scripts/count_legacy.py`. O script só lê o banco e
+    conta as linhas com `ChatChannel.TELEGRAM`, `CashflowSource.BOT` e
+    `PromptKey.RESEARCH`, e vê se o `MEMORY.md` do consultor ainda é uma
+    semente antiga. **Saída 0:** a branch `chore/remove-legacy` (um commit, já
+    pronto) entra na main e o guardião faz o deploy dela. **Saída 1:** o
+    legado fica e as contagens vão para o Pedro. O SQLModel grava o NOME do
+    enum, então remover um membro que ainda tem linha quebra toda leitura da
+    tabela (`LookupError`). Por isso a remoção só vem depois da contagem.
 
 **Verificar:** `deploy/pi/health.sh` = `ok`; a raiz do tailnet abre no iPhone;
 "oi" no `/consultor` responde (prova CLI, trust e token); push de teste em
