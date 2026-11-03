@@ -10,6 +10,7 @@ import {
   type CreditCard,
 } from "@/lib/api";
 import { useCards } from "@/hooks/use-cards";
+import { useTwoTap } from "@/hooks/use-two-tap";
 import {
   currentSubscription,
   disablePush,
@@ -115,15 +116,15 @@ const ConfiguracoesPage = () => {
           style={{ color: "var(--text-secondary)" }}
         >
           <li>
-            Em <strong>Aporte</strong>, informe o valor e clique em &quot;Adicionar aporte e rodar
-            análise&quot;.
+            Em <strong>Investimentos › Aportar</strong>, informe o valor e agende: o comitê roda
+            na madrugada (ou peça ao consultor).
           </li>
           <li>
             O agente roda todas as reuniões encadeadas no <code style={{ background: "var(--bg-secondary)", padding: "1px 6px", borderRadius: 3 }}>claude</code>{" "}
             headless (Opus · max): acompanhe etapa por etapa na própria tela.
           </li>
           <li>Ao final, ele entrega onde investir e quanto, e avisa no app.</li>
-          <li>Registre o que comprou em <strong>Ativos</strong> (cada compra é um lote com trava própria).</li>
+          <li>Registre o que comprou em <strong>Investimentos › Carteira</strong> (cada compra é um lote com trava própria).</li>
         </ol>
       </section>
     </div>
@@ -329,6 +330,8 @@ const CardsCard = () => {
     }
   };
 
+  const { armed, tap } = useTwoTap();
+
   const remove = async (card: CreditCard) => {
     setNote(null);
     try {
@@ -400,11 +403,11 @@ const CardsCard = () => {
                 )}
                 <button
                   type="button"
-                  onClick={() => void remove(card)}
+                  onClick={() => tap(card.id, () => void remove(card))}
                   className="min-h-[2.75rem] rounded-md border px-3 text-[13px] font-medium"
                   style={{ borderColor: "var(--border)", color: "var(--danger)" }}
                 >
-                  Remover
+                  {armed === card.id ? "Toque de novo" : "Remover"}
                 </button>
               </div>
             </li>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchCashflow,
   fetchCashflowSummary,
@@ -18,8 +18,16 @@ export const useCashflow = (month: string) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
+  const shownMonth = useRef(month);
 
   useEffect(() => {
+    // A new month starts blank: if its fetch fails, last month's rows must not
+    // stay on screen under the new month's title. A refresh keeps what it has.
+    if (shownMonth.current !== month) {
+      shownMonth.current = month;
+      setEntries(null);
+      setSummary(null);
+    }
     // Cancellation guard: switching months fast could let January's slow
     // response land AFTER February's and overwrite it — entries from one
     // month under the header of another.

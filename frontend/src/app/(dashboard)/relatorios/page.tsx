@@ -39,6 +39,7 @@ import {
   parseLocalDate,
   stripMachineBlocks,
 } from "@/lib/format";
+import { useTwoTap } from "@/hooks/use-two-tap";
 
 /** "Revisão semanal · 2026-10-11" → "Revisão semanal · 11/10/2026"; drops a
  *  leading markdown "#" some report titles were stored with. */
@@ -70,16 +71,8 @@ export const RelatoriosView = () => {
   // wrong item, and revisiting an item is instant.
   const [details, setDetails] = useState<Record<string, Contribution>>({});
   const [error, setError] = useState<string | null>(null);
-  // Delete is two taps on the same button: the first arms it, the second
-  // deletes. Replaces window.confirm, which iOS renders as a system alert.
-  const [armedDelete, setArmedDelete] = useState<string | null>(null);
+  const { armed: armedDelete, tap } = useTwoTap();
   const [nextWeekly, setNextWeekly] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!armedDelete) return;
-    const timer = setTimeout(() => setArmedDelete(null), 4000);
-    return () => clearTimeout(timer);
-  }, [armedDelete]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -130,11 +123,6 @@ export const RelatoriosView = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (armedDelete !== id) {
-      setArmedDelete(id);
-      return;
-    }
-    setArmedDelete(null);
     try {
       await deleteContribution(id);
       if (expandedId === id) setExpandedId(null);
@@ -278,7 +266,7 @@ export const RelatoriosView = () => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        void handleDelete(item.id);
+                        tap(item.id, () => void handleDelete(item.id));
                       }}
                       className="p-2 rounded-md transition-colors flex items-center justify-center gap-1 text-xs font-medium min-h-11 min-w-11 md:min-h-0 md:min-w-0"
                       style={

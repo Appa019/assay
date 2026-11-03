@@ -22,6 +22,7 @@ import {
   type CreditCard,
 } from "@/lib/api";
 import { useCards } from "@/hooks/use-cards";
+import { useTwoTap } from "@/hooks/use-two-tap";
 import { formatAmount, formatBRL, parseLocalDate } from "@/lib/format";
 import { FluxoView } from "./fluxo-view";
 
@@ -217,6 +218,8 @@ const MesView = () => {
     [summary],
   );
 
+  const { armed, tap } = useTwoTap();
+
   const remove = async (id: string) => {
     setOpenId(null);
     setDeleteError(null);
@@ -311,7 +314,7 @@ const MesView = () => {
             color: netColor,
           }}
         >
-          {loading && !summary ? "–" : formatBRL(net)}
+          {summary ? formatBRL(net) : "–"}
         </p>
 
         <div
@@ -320,8 +323,8 @@ const MesView = () => {
         >
           {(
             [
-              { label: "Entrou", value: summary?.income_brl ?? 0, color: "var(--success)" },
-              { label: "Saiu", value: summary?.expense_brl ?? 0, color: "var(--danger)" },
+              { label: "Entrou", value: summary?.income_brl, color: "var(--success)" },
+              { label: "Saiu", value: summary?.expense_brl, color: "var(--danger)" },
             ] as const
           ).map(({ label, value, color }) => (
             <div key={label} className="px-4 py-3.5" style={{ background: "var(--bg-card)" }}>
@@ -332,7 +335,7 @@ const MesView = () => {
                 {label}
               </p>
               <p className="tabular mt-1 text-lg font-semibold" style={{ color }}>
-                {formatBRL(value)}
+                {value === undefined ? "–" : formatBRL(value)}
               </p>
             </div>
           ))}
@@ -509,22 +512,28 @@ const MesView = () => {
                               {group && (
                                 <button
                                   type="button"
-                                  onClick={() => void removeGroup(group)}
+                                  onClick={() => tap(`g-${group}`, () => void removeGroup(group))}
                                   className="flex min-h-[2.75rem] items-center gap-1.5 rounded-md border px-3 font-medium"
                                   style={{ borderColor: "var(--border)", color: "var(--danger)" }}
                                 >
                                   <Trash2 size={14} strokeWidth={1.9} />
-                                  Excluir compra ({entry.installment_count} parcelas)
+                                  {armed === `g-${group}`
+                                    ? "Toque de novo para excluir tudo"
+                                    : `Excluir compra (${entry.installment_count} parcelas)`}
                                 </button>
                               )}
                               <button
                                 type="button"
-                                onClick={() => void remove(entry.id)}
+                                onClick={() => tap(entry.id, () => void remove(entry.id))}
                                 className="flex min-h-[2.75rem] items-center gap-1.5 rounded-md border px-3 font-medium"
                                 style={{ borderColor: "var(--border)", color: "var(--danger)" }}
                               >
                                 <Trash2 size={14} strokeWidth={1.9} />
-                                {group ? "Excluir parcela" : "Excluir"}
+                                {armed === entry.id
+                                  ? "Toque de novo"
+                                  : group
+                                    ? "Excluir parcela"
+                                    : "Excluir"}
                               </button>
                             </span>
                           </div>
