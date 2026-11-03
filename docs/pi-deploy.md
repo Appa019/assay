@@ -97,7 +97,7 @@ cliente perde as duas memórias e precisa reinscrever o push em todo aparelho.
 ├── .env  .venv/  frontend/node_modules/  frontend/.next/      (fora do git)
 ├── storage -> <HD>/investimentos   link simbólico para o HD (seção 3)
 └── deploy/pi/
-    ├── deploy.sh    pull --ff-only → install → check → troca o build → health; volta sozinho
+    ├── deploy.sh    [sha]: fetch → ff-only até o sha → install → check → troca o build → health; volta sozinho
     ├── install.sh   idempotente; units via scripts/install_systemd.sh
     ├── check.sh     ruff, pytest, eslint, tsc e build em frontend/.next-build
     ├── health.sh    0 = tudo ok · 2 = aviso (job falhou, CLI claude ausente) · 1 = quebrado

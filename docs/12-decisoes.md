@@ -533,6 +533,18 @@ avisos antigos voltavam. Todos passam por `app/core/json_state` (tmp + replace).
 - **Contraste**: `--success`, `--warning` e `--danger` foram escurecidos para
   passar 4,5:1 como texto sobre `--bg-secondary` e sobre o próprio `-light`.
 
+### D49 · Deploy pelo sha revisado, com volta em todo caminho
+Contrato novo do pi-ops (2026-11-03): o guardião roda `~/pi-ops/bin/deploy
+investimentos <sha>` numa unit própria, com lock global. O `deploy.sh` faz
+`fetch`, recusa sha fora da `origin/main` e avança com `merge --ff-only`: sobe
+o commit revisado, não o que entrou depois. `pull` saiu. Install, check,
+restart, health e TERM/INT voltam ao commit anterior, com o build e os pacotes
+dele, e reiniciam. A volta faz `checkout -- .` antes do `reset --keep`, que
+recusava com um lockfile sujo pelo check. Na saída 75 nada reinicia. O
+`check.sh` passou a testar o lock do comitê ANTES do `pip install`: antes, o
+75 já tinha trocado pacotes na `.venv` viva com o comitê rodando. Cada caminho
+tem teste em `tests/test_deploy_sh.py`; a versão antiga falha 7 deles.
+
 ### D33 · Mandato mais defensivo: RF 50% · Ações 35% · Crypto 15%
 Em 2026-09-05 o cliente fixou **renda fixa em 50%** e deixou o resto a critério
 técnico. O alvo sai de 35/40/25 para **50/35/15**: o dry powder deixa de ser o

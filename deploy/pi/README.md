@@ -43,11 +43,16 @@ devolve à fila no boot.
 
 ## Scripts
 
-- `deploy.sh`: `git pull --ff-only` → `install.sh` → `check.sh` → troca o build
-  e reinicia backend e frontend → `health.sh`. Se `install`/`check` falhar, o
-  código volta ao commit anterior (o backend e os timers rodam o Python direto
-  do checkout), junto com os pacotes do `.venv` e do `node_modules` se mudaram.
-  Se o `health` sair 1, voltam também o build. Saída 75 = comitê rodando.
+- `deploy.sh [sha]`: o guardião chama via `~/pi-ops/bin/deploy investimentos
+  <sha>`, numa unit própria e um deploy por vez. Faz `git fetch`, recusa sha
+  fora da `origin/main` e avança com `merge --ff-only` (nunca `pull`); depois
+  `install.sh` → `check.sh` (build em `.next-build`) → troca o build → reinicia
+  backend e frontend → `health.sh` (0 ou 2 = ok). Qualquer falha (install,
+  check, restart, health, TERM/INT) volta tudo ao commit anterior: código
+  (`checkout -- .` + `reset --keep`), pacotes do `.venv`/`node_modules` se os
+  lockfiles mudaram, units, build anterior, e reinicia. Saída 75 = comitê
+  rodando: volta o código e NADA reinicia; o `check.sh` testa o lock antes de
+  instalar pacotes.
 - `install.sh`: idempotente. Gera e habilita as units via
   `scripts/install_systemd.sh` (fonte única dos horários). Recusa uma pasta sem
   `storage/portfolio.db`; primeira instalação: `--first-install`.
@@ -91,6 +96,8 @@ Depois: o push precisa de reinscrição só se a chave VAPID não veio no
 
 ## Rollback de código
 
-`deploy.sh` volta sozinho. À mão: `git reset --keep <sha anterior>`, depois
+`deploy.sh` volta sozinho; para voltar a um commit, o guardião faz o deploy dele
+(`~/pi-ops/bin/deploy investimentos <sha>`, que precisa estar na `origin/main`).
+À mão: `git checkout -- . && git reset --keep <sha anterior>`, depois
 `deploy/pi/check.sh` e `mv frontend/.next-build frontend/.next`, e
 `systemctl --user restart investimentos-backend investimentos-frontend`.
