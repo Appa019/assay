@@ -1150,52 +1150,9 @@ def is_busy() -> bool:
     return path.exists() and analysis_runner._lock_is_active(path)
 
 
-def converse(
-    text: str,
-    channel: ChatChannel = ChatChannel.WEB,
-    *,
-    display: str | None = None,
-) -> str:
-    """Run one turn AND persist both sides of it.
-
-    Every caller should use this instead of ``run_chat_turn`` so the transcript
-    stays complete no matter which door the message came through. Errors are
-    recorded too — a failed turn the user can see beats a silent gap.
-    """
-    _record(ChatRole.USER, (display or text).strip(), channel)
-    pending = _record(ChatRole.ASSISTANT, "", channel, status=ChatTurnStatus.RUNNING)
-    try:
-        reply, picked, step = run_chat_turn(text)
-    except ChatBusyError as exc:
-        # No push here: the sender is looking at the app right now (they just
-        # hit send) and the message never actually ran.
-        _settle(pending, str(exc), ChatTurnStatus.FAILED)
-        raise
-    except ChatUnavailableError as exc:
-        _settle(pending, str(exc), ChatTurnStatus.FAILED)
-        _push_reply_ready(channel, str(exc))
-        raise
-    except Exception as exc:  # noqa: BLE001 — the transcript must never dangle
-        _settle(pending, f"✖ Erro inesperado: {exc}", ChatTurnStatus.FAILED)
-        _push_reply_ready(channel, f"✖ Erro inesperado: {exc}")
-        raise
-    _settle(
-        pending,
-        reply,
-        ChatTurnStatus.DONE,
-        model=picked.model,
-        tier=picked.tier.value,
-        cost_usd=step.cost_usd,
-        duration_s=step.duration_s,
-    )
-    _push_reply_ready(channel, reply)
-    return reply
-
-
 def _push_reply_ready(channel: ChatChannel, body: str) -> None:
     """Web Push when a SITE turn finishes — an opus/max reply takes minutes
-    and the phone should buzz instead of the user babysitting a spinner.
-    Telegram turns already deliver their reply as a Telegram message."""
+    and the phone should buzz instead of the user babysitting a spinner."""
     if channel != ChatChannel.WEB:
         return
     from app.services import webpush_service  # local: keep module import light

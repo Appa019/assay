@@ -175,20 +175,21 @@ def test_lock_released_after_turn(chat_dirs: Path, monkeypatch: pytest.MonkeyPat
     assert not chat_service._chat_lock_path().exists()
 
 
-def test_converse_persists_both_sides_of_the_turn(
+def test_a_drained_turn_persists_both_sides(
     chat_dirs: Path, monkeypatch: pytest.MonkeyPatch, session
 ) -> None:
-    """D7: every caller goes through converse() precisely because it is what
-    writes the shared transcript — both rows, whichever door was used."""
+    """D7: callers go through enqueue() because it is what writes the
+    transcript — the client's row and the reply the worker settles."""
     from sqlmodel import select
 
     from app.models.chat import ChatChannel, ChatMessage, ChatRole, ChatTurnStatus
 
     monkeypatch.setattr(chat_service, "engine", session.get_bind())
+    monkeypatch.setattr(chat_service, "start_queue_worker", lambda: None)
     monkeypatch.setattr(analysis_runner, "_run_claude_step", lambda *a, **k: _step("resposta!"))
 
-    reply = chat_service.converse("quanto está o BTC hoje?", ChatChannel.WEB)
-    assert reply == "resposta!"
+    chat_service.enqueue("quanto está o BTC hoje?", ChatChannel.WEB)
+    chat_service._drain_once()
 
     rows = list(session.exec(select(ChatMessage).order_by(ChatMessage.created_at)).all())
     assert [r.role for r in rows] == [ChatRole.USER, ChatRole.ASSISTANT]
@@ -199,7 +200,7 @@ def test_converse_persists_both_sides_of_the_turn(
     assert rows[1].model  # the route taken is recorded on the message
 
 
-def test_converse_records_the_failure_on_the_pending_row(
+def test_a_crashed_turn_is_recorded_on_the_pending_row(
     chat_dirs: Path, monkeypatch: pytest.MonkeyPatch, session
 ) -> None:
     from sqlmodel import select
@@ -207,18 +208,19 @@ def test_converse_records_the_failure_on_the_pending_row(
     from app.models.chat import ChatChannel, ChatMessage, ChatRole, ChatTurnStatus
 
     monkeypatch.setattr(chat_service, "engine", session.get_bind())
+    monkeypatch.setattr(chat_service, "start_queue_worker", lambda: None)
 
     def fake_step(*_a: object, **_k: object) -> StepResult:
-        raise LimitError("usage limit reached")
+        raise RuntimeError("cli exploded")
 
     monkeypatch.setattr(analysis_runner, "_run_claude_step", fake_step)
-    with pytest.raises(chat_service.ChatUnavailableError):
-        chat_service.converse("oi, tudo bem?", ChatChannel.TELEGRAM)
+    chat_service.enqueue("oi, tudo bem?", ChatChannel.WEB)
+    chat_service._drain_once()
 
     rows = list(session.exec(select(ChatMessage).order_by(ChatMessage.created_at)).all())
     assert rows[-1].role == ChatRole.ASSISTANT
     assert rows[-1].status == ChatTurnStatus.FAILED
-    assert "limite" in rows[-1].content.lower()
+    assert "cli exploded" in rows[-1].content
 
 
 def test_reset_session_drops_state(chat_dirs: Path) -> None:
@@ -414,7 +416,7 @@ def test_web_turn_completion_fires_a_push(
     chat_dirs: Path, monkeypatch: pytest.MonkeyPatch, session
 ) -> None:
     """An opus/max reply takes minutes; a turn asked through the SITE must buzz
-    the phone when it lands. Telegram turns already deliver as a message."""
+    the phone when it lands. Other channels (old Telegram rows) never push."""
     from app.models.chat import ChatChannel
     from app.services import webpush_service
 
@@ -427,13 +429,16 @@ def test_web_turn_completion_fires_a_push(
         lambda title, body, url="/consultor": pushed.append((title, body)),
     )
 
-    chat_service.converse("como está o mês?", ChatChannel.WEB)
+    monkeypatch.setattr(chat_service, "start_queue_worker", lambda: None)
+    chat_service.enqueue("como está o mês?", ChatChannel.WEB)
+    chat_service._drain_once()
     assert len(pushed) == 1
     assert "respondeu" in pushed[0][0].lower()
     assert pushed[0][1] == "pronto!"
 
     pushed.clear()
-    chat_service.converse("e agora?", ChatChannel.TELEGRAM)
+    chat_service.enqueue("e agora?", ChatChannel.TELEGRAM)
+    chat_service._drain_once()
     assert pushed == []
 
 
