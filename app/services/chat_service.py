@@ -654,25 +654,18 @@ def _state_path() -> Path:
 
 
 def _load_state() -> dict[str, Any]:
-    try:
-        data = json.loads(_state_path().read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError):
-        return {}
+    return load_json_state(_state_path())
 
 
 def _save_state(session_id: str, turns: int, context_tokens: int = 0) -> None:
-    _state_path().parent.mkdir(parents=True, exist_ok=True)
-    _state_path().write_text(
-        json.dumps(
-            {
-                "session_id": session_id,
-                "turns": turns,
-                "context_tokens": context_tokens,
-                "updated_at": datetime.now(UTC).isoformat(),
-            }
-        ),
-        encoding="utf-8",
+    save_json_state(
+        _state_path(),
+        {
+            "session_id": session_id,
+            "turns": turns,
+            "context_tokens": context_tokens,
+            "updated_at": datetime.now(UTC).isoformat(),
+        },
     )
 
 

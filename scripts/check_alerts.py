@@ -11,7 +11,6 @@ re-crossed later alerts again — without spamming every run.
 """
 
 import asyncio
-import json
 import sys
 from pathlib import Path
 
@@ -22,6 +21,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 from sqlmodel import Session, select  # noqa: E402
 
 from app.core.database import engine, init_db  # noqa: E402
+from app.core.json_state import load_json_state, save_json_state  # noqa: E402
 from app.models.asset import Asset  # noqa: E402
 from app.models.notification import NotificationKind, NotificationLevel  # noqa: E402
 from app.services import notification_center, price_refresh_service  # noqa: E402
@@ -30,15 +30,11 @@ _STATE_PATH = _PROJECT_ROOT / "storage" / "alerts_state.json"
 
 
 def _load_state() -> dict[str, bool]:
-    try:
-        return json.loads(_STATE_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
+    return load_json_state(_STATE_PATH)
 
 
 def _save_state(state: dict[str, bool]) -> None:
-    _STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _STATE_PATH.write_text(json.dumps(state, indent=1), encoding="utf-8")
+    save_json_state(_STATE_PATH, state)
 
 
 def main() -> int:
@@ -78,7 +74,7 @@ def main() -> int:
                             f"{emoji} {asset.ticker} {verb}: preço R$ {float(price):,.2f} "
                             f"vs nível R$ {float(level):,.2f} "
                             f"(lote de {asset.entry_date.isoformat()}). "
-                            "Considere acionar o comitê (/revisao) ou vender (/vender)."
+                            "Considere pedir ao consultor uma revisão ou vender em Investimentos › Carteira."
                         )
                     elif not hit and state.get(key):
                         state[key] = False  # re-armed for the next crossing

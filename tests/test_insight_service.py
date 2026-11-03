@@ -1,6 +1,6 @@
 """Deterministic insight engine: projection math, the anomaly history guard,
 dedupe/re-arm semantics and the weekly push budget with its digest queue.
-Telegram is always mocked — nothing is ever sent for real."""
+Notifications are always mocked — nothing is ever sent for real."""
 
 import json
 from datetime import date, timedelta

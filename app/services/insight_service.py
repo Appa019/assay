@@ -44,7 +44,6 @@ date) and ``date.today()`` (already local) — no UTC-naive timestamp is ever
 turned into a calendar date here.
 """
 
-import json
 from calendar import monthrange
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -54,6 +53,7 @@ from typing import Any
 import structlog
 from sqlmodel import Session, select
 
+from app.core.json_state import load_json_state, save_json_state
 from app.models.asset import Asset
 from app.models.cashflow import CashflowKind
 from app.models.notification import NotificationKind
@@ -103,22 +103,11 @@ class Insight:
 
 
 def _load_state() -> dict[str, Any]:
-    try:
-        raw = json.loads(_STATE_PATH.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return {}
-    except (OSError, ValueError) as exc:
-        logger.warning("insights_state_unreadable_reset", error=str(exc))
-        return {}
-    if not isinstance(raw, dict):
-        logger.warning("insights_state_wrong_shape_reset")
-        return {}
-    return raw
+    return load_json_state(_STATE_PATH)
 
 
 def _save_state(state: dict[str, Any]) -> None:
-    _STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _STATE_PATH.write_text(json.dumps(state, indent=1, ensure_ascii=False), encoding="utf-8")
+    save_json_state(_STATE_PATH, state)
 
 
 def _month_map(state: dict[str, Any], key: str, month_key: str) -> dict[str, Any]:

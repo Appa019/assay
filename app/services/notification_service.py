@@ -10,7 +10,6 @@ State is persisted so a milestone is never handled twice. Keys are only marked
 done AFTER the action succeeds, so a failed run is retried next day.
 """
 
-import json
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -18,6 +17,7 @@ from typing import Any
 import structlog
 from sqlmodel import Session, select
 
+from app.core.json_state import load_json_state, save_json_state
 from app.models.asset import Asset, AssetClass
 from app.services import portfolio_service
 
@@ -28,17 +28,11 @@ _STATE_PATH = _PROJECT_ROOT / "storage" / "notifications_state.json"
 
 
 def _load_state() -> dict[str, Any]:
-    if _STATE_PATH.exists():
-        try:
-            return json.loads(_STATE_PATH.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            logger.warning("notifications_state_corrupt_reset")
-    return {"asset_unlocks": []}
+    return load_json_state(_STATE_PATH) or {"asset_unlocks": []}
 
 
 def _save_state(state: dict[str, Any]) -> None:
-    _STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _STATE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    save_json_state(_STATE_PATH, state)
 
 
 def _lot_key(asset: Asset) -> str:
