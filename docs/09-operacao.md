@@ -19,7 +19,7 @@
 **Bind SEMPRE em `127.0.0.1`.** A LAN é compartilhada com o prédio inteiro;
 `0.0.0.0` entrega as finanças do cliente aos vizinhos.
 
-Detalhes de rede, SSH, firewall e túnel: **`acesso-remoto-pi.md`**.
+Detalhes de rede, SSH, firewall e túnel: `~/<docs-do-pi>/acesso-raspberry-pi.md` (fora do repo; docs do Pi).
 
 ## Comandos no Pi
 

@@ -41,7 +41,7 @@ do build.
 ├── tests/                    suíte pytest (+ conftest)
 ├── storage/                  DADOS EM RUNTIME — gitignored (ver §storage)
 ├── docs/                     esta documentação
-├── CLAUDE.md PRODUCT.md DESIGN.md acesso-remoto-pi.md README.md
+├── CLAUDE.md PRODUCT.md DESIGN.md README.md
 ├── Makefile                  make check / dev / analyze / weekly / prices …
 └── .github/workflows/ci.yml  backend (ruff+pytest) · frontend (lint+types+build)
 ```

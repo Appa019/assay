@@ -153,7 +153,7 @@ de máquina, não deste app.
 | `storage/claude_session.json` | Pi, se existir | apagar: resíduo do Playwright antigo |
 | `~/assay_backup_20260905_pre_reset/` | Pi | `~/attic/` |
 | `.claude/skills/deploy/SKILL.md` (Vercel) | repo | apagar, já marcada obsoleta em `docs/13` |
-| `~/investimentos_manual` em `CLAUDE.md`, `docs/09` e auto-memória (o `acesso-remoto-pi.md` não cita a pasta) | repo | trocar pelo caminho novo **no mesmo commit da migração** |
+| `~/investimentos_manual` em `CLAUDE.md`, `docs/09` e auto-memória (o antigo `acesso-remoto-pi.md` saiu do repo) | repo | trocar pelo caminho novo **no mesmo commit da migração** |
 | §7 e §11 de `raspberry-pi.md` | docs do Pi | atualizar: bot ativo, branch, 8–10 timers |
 
 ## 5. Migração (fase 2, com o Pi online)

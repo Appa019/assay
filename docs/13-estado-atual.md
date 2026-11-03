@@ -219,7 +219,6 @@ acionável foi corrigido na mesma data — detalhes em `12-decisoes.md`
 | Onde | Diz | Realidade |
 |---|---|---|
 | `README.md` (raiz) | não menciona consultor, cashflow nem extrato | é anterior à camada de finanças pessoais. Serve como capa do repo, não referência |
-| `acesso-remoto-pi.md` §7 | "Tailscale ainda não configurado" | está configurado e é o acesso oficial (`https://<host-do-pi>.<tailnet>.ts.net`) |
 | `.claude/skills/deploy/SKILL.md` | deploy para Vercel | o alvo é o **Pi**. Skill obsoleta |
 
 ## Dívidas e pontos frágeis (nenhum urgente)
