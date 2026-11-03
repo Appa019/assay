@@ -30,6 +30,8 @@ export type Asset = {
   thesis: string | null;
   target_price: number | null;
   stop_price: number | null;
+  // Crypto only: lot at a foreign exchange (decides the IR regime).
+  held_abroad: boolean;
   // Sell lock resolved by the backend, per class and per lot (stocks 30d,
   // crypto 7d, CDB none). Never re-derive the rule here.
   lock_days_total: number;
@@ -46,10 +48,11 @@ export type AssetCreate = {
   avg_price: number;
   current_price?: number;
   entry_date?: string;
+  held_abroad?: boolean;
 };
 
 // Quantity and average price change only through the ledger (buy, sell).
-export type AssetUpdate = Partial<Pick<Asset, "name">> & {
+export type AssetUpdate = Partial<Pick<Asset, "name" | "held_abroad">> & {
   current_price?: number;
 };
 
@@ -474,11 +477,23 @@ export type YearEndPosition = {
   cost_basis_brl: number;
 };
 
+/** Lei 14.754/2023: foreign-exchange crypto, taxed once a year in the DAA. */
+export type CryptoAbroadYear = {
+  sales_brl: number;
+  net_gain_brl: number;
+  loss_carry_used_brl: number;
+  tax_due_brl: number;
+  loss_carryforward_brl: number;
+  paid_in: string;
+};
+
 export type TaxReport = {
   year: number;
   months: TaxMonth[];
   total_darf_brl: number;
-  loss_carryforward_brl: { stocks: number; crypto: number };
+  // National crypto never carries a loss (P&R 583): only stocks do.
+  loss_carryforward_brl: { stocks: number };
+  crypto_abroad: CryptoAbroadYear;
   year_end_positions: YearEndPosition[];
   notes: string[];
 };

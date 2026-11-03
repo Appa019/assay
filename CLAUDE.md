@@ -211,8 +211,11 @@ sem Playwright.
   banda). Estado em `storage/alerts_state.json`.
 - **IR**: `GET /api/tax/{ano}` + aba IR em `/investimentos` — apuração
   SIMPLIFICADA mensal
-  (isenções 20k ações / 35k crypto, carryforward de prejuízo, DARF mínima,
-  CDB informativo retido na fonte, posição 31/12). Não substitui contador.
+  (ações: isenção 20k + carryforward de prejuízo; crypto nacional: isenção
+  35k, cada venda paga sozinha, prejuízo NÃO compensa; crypto em exchange no
+  exterior (`held_abroad`): 15% anual da Lei 14.754 com perdas carregadas, D51;
+  DARF mínima, CDB informativo retido na fonte, posição 31/12). Não substitui
+  contador.
 - **Relatório mensal**: `monthly_report.py` (dias 1-2) → Report(monthly) +
   aviso no app: patrimônio,
   operações, IR do mês, custo de

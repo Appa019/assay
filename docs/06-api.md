@@ -152,7 +152,7 @@ disparar o push. É o sino do app.
 |---|---|---|
 | `GET` | `/api/macro` | Snapshot macro (Selic, IPCA 12m, CDI, USD/BRL, Ibov, dominância BTC, Fear&Greed, `warnings[]`). Cache de `MARKET_CACHE_TTL` (120s) |
 | `GET` | `/api/cadence` | Informativo: data do último aporte, dias desde então, total. **Não** existe ciclo fixo |
-| `GET` | `/api/tax/{ano}` | IR simplificado: DARF mensal por classe + posições em 31/12. 422 fora de 2020..ano atual |
+| `GET` | `/api/tax/{ano}` | IR simplificado: DARF mensal de ações e crypto nacional + `crypto_abroad` (resultado anual da Lei 14.754) + posições em 31/12. 422 fora de 2020..ano atual |
 | `GET` | `/api/health` | `{status, version}` |
 
 ---

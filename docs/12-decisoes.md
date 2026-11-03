@@ -556,6 +556,64 @@ para a manhã. Ele roda em fail-fast, e limite ou lock ocupado viram aviso
 "continua na próxima madrugada", não falha. **Custo aceito:** um aporte que
 bate no limite termina na noite seguinte, até um dia depois.
 
+### D51 · IR de cripto: nacional × exterior
+Decisão do cliente (2026-11-03): corrigir sem esperar o contador. O código
+tratava cripto igual a ação: 15% fixo e prejuízo compensando meses seguintes.
+As duas coisas estavam erradas para cripto.
+
+**Fontes oficiais (lidas em 2026-11-03):**
+- Perguntas e Respostas IRPF 2026, v1.00 de 23/04/2026, a edição mais recente:
+  https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/perguntas-e-respostas/dirpf/p-r-irpf-2026-v1-00-2026-04-23.pdf/view
+  - 653: cripto vendida no Brasil acima de R$ 35.000,00 no mês paga ganho de
+    capital por alíquotas progressivas, DARF código 4600 até o último dia útil
+    do mês seguinte; as regras para instituições no Brasil "não foram
+    alteradas". A soma junta todo tipo de criptoativo.
+  - 583: "Os resultados positivos e negativos apurados em operações distintas
+    não podem ser somados algebricamente por falta de previsão legal. O ganho
+    de capital deve ser apurado e tributado em separado em relação a cada
+    alienação."
+  - 574: 15% até R$ 5M de ganho, 17,5% até R$ 10M, 20% até R$ 30M, 22,5%
+    acima, cada faixa sobre a "parcela" do ganho (Lei 8.981/1995, art. 21).
+  - 473, Atenção 2: desde 01/01/2024 cripto custodiada ou negociada por
+    instituição no exterior é aplicação financeira no exterior (Lei 14.754,
+    art. 3º §1º I; IN RFB 2.180/2024, art. 9º §1º), 15% na Declaração de
+    Ajuste Anual; em autocustódia vale a residência do contribuinte.
+- Lei 14.754/2023 (https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2023/lei/l14754.htm):
+  art. 2º §1º (15% sobre a parcela anual), art. 9º (perdas abatem rendimentos
+  do mesmo período; o saldo vai para períodos seguintes, uma única vez), art. 47
+  (vigência em 2024).
+- IN RFB 1.888/2019 trata só de PRESTAR INFORMAÇÃO (P&R 473), não de imposto, e
+  é substituída pela IN RFB 2.291/2025 (DeCripto) a partir de 01/07/2026.
+- MP 1.303/2025, que mudaria a tributação de cripto, perdeu a vigência em
+  08/10/2025 (Ato Declaratório do Presidente da Mesa do Congresso nº 67/2025).
+
+**Como ficou:**
+- Campo `held_abroad` em `Asset` e `Trade`, padrão `false` (nacional). Só vale
+  para crypto. Lotes e trades antigos entram como nacionais pela migração.
+- Nacional: soma das vendas NACIONAIS do mês ≤ 35.000,00 → isento (os 35 mil
+  exatos são isentos). Acima, cada venda com ganho paga sozinha pelas faixas; a
+  venda com prejuízo não abate nada, nem no mês nem depois. Não há mais saldo de
+  prejuízo de cripto.
+- Exterior, a partir de 2024: soma algébrica do ano, 15% sobre o positivo,
+  prejuízo carregado para os anos seguintes. Vai em `crypto_abroad` no
+  relatório, nunca no `total_darf_brl`.
+- Ações não mudaram.
+
+**Leituras que são decisão nossa, não texto expresso:**
+- A P&R 653 ainda diz que a isenção soma cripto "no Brasil ou no exterior",
+  mas essa frase é a regra até 2023, copiada no item das instituições no Brasil.
+  Desde 2024 a venda no exterior é aplicação financeira da Lei 14.754, que não
+  tem isenção. Por isso ela sai da soma dos 35 mil.
+- Venda no exterior antes de 2024 segue o regime nacional (entra na soma).
+- As faixas progressivas valem por venda. A regra de somar "alienação em
+  partes do mesmo bem" (P&R 574) não foi modelada: só muda algo acima de R$ 5M
+  de ganho, fora da escala desta carteira.
+- O ledger guarda o preço em reais. Para lote no exterior, quem registra deve
+  usar a cotação de venda do BCB da data (Lei 14.754, art. 15).
+
+**Não cobre:** permuta de cripto por cripto (é fato gerador, P&R 653; o app
+não registra permuta) e o imposto pago no exterior a deduzir.
+
 ### D33 · Mandato mais defensivo: RF 50% · Ações 35% · Crypto 15%
 Em 2026-09-05 o cliente fixou **renda fixa em 50%** e deixou o resto a critério
 técnico. O alvo sai de 35/40/25 para **50/35/15**: o dry powder deixa de ser o

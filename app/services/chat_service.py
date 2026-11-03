@@ -233,7 +233,9 @@ com uma ordem de saque justificada:
       classe MAIS acima do alvo do mandato (vender ali rebalanceia de graça);
       (iv) menor convicção.
 4. **Conte o IR antes de recomendar**: vendas de ações até R$ 20 mil no MÊS são
-   isentas; cripto até R$ 35 mil no mês. Se dá para ficar abaixo do limite,
+   isentas; cripto em exchange brasileira até R$ 35 mil no mês (lote com
+   `held_abroad` = exchange no exterior: sem isenção, 15% no ano). Prejuízo em
+   cripto nacional não abate nada. Se dá para ficar abaixo do limite,
    fique — e diga que economizou DARF. Se não dá, avise quanto de imposto sai.
    Confira o mês corrente em `GET /api/tax/<ano>`.
 5. **Entregue assim**: quanto tirar de cada lugar, nesta ordem, o quanto sobra,

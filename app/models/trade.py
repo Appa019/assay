@@ -43,6 +43,8 @@ class Trade(SQLModel, table=True):
     realized_pnl_pct: float | None = Field(default=None)
     # Entry date of the lot this sell closed (per-lot holding accounting).
     lot_entry_date: date | None = Field(default=None)
+    # Copied from the lot: crypto at a foreign exchange (see tax_service).
+    held_abroad: bool = Field(default=False)
 
     executed_at: datetime = Field(default_factory=_now_utc, index=True)
     note: str | None = Field(default=None, max_length=512)

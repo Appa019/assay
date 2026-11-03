@@ -53,6 +53,7 @@ def build_asset_with_trade(session: Session, payload: AssetCreate) -> Asset:
         avg_price=payload.avg_price,
         current_price=payload.current_price or payload.avg_price,
         entry_date=payload.entry_date or date.today(),
+        held_abroad=payload.held_abroad,
     )
     session.add(asset)
     session.add(
@@ -66,6 +67,7 @@ def build_asset_with_trade(session: Session, payload: AssetCreate) -> Asset:
             price=asset.avg_price,
             total_brl=(asset.quantity * asset.avg_price).quantize(Decimal("0.01")),
             lot_entry_date=asset.entry_date,
+            held_abroad=asset.held_abroad,
         )
     )
     return asset
@@ -82,6 +84,10 @@ def create_asset(session: Session, payload: AssetCreate) -> Asset:
 def update_asset(session: Session, asset_id: UUID, payload: AssetUpdate) -> Asset:
     asset = get_asset(session, asset_id)
     data = payload.model_dump(exclude_unset=True)
+    if data.get("held_abroad") and asset.asset_class != AssetClass.CRYPTO:
+        raise ValueError("held_abroad só vale para crypto (ações e CDB são do Brasil)")
+    if data.get("held_abroad") is None:
+        data.pop("held_abroad", None)  # null is not a value for a NOT NULL flag
     for key, value in data.items():
         setattr(asset, key, value)
     asset.updated_at = datetime.now(UTC)
@@ -210,6 +216,7 @@ def sell_asset(
             realized_pnl_brl=realized_brl,
             realized_pnl_pct=round(realized_pct, 2) if realized_pct is not None else None,
             lot_entry_date=asset.entry_date,
+            held_abroad=asset.held_abroad,
         )
     )
 

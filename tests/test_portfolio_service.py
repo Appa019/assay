@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 from app.config import settings
 from app.models.asset import Asset, AssetClass
 from app.models.trade import Trade, TradeSide
-from app.schemas.asset import AssetCreate
+from app.schemas.asset import AssetCreate, AssetUpdate
 from app.services import portfolio_service
 
 
@@ -121,6 +121,46 @@ def test_sell_crypto_lot_past_its_shorter_lock(session: Session, crypto_unlocked
     result = portfolio_service.sell_asset(session, crypto_unlocked.id)
     assert result.sale_value == Decimal("11000.00")
     assert session.get(Asset, crypto_unlocked.id) is None
+
+
+def test_abroad_flag_travels_from_lot_to_every_trade(session: Session) -> None:
+    asset = portfolio_service.create_asset(
+        session,
+        AssetCreate(
+            ticker="SOL",
+            asset_class=AssetClass.CRYPTO,
+            quantity=Decimal("2"),
+            avg_price=Decimal("800"),
+            entry_date=(datetime.now(UTC) - timedelta(days=30)).date(),
+            held_abroad=True,
+        ),
+    )
+    assert portfolio_service.to_asset_read(asset).held_abroad is True
+    portfolio_service.sell_asset(session, asset.id, price=Decimal("900"), quantity=Decimal("1"))
+    trades = list(session.exec(select(Trade)).all())
+    assert [t.held_abroad for t in trades] == [True, True]  # buy + sell
+
+
+def test_abroad_flag_is_crypto_only(session: Session, stock_unlocked: Asset) -> None:
+    with pytest.raises(ValueError, match="só vale para crypto"):
+        AssetCreate(
+            ticker="PETR4",
+            asset_class=AssetClass.STOCKS,
+            quantity=Decimal("1"),
+            avg_price=Decimal("30"),
+            held_abroad=True,
+        )
+    with pytest.raises(ValueError, match="só vale para crypto"):
+        portfolio_service.update_asset(session, stock_unlocked.id, AssetUpdate(held_abroad=True))
+
+
+def test_abroad_flag_can_be_fixed_later(session: Session, crypto_unlocked: Asset) -> None:
+    assert crypto_unlocked.held_abroad is False  # national by default
+    portfolio_service.update_asset(session, crypto_unlocked.id, AssetUpdate(held_abroad=True))
+    assert session.get(Asset, crypto_unlocked.id).held_abroad is True
+    # null leaves it alone instead of breaking the NOT NULL column
+    portfolio_service.update_asset(session, crypto_unlocked.id, AssetUpdate(held_abroad=None))
+    assert session.get(Asset, crypto_unlocked.id).held_abroad is True
 
 
 def test_asset_read_carries_the_lock(crypto_locked: Asset, cdb: Asset) -> None:

@@ -47,6 +47,8 @@ async def update_asset(
         asset = portfolio_service.update_asset(session, asset_id, payload)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return portfolio_service.to_asset_read(asset)
 
 

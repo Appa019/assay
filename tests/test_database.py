@@ -64,3 +64,18 @@ def test_step_telemetry_columns_land_on_an_old_prompt_table(tmp_path) -> None:
         cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(contribution_prompt)")}
     assert {"cost_usd", "duration_s", "num_turns", "context_tokens"} <= cols
     engine.dispose()
+
+
+def test_held_abroad_lands_as_national_on_existing_rows(tmp_path) -> None:
+    """Lots and trades from before the flag are national: that is the default."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'mig.db'}")
+    with engine.begin() as conn:
+        conn.exec_driver_sql("CREATE TABLE asset (id TEXT PRIMARY KEY)")
+        conn.exec_driver_sql("CREATE TABLE trade (id TEXT PRIMARY KEY)")
+        conn.exec_driver_sql("INSERT INTO asset (id) VALUES ('a1')")
+        conn.exec_driver_sql("INSERT INTO trade (id) VALUES ('t1')")
+    _ensure_sqlite_columns(engine)
+    with engine.begin() as conn:
+        assert conn.exec_driver_sql("SELECT held_abroad FROM asset").scalar() == 0
+        assert conn.exec_driver_sql("SELECT held_abroad FROM trade").scalar() == 0
+    engine.dispose()

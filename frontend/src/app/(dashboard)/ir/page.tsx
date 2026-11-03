@@ -85,7 +85,8 @@ export const IrView = () => {
           </h2>
           <p className="text-sm mt-3 max-w-xl" style={{ color: "var(--text-secondary)" }}>
             Mapa simplificado por mês: vendas, isenções e DARF devido em ações e
-            crypto, mais as posições de 31/12 para bens e direitos.
+            crypto nacional, o resultado anual da crypto no exterior e as posições
+            de 31/12 para bens e direitos.
           </p>
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
@@ -160,9 +161,13 @@ export const IrView = () => {
               sub="abate ganhos futuros da mesma classe"
             />
             <StatCard
-              title="Prejuízo a compensar · Crypto"
-              value={formatBRL(report.loss_carryforward_brl.crypto)}
-              sub="abate ganhos futuros da mesma classe"
+              title="Crypto no exterior · imposto do ano"
+              value={formatBRL(report.crypto_abroad.tax_due_brl)}
+              sub={
+                report.crypto_abroad.loss_carryforward_brl > 0
+                  ? `15% na ${report.crypto_abroad.paid_in}; prejuízo a compensar ${formatBRL(report.crypto_abroad.loss_carryforward_brl)}`
+                  : `15% sobre o resultado do ano, na ${report.crypto_abroad.paid_in}`
+              }
             />
           </section>
 
@@ -214,7 +219,11 @@ export const IrView = () => {
                         {formatMonth(m.month)}
                       </p>
                       <MonthClassBlock label="Vendas ações" cls={m.stocks} />
-                      <MonthClassBlock label="Vendas crypto" cls={m.crypto} />
+                      <MonthClassBlock
+                        label="Vendas crypto nacional"
+                        cls={m.crypto}
+                        lossCarries={false}
+                      />
                     </div>
                   ))}
                 </div>
@@ -231,8 +240,8 @@ export const IrView = () => {
                         <th className="px-4 py-3 font-medium">Mês</th>
                         <th className="px-4 py-3 font-medium text-right">Vendas ações</th>
                         <th className="px-4 py-3 font-medium">Status ações</th>
-                        <th className="px-4 py-3 font-medium text-right">Vendas crypto</th>
-                        <th className="px-4 py-3 font-medium">Status crypto</th>
+                        <th className="px-4 py-3 font-medium text-right">Vendas crypto BR</th>
+                        <th className="px-4 py-3 font-medium">Status crypto BR</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -254,7 +263,7 @@ export const IrView = () => {
                             {m.crypto.sales_brl > 0 ? formatBRL(m.crypto.sales_brl) : "–"}
                           </td>
                           <td className="px-4 py-3.5">
-                            <TaxStatus cls={m.crypto} />
+                            <TaxStatus cls={m.crypto} lossCarries={false} />
                           </td>
                         </tr>
                       ))}
@@ -568,19 +577,28 @@ const StackedField = ({ label, value }: { label: string; value: string }) => (
 );
 
 /** Phone view of one month × one asset class: sales figure plus the status. */
-const MonthClassBlock = ({ label, cls }: { label: string; cls: TaxMonthClass }) => (
+const MonthClassBlock = ({
+  label,
+  cls,
+  lossCarries = true,
+}: {
+  label: string;
+  cls: TaxMonthClass;
+  lossCarries?: boolean;
+}) => (
   <div>
     <StackedField
       label={label}
       value={cls.sales_brl > 0 ? formatBRL(cls.sales_brl) : "–"}
     />
     <div className="mt-2">
-      <TaxStatus cls={cls} />
+      <TaxStatus cls={cls} lossCarries={lossCarries} />
     </div>
   </div>
 );
 
-const TaxStatus = ({ cls }: { cls: TaxMonthClass }) => {
+/** lossCarries=false for national crypto: a loss there offsets nothing (P&R 583). */
+const TaxStatus = ({ cls, lossCarries = true }: { cls: TaxMonthClass; lossCarries?: boolean }) => {
   if (cls.sales_brl <= 0) {
     return (
       <span className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -606,16 +624,6 @@ const TaxStatus = ({ cls }: { cls: TaxMonthClass }) => {
       </span>
     );
   }
-  if (cls.net_gain_brl < 0) {
-    return (
-      <span>
-        <Badge bg="var(--bg-secondary)" color="var(--text-secondary)">
-          Prejuízo (compensável)
-        </Badge>
-        {carryNote}
-      </span>
-    );
-  }
   if (cls.tax_due_brl > 0) {
     return (
       <span>
@@ -625,6 +633,16 @@ const TaxStatus = ({ cls }: { cls: TaxMonthClass }) => {
         >
           DARF {formatBRL(cls.tax_due_brl)}
           {cls.darf_below_minimum ? " · abaixo do mínimo" : ""}
+        </Badge>
+        {carryNote}
+      </span>
+    );
+  }
+  if (cls.net_gain_brl < 0) {
+    return (
+      <span>
+        <Badge bg="var(--bg-secondary)" color="var(--text-secondary)">
+          {lossCarries ? "Prejuízo (compensável)" : "Prejuízo (não compensa)"}
         </Badge>
         {carryNote}
       </span>

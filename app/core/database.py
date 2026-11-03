@@ -62,7 +62,9 @@ _ADDED_COLUMNS: dict[str, dict[str, str]] = {
         "thesis": "TEXT",
         "target_price": "NUMERIC",
         "stop_price": "NUMERIC",
+        "held_abroad": "BOOLEAN NOT NULL DEFAULT 0",
     },
+    "trade": {"held_abroad": "BOOLEAN NOT NULL DEFAULT 0"},
     "cashflow_entry": {
         "wallet": "TEXT NOT NULL DEFAULT 'conta'",
         # Credit card + installments (2026-09-12). CHAR(32) is what SQLModel's

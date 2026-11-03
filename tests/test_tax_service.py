@@ -34,6 +34,7 @@ def _sell(
     total: str,
     pnl: str,
     when: datetime,
+    held_abroad: bool = False,
 ) -> None:
     session.add(
         Trade(
@@ -46,6 +47,7 @@ def _sell(
             realized_pnl_brl=Decimal(pnl),
             lot_entry_date=date(2026, 1, 2),
             executed_at=when,
+            held_abroad=held_abroad,
         )
     )
     session.commit()
@@ -182,3 +184,108 @@ def test_darf_below_minimum_flag(session: Session) -> None:
     assert feb["darf_below_minimum"] is True
     assert mar["tax_due_brl"] == 30.0
     assert mar["darf_below_minimum"] is False
+
+
+# ── Crypto: national (ganho de capital mensal) × abroad (Lei 14.754) ──────
+
+
+def _crypto(session: Session, total: str, pnl: str, when: datetime, abroad: bool = False) -> None:
+    _sell(
+        session,
+        ticker="BTC",
+        asset_class=AssetClass.CRYPTO,
+        total=total,
+        pnl=pnl,
+        when=when,
+        held_abroad=abroad,
+    )
+
+
+def test_crypto_exactly_35k_in_the_month_is_exempt(session: Session) -> None:
+    # Two sales adding up to exactly R$ 35.000,00: "igual ou inferior" (P&R 653).
+    _crypto(session, "20000", "5000", datetime(2026, 5, 4, 15, tzinfo=UTC))
+    _crypto(session, "15000", "4000", datetime(2026, 5, 20, 15, tzinfo=UTC))
+    month = tax_service.build_year_report(session, 2026)["months"][0]["crypto"]
+    assert month["sales_brl"] == 35000.0
+    assert month["exempt"] is True
+    assert month["tax_due_brl"] == 0.0
+
+
+def test_crypto_one_cent_above_35k_taxes_every_gaining_sale(session: Session) -> None:
+    _crypto(session, "20000", "5000", datetime(2026, 5, 4, 15, tzinfo=UTC))
+    _crypto(session, "15000.01", "4000", datetime(2026, 5, 20, 15, tzinfo=UTC))
+    report = tax_service.build_year_report(session, 2026)
+    month = report["months"][0]["crypto"]
+    assert month["exempt"] is False
+    assert month["tax_due_brl"] == 1350.0  # (5000 + 4000) × 15%
+    assert report["total_darf_brl"] == 1350.0
+
+
+def test_crypto_loss_offsets_nothing_in_the_month(session: Session) -> None:
+    # P&R 583: distinct sales are never netted. Net is −1000, tax is still due.
+    _crypto(session, "30000", "4000", datetime(2026, 6, 3, 15, tzinfo=UTC))
+    _crypto(session, "10000", "-5000", datetime(2026, 6, 10, 15, tzinfo=UTC))
+    month = tax_service.build_year_report(session, 2026)["months"][0]["crypto"]
+    assert month["net_gain_brl"] == -1000.0
+    assert month["tax_due_brl"] == 600.0
+
+
+def test_crypto_loss_then_gain_does_not_carry_forward(session: Session) -> None:
+    _crypto(session, "40000", "-8000", datetime(2026, 2, 3, 15, tzinfo=UTC))
+    _crypto(session, "40000", "6000", datetime(2026, 3, 3, 15, tzinfo=UTC))
+    report = tax_service.build_year_report(session, 2026)
+    february, march = (m["crypto"] for m in report["months"])
+    assert february["tax_due_brl"] == 0.0
+    assert march["loss_carry_used_brl"] == 0.0
+    assert march["tax_due_brl"] == 900.0  # full 6000 × 15%, the Feb loss is lost
+    assert "crypto" not in report["loss_carryforward_brl"]
+
+
+def test_progressive_brackets_apply_per_slice() -> None:
+    tax = tax_service.progressive_capital_gains_tax
+    assert tax(Decimal("1000")) == Decimal("150.00")
+    assert tax(Decimal("5000000")) == Decimal("750000.00")
+    # 5M × 15% + 1M × 17,5%
+    assert tax(Decimal("6000000")) == Decimal("925000.00")
+    # 5M×15% + 5M×17,5% + 20M×20% + 10M×22,5%
+    assert tax(Decimal("40000000")) == Decimal("7875000.00")
+
+
+def test_abroad_sales_leave_the_35k_test_and_pay_yearly(session: Session) -> None:
+    # Same month: 30k national (exempt alone) + 20k abroad. Mixing them would
+    # cross 35k; the abroad sale belongs to Lei 14.754 since 2024.
+    _crypto(session, "30000", "3000", datetime(2026, 7, 8, 15, tzinfo=UTC))
+    _crypto(session, "20000", "2000", datetime(2026, 7, 9, 15, tzinfo=UTC), abroad=True)
+    report = tax_service.build_year_report(session, 2026)
+    national = report["months"][0]["crypto"]
+    assert national["sales_brl"] == 30000.0
+    assert national["exempt"] is True
+    assert report["total_darf_brl"] == 0.0  # abroad is never a monthly DARF
+    abroad = report["crypto_abroad"]
+    assert abroad["sales_brl"] == 20000.0
+    assert abroad["tax_due_brl"] == 300.0
+    assert abroad["paid_in"] == "Declaração de Ajuste Anual 2027"
+
+
+def test_abroad_losses_offset_within_the_year_and_carry_to_the_next(session: Session) -> None:
+    _crypto(session, "9000", "-4000", datetime(2025, 3, 3, 15, tzinfo=UTC), abroad=True)
+    _crypto(session, "9000", "1000", datetime(2025, 9, 3, 15, tzinfo=UTC), abroad=True)
+    _crypto(session, "9000", "5000", datetime(2026, 4, 3, 15, tzinfo=UTC), abroad=True)
+    y2025 = tax_service.build_year_report(session, 2025)["crypto_abroad"]
+    assert y2025["net_gain_brl"] == -3000.0
+    assert y2025["tax_due_brl"] == 0.0
+    assert y2025["loss_carryforward_brl"] == 3000.0
+    y2026 = tax_service.build_year_report(session, 2026)["crypto_abroad"]
+    assert y2026["loss_carry_used_brl"] == 3000.0
+    assert y2026["tax_due_brl"] == 300.0  # (5000 − 3000) × 15%
+    assert y2026["loss_carryforward_brl"] == 0.0
+
+
+def test_abroad_before_2024_follows_the_national_regime(session: Session) -> None:
+    _crypto(session, "20000", "1000", datetime(2023, 8, 1, 15, tzinfo=UTC))
+    _crypto(session, "20000", "2000", datetime(2023, 8, 2, 15, tzinfo=UTC), abroad=True)
+    report = tax_service.build_year_report(session, 2023)
+    month = report["months"][0]["crypto"]
+    assert month["sales_brl"] == 40000.0  # both count toward the old 35k test
+    assert month["tax_due_brl"] == 450.0
+    assert report["crypto_abroad"]["tax_due_brl"] == 0.0

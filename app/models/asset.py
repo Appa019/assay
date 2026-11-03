@@ -36,5 +36,8 @@ class Asset(SQLModel, table=True):
     target_price: Decimal | None = Field(default=None, decimal_places=8, max_digits=24)
     stop_price: Decimal | None = Field(default=None, decimal_places=8, max_digits=24)
     entry_date: date = Field(default_factory=_today)
+    # Crypto only: custodied or traded by an exchange abroad. Decides the tax
+    # regime (Lei 14.754/2023 from 2024 on); national is the default.
+    held_abroad: bool = Field(default=False)
     created_at: datetime = Field(default_factory=_now_utc)
     updated_at: datetime = Field(default_factory=_now_utc)

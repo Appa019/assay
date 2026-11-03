@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.models.asset import AssetClass
 from app.models.trade import TradeSide
@@ -16,11 +16,18 @@ class AssetCreate(BaseModel):
     avg_price: Decimal = Field(..., gt=0)
     current_price: Decimal | None = Field(default=None, ge=0)
     entry_date: date | None = None
+    held_abroad: bool = False
 
     @field_validator("ticker")
     @classmethod
     def _normalize_ticker(cls, v: str) -> str:
         return v.strip().upper()
+
+    @model_validator(mode="after")
+    def _abroad_only_for_crypto(self) -> "AssetCreate":
+        if self.held_abroad and self.asset_class != AssetClass.CRYPTO:
+            raise ValueError("held_abroad só vale para crypto (ações e CDB são do Brasil)")
+        return self
 
 
 class AssetUpdate(BaseModel):
@@ -31,6 +38,8 @@ class AssetUpdate(BaseModel):
     thesis: str | None = Field(default=None, max_length=2000)
     target_price: Decimal | None = Field(default=None, ge=0)
     stop_price: Decimal | None = Field(default=None, ge=0)
+    # Fixing a lot registered at the wrong place; applies to its future sales.
+    held_abroad: bool | None = None
 
 
 class AssetRead(BaseModel):
@@ -45,6 +54,7 @@ class AssetRead(BaseModel):
     target_price: float | None = None
     stop_price: float | None = None
     entry_date: date
+    held_abroad: bool = False
     # Sell lock resolved by the backend (per class, per lot): total days the lot
     # must be held and how many are left. Clients render these instead of
     # re-deriving the rule.

@@ -131,6 +131,7 @@ export const AtivosView = () => {
   // "38.50" loses its separator mid-typing.
   const [amounts, setAmounts] = useState({ quantity: "", avg_price: "", current_price: "" });
   const [editPrice, setEditPrice] = useState("");
+  const [editAbroad, setEditAbroad] = useState(false);
   const [salePrice, setSalePrice] = useState("");
   const [saleQuantity, setSaleQuantity] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -168,6 +169,7 @@ export const AtivosView = () => {
   useEffect(() => {
     if (editing) {
       setEditPrice(String(editing.current_price ?? editing.avg_price));
+      setEditAbroad(editing.held_abroad);
       editDialog.current?.showModal();
     } else {
       editDialog.current?.close();
@@ -254,6 +256,7 @@ export const AtivosView = () => {
         avg_price: avgPrice,
         current_price: currentPrice,
         entry_date: formData.entry_date,
+        held_abroad: formData.asset_class === "crypto" && formData.held_abroad === true,
       };
       await createAsset(payload);
       setMessage({ type: "success", text: `${formData.ticker} adicionado à carteira` });
@@ -339,7 +342,10 @@ export const AtivosView = () => {
     }
     setSubmitting(true);
     try {
-      await updateAsset(editing.id, { current_price: value });
+      await updateAsset(editing.id, {
+        current_price: value,
+        ...(editing.asset_class === "crypto" ? { held_abroad: editAbroad } : {}),
+      });
       setMessage({ type: "success", text: `${editing.ticker} atualizado` });
       setEditing(null);
       await refresh();
@@ -523,6 +529,7 @@ export const AtivosView = () => {
                       setFormData({
                         ...formData,
                         asset_class: e.target.value as AssetClass,
+                        held_abroad: false,
                       })
                     }
                     className="w-full px-4 py-2.5 rounded-md text-sm outline-none max-md:text-base max-md:min-h-11"
@@ -570,6 +577,13 @@ export const AtivosView = () => {
                   value={formData.entry_date ?? ""}
                   onChange={(v) => setFormData({ ...formData, entry_date: v })}
                 />
+                {formData.asset_class === "crypto" && (
+                  <AbroadToggle
+                    id="abroad"
+                    checked={formData.held_abroad === true}
+                    onChange={(v) => setFormData({ ...formData, held_abroad: v })}
+                  />
+                )}
                 <div className="sm:col-span-2 lg:col-span-3 flex gap-3 mt-2">
                   <button
                     type="submit"
@@ -1063,6 +1077,11 @@ export const AtivosView = () => {
               value={editPrice}
               onChange={setEditPrice}
             />
+            {editing.asset_class === "crypto" && (
+              <div className="mt-4">
+                <AbroadToggle id="edit-abroad" checked={editAbroad} onChange={setEditAbroad} />
+              </div>
+            )}
             <div className="flex gap-3 mt-5 max-md:flex-col">
               <button
                 type="submit"
@@ -1087,6 +1106,38 @@ export const AtivosView = () => {
     </div>
   );
 };
+
+/** Crypto lot at a foreign exchange: changes the IR regime (Lei 14.754). */
+const AbroadToggle = ({
+  id,
+  checked,
+  onChange,
+}: {
+  id: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) => (
+  <label
+    htmlFor={id}
+    className="sm:col-span-2 lg:col-span-3 flex items-start gap-3 min-h-11 cursor-pointer"
+  >
+    <input
+      id={id}
+      type="checkbox"
+      checked={checked}
+      onChange={(e) => onChange(e.target.checked)}
+      className="mt-0.5 size-5 shrink-0"
+      style={{ accentColor: "var(--accent)" }}
+    />
+    <span className="text-sm" style={{ color: "var(--text-primary)" }}>
+      Comprado em exchange no exterior
+      <span className="block text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+        Muda o IR: no exterior paga 15% sobre o resultado do ano, na declaração anual. Exchange
+        brasileira ou carteira própria fica desmarcado.
+      </span>
+    </span>
+  </label>
+);
 
 /** Label-over-value pair used by the phone card lists that replace the tables. */
 const CardStat = ({

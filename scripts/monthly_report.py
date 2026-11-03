@@ -29,7 +29,7 @@ from app.models.contribution import ContributionPrompt  # noqa: E402
 from app.models.notification import NotificationKind, NotificationLevel  # noqa: E402
 from app.models.portfolio_snapshot import PortfolioSnapshot  # noqa: E402
 from app.models.report import Report, ReportKind  # noqa: E402
-from app.models.trade import Trade  # noqa: E402
+from app.models.trade import Trade, TradeSide  # noqa: E402
 from app.services import (  # noqa: E402
     notification_center,
     portfolio_service,
@@ -123,10 +123,15 @@ def build_report(session: Session, start: date, end: date) -> str:
 
     lines += ["", "## IR do mês"]
     if tax_month:
-        for label_cls, key in (("Ações", "stocks"), ("Crypto", "crypto")):
+        for label_cls, key in (("Ações", "stocks"), ("Crypto nacional", "crypto")):
             data = tax_month.get(key, {})
             status = "isento" if data.get("exempt") else f"DARF {_fmt(data.get('tax_due_brl', 0))}"
             lines.append(f"- {label_cls}: vendas {_fmt(data.get('sales_brl', 0))} → {status}")
+        if any(t.side == TradeSide.SELL and t.held_abroad for t in trades):
+            lines.append(
+                "- Crypto no exterior: sem DARF no mês; entra no resultado do ano "
+                "(15%, declaração anual — Lei 14.754/2023)."
+            )
     else:
         lines.append("- Sem vendas tributáveis no mês.")
 

@@ -32,6 +32,10 @@ Campos além do óbvio (`ticker`, `asset_class`, `quantity`, `avg_price`,
   Preenchidos ao executar uma `Order`. Alimentam a revisão semanal (a tese é
   reavaliada explicitamente: intacta / enfraquecida / quebrada) e os alertas de
   preço.
+- `held_abroad` — só crypto: lote custodiado ou negociado em exchange no
+  exterior. Padrão `false` (exchange brasileira ou carteira própria de
+  residente). Decide o regime de IR (D51); o formulário de lote e o diálogo de
+  edição têm a caixa, e a API recusa (422) em ação e CDB.
 
 `AssetClass`: `fixed_income` · `stocks` · `crypto`.
 
@@ -46,7 +50,8 @@ Toda compra e toda venda vira uma linha, **para sempre**. Vender apaga o
 - neutralização de fluxo no benchmark (TWR)
 
 `lot_entry_date` guarda a data de entrada do lote fechado (contabilidade por
-lote).
+lote). `held_abroad` é copiado do lote em toda compra e venda: o IR lê o
+trade, não o lote (que some na venda).
 
 ### `Contribution` + `ContributionPrompt`
 
@@ -249,10 +254,12 @@ normalizados a 100 na primeira data comum e forward-filled nos dias de snapshot.
 | Classe | Regra |
 |---|---|
 | Ações B3 | vendas do mês ≤ R$ 20.000 → isento; acima, 15% sobre o ganho líquido, compensando prejuízo acumulado |
-| Crypto | vendas do mês ≤ R$ 35.000 → isento; acima, 15% com a mesma compensação |
+| Crypto nacional | vendas do mês ≤ R$ 35.000 (inclusive) → isento; acima, CADA venda com ganho paga sozinha pelas faixas progressivas (15% até R$ 5M … 22,5%). Prejuízo **não compensa** nada, nem no mês nem depois |
+| Crypto no exterior (desde 2024) | Lei 14.754: 15% sobre o resultado do ANO, na declaração anual (sem DARF mensal, sem isenção, fora da soma dos R$ 35 mil). Perdas abatem ganhos do ano e o saldo passa aos anos seguintes |
 | CDB | IR retido na fonte (tabela regressiva) — só informativo, alíquota estimada pelo prazo do lote |
 
-DARF mínima de R$ 10 (valores menores acumulam para o mês seguinte).
+DARF mínima de R$ 10 (valores menores acumulam para o mês seguinte). Fontes
+oficiais e decisões de leitura em `docs/12-decisoes.md` D51.
 **Não cobre:** day-trade, JCP/dividendos, corretagem, eventos societários.
 
 ## Migrações de schema (leia antes de adicionar coluna)
