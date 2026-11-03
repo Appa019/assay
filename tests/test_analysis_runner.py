@@ -321,7 +321,9 @@ def test_final_validator_passes_a_matching_block_untouched(
     assert out.final_summary == _GOOD_CLOSE
 
 
-def test_final_validator_adopts_an_improved_fixup(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_final_validator_adopts_an_improved_fixup(
+    monkeypatch: pytest.MonkeyPatch, isolated_runner_dirs: Path
+) -> None:
     """A drifted sheet triggers ONE in-session corrective turn; the corrected
     closing replaces the original when it parses at least as well."""
     contribution = Contribution(amount_brl=Decimal("1000"))
@@ -330,6 +332,8 @@ def test_final_validator_adopts_an_improved_fixup(monkeypatch: pytest.MonkeyPatc
 
     def fake_fixup(prompt: str, **kwargs) -> ar.StepResult:
         calls.append(prompt)
+        # the fix-up shares the committee workspace: it must hold the global lock
+        assert not ar._acquire_global_run_lock("weekly")
         return ar.StepResult(
             label="", result=_GOOD_CLOSE, cost_usd=0.1, duration_s=2.0, session_id="sess"
         )
@@ -345,7 +349,7 @@ def test_final_validator_adopts_an_improved_fixup(monkeypatch: pytest.MonkeyPatc
 
 
 def test_final_validator_keeps_original_when_fixup_is_worse(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, isolated_runner_dirs: Path
 ) -> None:
     contribution = Contribution(amount_brl=Decimal("1000"))
     summary = ar.RunSummary(run_id="r1", session_id="sess", final_summary=_DRIFTED_CLOSE)
@@ -360,6 +364,24 @@ def test_final_validator_keeps_original_when_fixup_is_worse(
         summary, contribution, model="m", effort="e", timeout=60, on_event=None
     )
     assert out.final_summary == _DRIFTED_CLOSE  # never adopt a worse closing
+
+
+def test_final_validator_skips_the_fixup_while_another_run_holds_the_lock(
+    monkeypatch: pytest.MonkeyPatch, isolated_runner_dirs: Path
+) -> None:
+    contribution = Contribution(amount_brl=Decimal("1000"))
+    summary = ar.RunSummary(run_id="r1", session_id="sess", final_summary=_DRIFTED_CLOSE)
+    monkeypatch.setattr(
+        ar, "_run_step_resilient", lambda *a, **k: pytest.fail("must not run beside another")
+    )
+    assert ar._acquire_global_run_lock("weekly")
+    try:
+        out = ar._validate_and_correct_final(
+            summary, contribution, model="m", effort="e", timeout=60, on_event=None
+        )
+    finally:
+        ar._release_global_run_lock()
+    assert out.final_summary == _DRIFTED_CLOSE
 
 
 # --- fresh restart wipes stale responses (A9 regression, contribution flow) ----

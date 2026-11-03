@@ -1514,6 +1514,11 @@ def _validate_and_correct_final(
         "chaves exatas), com Σ valor_brl batendo o aporte (±R$ 5). NÃO refaça "
         "pesquisa nem mude as decisões — apenas corrija e reemita inteiro."
     )
+    # run_chain already released the global lock; the fix-up is one more step
+    # in the same workspace, so it takes the lock again or is skipped.
+    if not _acquire_global_run_lock(summary.run_id):
+        logger.warning("final_fixup_skipped_busy")
+        return summary
     try:
         step = _run_step_resilient(
             prompt,
@@ -1532,6 +1537,8 @@ def _validate_and_correct_final(
     except Exception as exc:  # noqa: BLE001 — the validator must never sink a finished run
         logger.warning("final_fixup_failed", error=str(exc))
         return summary
+    finally:
+        _release_global_run_lock()
 
     fixed = order_service.summarize_block(step.result, expected_total=contribution.amount_brl)
     old_dev = check["deviation_pct"] if check["deviation_pct"] is not None else float("inf")
