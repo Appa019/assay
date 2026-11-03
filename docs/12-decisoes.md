@@ -217,7 +217,7 @@ As DDs por nome (Reuniões 3/4) rodam com 2× `AGENT_STEP_TIMEOUT` via
 
 > Origem: missão de melhoria do assessor (diagnóstico de código + conversas de
 > produção + pesquisa de estado da arte com verificação adversarial). Relatório
-> completo em `CONSULTOR_UPGRADE_REPORT.md` na raiz.
+> completo em `CONSULTOR_UPGRADE_REPORT.md` na raiz (removido em 2026-11-02; o backlog dele foi para `13-estado-atual.md`).
 
 ### D23 · Perfil de MCP por workload
 O chat carregava o baseline INTEIRO do comitê — todo turno bootava ~12
@@ -1048,3 +1048,5 @@ de tirar, conferimos comando a comando o que o bot fazia e onde isso mora hoje:
 instalações antigas. O código (`telegram_bot.py`, `telegram_setup.py`,
 espelho em `telegram_service`) ainda está no repo: apagar é o próximo passo,
 junto com o `CLAUDE.md` e o `docs/08-telegram.md`.
+
+Atualização (mesmo dia): o código foi apagado em `0dd0f09`.
