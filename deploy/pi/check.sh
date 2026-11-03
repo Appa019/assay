@@ -9,16 +9,25 @@ export PATH="$HOME/.local/node/bin:$HOME/.local/bin:$PATH"
 PY=.venv/bin/python
 
 [ -x "$PY" ] || python3 -m venv .venv
-"$PY" -m pip install -q -r requirements.txt
 
-# The build takes hundreds of MB and the deploy restarts the backend; neither
-# may overlap a committee run (1.1 GB peak, holds the global lock throughout).
-if "$PY" -c 'import sys
+# The build takes hundreds of MB, the install swaps packages under the running
+# timers and the deploy restarts the backend; none of it may overlap a committee
+# run (1.1 GB peak, holds the global lock throughout). Checked BEFORE the install,
+# so exit 75 normally leaves the live .venv untouched. If this revision needs a
+# package the old venv lacks, the import fails and reads as "no run"; the check
+# after the install catches that case (deploy.sh then puts the old packages back).
+committee_running() {
+  "$PY" -c 'import sys
 from app.services import analysis_runner as a
-sys.exit(0 if a._lock_is_active(a._RUN_LOCK_DIR / a._GLOBAL_LOCK_NAME) else 1)'; then
+sys.exit(0 if a._lock_is_active(a._RUN_LOCK_DIR / a._GLOBAL_LOCK_NAME) else 1)' 2>/dev/null
+}
+not_now() {
   echo "check: análise do comitê rodando; tente de novo quando ela terminar" >&2
   exit 75
-fi
+}
+committee_running && not_now
+"$PY" -m pip install -q -r requirements.txt
+committee_running && not_now
 
 "$PY" -m ruff check app scripts tests
 "$PY" -m ruff format --check app scripts tests
