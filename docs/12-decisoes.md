@@ -435,6 +435,14 @@ quando o aviso era a mensagem do Telegram. Com o espelho desligado (D30), o
 relatório era salvo mas não ia para o inbox nem para o push: o cliente só o
 via se abrisse `?aba=analises`. Agora usa o padrão do serviço (`notify=True`).
 
+### A45 · SQLModel 0.0.45 recusa datetime sem fuso
+Achado na CI de 2026-11-02 (38 testes vermelhos, verdes no desktop). Desde a
+0.0.45 o SQLModel mapeia todo campo `datetime` para `UTCDateTime`: recusa valor
+sem fuso na escrita e devolve com fuso na leitura. O app inteiro grava datetime
+ingênuo, então qualquer instalação nova (CI, ou o venv novo da migração do Pi)
+quebraria as escritas em produção. Não era o fuso do runner. `requirements.txt`
+tem teto `<0.0.45`; só suba depois de migrar o app para datetime com fuso.
+
 ### D33 · Mandato mais defensivo: RF 50% · Ações 35% · Crypto 15%
 Em 2026-09-05 o cliente fixou **renda fixa em 50%** e deixou o resto a critério
 técnico. O alvo sai de 35/40/25 para **50/35/15**: o dry powder deixa de ser o
