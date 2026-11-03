@@ -42,12 +42,18 @@ fi
 command -v systemctl >/dev/null 2>&1 || { echo "systemctl não encontrado." >&2; exit 1; }
 
 mkdir -p "$UNIT_DIR" "${PROJECT_ROOT}/storage/logs"
+# storage/ may be a symlink to the external disk (pi-ops mounts it with nofail).
+# Every service then requires that mount: without it the app would start on the
+# empty mount point on the SD card and init_db would create a fresh database.
+# On a plain folder this is just the root filesystem, a no-op.
+DATA_DIR="$(readlink -f "${PROJECT_ROOT}/storage")"
 
 long_service() { # long_service <name> <description> <command> [extra [Service] line]
   local extra="${4:+$'\n'$4}"
   cat > "${UNIT_DIR}/${PREFIX}-$1.service" <<UNIT
 [Unit]
 Description=$2
+RequiresMountsFor=${DATA_DIR}
 
 [Service]
 WorkingDirectory=${PROJECT_ROOT}
@@ -66,6 +72,7 @@ oneshot_pair() { # oneshot_pair <name> <description> <command> <on_calendar> [pe
   cat > "${UNIT_DIR}/${PREFIX}-$1.service" <<UNIT
 [Unit]
 Description=$2
+RequiresMountsFor=${DATA_DIR}
 
 [Service]
 Type=oneshot
