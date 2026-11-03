@@ -6,9 +6,10 @@
 #   timers   : aportes agendados · maturidade · revisão semanal · resume
 #              (15min) · preços (6h) · snapshot diário · alertas de alvo/stop
 #              · relatório mensal · insights diários · digest semanal · backup
-#              diário — 11 in all, Persistent=true, so a machine that was OFF
+#              diário — 11 in all. Persistent=true, so a machine that was OFF
 #              at the scheduled time catches up on boot (plain cron silently
-#              skips missed windows).
+#              skips missed windows), except the three that spend Claude
+#              usage, which wait for the next night instead (see below).
 # Idempotent. Remove with --uninstall. Requires a systemd user session.
 set -euo pipefail
 
@@ -42,7 +43,8 @@ command -v systemctl >/dev/null 2>&1 || { echo "systemctl não encontrado." >&2;
 
 mkdir -p "$UNIT_DIR" "${PROJECT_ROOT}/storage/logs"
 
-long_service() { # long_service <name> <description> <command>
+long_service() { # long_service <name> <description> <command> [extra [Service] line]
+  local extra="${4:+$'\n'$4}"
   cat > "${UNIT_DIR}/${PREFIX}-$1.service" <<UNIT
 [Unit]
 Description=$2
@@ -51,7 +53,7 @@ Description=$2
 WorkingDirectory=${PROJECT_ROOT}
 Environment=${PATH_LINE}
 Environment=PYTHONUNBUFFERED=1
-ExecStart=$3
+ExecStart=$3${extra}
 Restart=always
 RestartSec=5
 
@@ -60,7 +62,7 @@ WantedBy=default.target
 UNIT
 }
 
-oneshot_pair() { # oneshot_pair <name> <description> <command> <on_calendar>
+oneshot_pair() { # oneshot_pair <name> <description> <command> <on_calendar> [persistent]
   cat > "${UNIT_DIR}/${PREFIX}-$1.service" <<UNIT
 [Unit]
 Description=$2
@@ -78,7 +80,7 @@ Description=Timer: $2
 
 [Timer]
 OnCalendar=$4
-Persistent=true
+Persistent=${5:-true}
 RandomizedDelaySec=60
 
 [Install]
@@ -113,9 +115,14 @@ long_service frontend "Investimentos Manual — frontend Next.js" \
 # lock, so the two short jobs follow it. On a night when all three land (rare —
 # the aporte is ad-hoc and the weekly is 7-day gated), the short ones defer to
 # the next night, which is harmless and already handled.
-oneshot_pair scheduled "aportes agendados"          "${PY} ${PROJECT_ROOT}/scripts/run_scheduled.py"  "*-*-* 01:00"
-oneshot_pair cadence  "maturidade dos lotes"        "${PY} ${PROJECT_ROOT}/scripts/check_cadence.py"  "*-*-* 01:45"
-oneshot_pair weekly   "revisão semanal do comitê"    "${PY} ${PROJECT_ROOT}/scripts/weekly_review.py"  "*-*-* 02:10"
+#
+# Persistent=false on these three ONLY: catching up a missed night at boot
+# would start the committee in the middle of the day, which THE RULE forbids.
+# A missed night waits for the next one: the scheduled aporte stays scheduled,
+# the weekly stays due, a matured lot stays pending.
+oneshot_pair scheduled "aportes agendados"          "${PY} ${PROJECT_ROOT}/scripts/run_scheduled.py"  "*-*-* 01:00" false
+oneshot_pair cadence  "maturidade dos lotes"        "${PY} ${PROJECT_ROOT}/scripts/check_cadence.py"  "*-*-* 01:45" false
+oneshot_pair weekly   "revisão semanal do comitê"    "${PY} ${PROJECT_ROOT}/scripts/weekly_review.py"  "*-*-* 02:10" false
 oneshot_pair resume   "retomada de análises"         "${PY} ${PROJECT_ROOT}/scripts/resume_pending.py" "*:0/15"
 oneshot_pair prices   "marcação a mercado"           "${PY} ${PROJECT_ROOT}/scripts/refresh_prices.py" "*-*-* 00/6:15"
 oneshot_pair snapshot "snapshot diário da carteira"  "${PY} ${PROJECT_ROOT}/scripts/daily_snapshot.py" "*-*-* 18:45"
