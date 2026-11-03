@@ -24,17 +24,22 @@ que mudam comportamento (detalhe em A46–A55 e D48):
 - **Config**: `CHAT_MODEL`/`CHAT_EFFORT` saíram (sem uso); `.env.example`
   cobre toda variável lida por `Settings`.
 
-Em aberto, esperando decisão do Pedro:
-1. `investimentos-resume` roda a cada 15 min o dia todo; uma análise
-   interrompida pode ser retomada de tarde, contra a regra da madrugada.
-   Restringir a janela atrasa o aporte em até um dia.
-2. IR de cripto: `tax_service` compensa prejuízo de cripto com ganho futuro,
-   como faz com ações. Pela regra da Receita até nossa última verificação,
-   cripto é ganho de capital por alienação, sem compensação. Confirmar com o
-   contador antes de mudar.
-3. Código legado (`_LEGACY_CHAT_MEMORY_SEEDS`, `PromptKey.RESEARCH`,
-   `ChatChannel.TELEGRAM`, `CashflowSource.BOT`): sai depois de uma contagem
-   no banco do Pi confirmar que nenhuma linha usa.
+As três perguntas foram decididas pelo Pedro em 2026-11-03 (abaixo).
+
+## 2026-11-03 — decisões do Pedro sobre a fase 4
+
+- **Retomada só de madrugada** (D50): `investimentos-resume` roda a cada
+  15 min entre 00:00 e 02:45. O aporte agendado da 01:00 não espera mais o
+  reset dentro do processo: limite ou lock ocupado viram "continua na próxima
+  madrugada". Um aporte que bate no limite pode terminar até um dia depois.
+- **IR de cripto corrigido** (D51): campo `held_abroad` (padrão nacional) em
+  lote e trade. Cripto nacional: isenção até R$ 35 mil inclusive, cada venda
+  com ganho paga sozinha pelas faixas progressivas, prejuízo não compensa.
+  Cripto no exterior desde 2024: Lei 14.754, 15% sobre o resultado do ano na
+  declaração anual, com perdas carregadas. Ações não mudaram.
+- **Legado**: `scripts/count_legacy.py` conta o uso no banco do Pi, e é o
+  passo 11 da migração em `docs/pi-deploy.md`. A remoção está pronta na
+  branch `chore/remove-legacy` e só entra se a contagem der zero.
 
 ## 2026-11-02 — bot removido, contrato de deploy e limpeza do repo
 
@@ -260,7 +265,7 @@ acionável foi corrigido na mesma data — detalhes em `12-decisoes.md`
 | 1 | `ativos/page.tsx` tem ~1430 linhas | maior arquivo do front; quebrar em componentes quando voltar a ser tocado |
 | 2 | `analysis_runner.py` ~1700 linhas (motor + locks + workspace + MCPs + validador) | funciona e está testado; separável em módulos numa refatoração futura |
 | 3 | Sem teste de frontend | validação é lint + type-check + build |
-| 4 | `PromptKey.RESEARCH` | legado de aportes pré-2026-05-24 |
+| 4 | `PromptKey.RESEARCH` + `ChatChannel.TELEGRAM` + `CashflowSource.BOT` | legado; sai pela branch `chore/remove-legacy` depois da contagem no Pi |
 | 5 | `README.md` desatualizado | ver tabela acima |
 | 6 | Banco zerado por decisão do cliente (2026-09-05) | esperado, não é dívida. Backup íntegro pré-reset em `~/assay_backup_20260905_pre_reset/` |
 | 7 | `delete_asset` apaga lote sem `Trade` nem trava de 30d (A41) | buraco silencioso no track record; sem risco agora (banco vazio), corrigir antes de acumular histórico |
