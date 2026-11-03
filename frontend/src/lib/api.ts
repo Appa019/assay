@@ -1,5 +1,6 @@
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+// Empty = same origin: next.config.ts rewrites /api/* to the backend. A
+// localhost default meant the phone calling itself when .env.local was missing.
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 export type AssetClass = "fixed_income" | "stocks" | "crypto";
 
@@ -169,8 +170,10 @@ const json = async <T>(res: Response): Promise<T> => {
   if (!res.ok) {
     let detail = "Erro na API";
     try {
-      const body = await res.json();
-      detail = (body as { detail?: string }).detail ?? detail;
+      const body = (await res.json()) as { detail?: string | { msg: string }[] };
+      // FastAPI validation errors (422) carry a list, not a string
+      if (Array.isArray(body.detail)) detail = body.detail.map((d) => d.msg).join("; ");
+      else detail = body.detail ?? detail;
     } catch {
       try {
         detail = (await res.text()) || detail;
