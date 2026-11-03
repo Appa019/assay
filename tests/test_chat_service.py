@@ -447,7 +447,6 @@ def test_attachment_group_becomes_one_turn(
 ) -> None:
     """Up to 3 files ride in ONE message: a receipt front and back is one
     purchase, and the prompt must tell the model to read them as a set."""
-    from app.models.chat import ChatChannel
 
     captured: dict[str, object] = {}
 
@@ -460,7 +459,7 @@ def test_attachment_group_becomes_one_turn(
     front.write_bytes(b"x")
     back.write_bytes(b"x")
 
-    chat_service.start_attachments_turn([front, back], "cupom do mercado", ChatChannel.WEB)
+    chat_service.start_attachments_turn([front, back], "cupom do mercado")
     prompt = str(captured["prompt"])
     assert str(front) in prompt and str(back) in prompt
     assert "CONJUNTO" in prompt
@@ -469,15 +468,13 @@ def test_attachment_group_becomes_one_turn(
     assert str(captured["display"]).startswith("📎 frente.jpg · verso.jpg")
 
     with pytest.raises(chat_service.ChatUnavailableError):
-        chat_service.start_attachments_turn([front] * 4, "", ChatChannel.WEB)
+        chat_service.start_attachments_turn([front] * 4, "")
 
 
 def test_media_turn_text_tells_model_to_reconcile_invoices(tmp_path: Path) -> None:
     """A single-file attachment turn must never ask the model to book the
     invoice: it must reconcile against cashflow and skip the invoice payment."""
-    prompt = chat_service.media_turn_text(
-        "arquivo", tmp_path / "fatura.pdf", "fatura do cartão", "pelo site"
-    )
+    prompt = chat_service.media_turn_text("arquivo", tmp_path / "fatura.pdf", "fatura do cartão")
     assert "resuma e registre" not in prompt
     assert "concilie" in prompt
 
@@ -778,7 +775,7 @@ def test_attachment_is_transcribed_outside_the_chained_session(
 
     monkeypatch.setattr(analysis_runner, "_run_claude_step", fake_step)
     reply, _route, step = chat_service.run_chat_turn(
-        chat_service.media_turn_text("imagem", path, "cupom", "pelo site")
+        chat_service.media_turn_text("imagem", path, "cupom")
     )
 
     assert reply == "registrei"
@@ -813,7 +810,7 @@ def test_transcription_failure_falls_back_to_reading_the_file(
 
     monkeypatch.setattr(analysis_runner, "_run_claude_step", fake_step)
     reply, _route, _step_result = chat_service.run_chat_turn(
-        chat_service.media_turn_text("imagem", path, "", "pelo site")
+        chat_service.media_turn_text("imagem", path, "")
     )
     assert reply == "li eu mesmo"
     assert "Leia você mesmo" in prompts[-1] and str(path) in prompts[-1]
@@ -860,7 +857,7 @@ def test_transcription_is_cached_across_a_retried_turn(
         return _step()
 
     monkeypatch.setattr(analysis_runner, "_run_claude_step", fake_step)
-    prompt = chat_service.media_turn_text("imagem", path, "", "pelo site")
+    prompt = chat_service.media_turn_text("imagem", path, "")
     _reply, _route, first = chat_service.run_chat_turn(prompt)
     _reply, _route, second = chat_service.run_chat_turn(prompt)
 

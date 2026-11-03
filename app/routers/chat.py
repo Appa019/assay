@@ -77,7 +77,7 @@ async def upload_attachments(
         contents.append((file.filename or "arquivo.bin", data))
     try:
         paths = [chat_service.save_attachment(name, data) for name, data in contents]
-        chat_service.start_attachments_turn(paths, caption.strip(), ChatChannel.WEB)
+        chat_service.start_attachments_turn(paths, caption.strip())
     except chat_service.ChatUnavailableError as exc:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)

@@ -98,7 +98,7 @@ _CONSULTANT_ORDERS = """\
 # Consultor Financeiro Pessoal — Ordens Permanentes
 
 Você é o CONSULTOR FINANCEIRO PESSOAL do cliente, conversando em TEMPO REAL
-pelo Telegram OU pelo site (é a MESMA conversa nos dois). Por trás de você
+pelo site (aba Consultor, quase sempre no celular). Por trás de você
 existe a mesma mesa institucional nível
 Goldman Sachs / J.P. Morgan do comitê de aportes — mas aqui você fala com UMA
 voz: próxima, direta, de confiança. Sempre em português brasileiro.
@@ -436,7 +436,7 @@ mesmo assim é proibido; emudecer também — escale com direção:
   data exata em que destrava.
 Formato: o que você NÃO vai fazer + por quê + o próximo passo concreto.
 
-## Formato das respostas (celular — Telegram e site)
+## Formato das respostas (celular)
 - CURTO e direto: regra geral ≤ 12 linhas; sem tabelas markdown largas; use
   bullets e negrito com moderação. Aprofunde só se o cliente pedir.
 - Confirmação de lançamento em 1 linha, com o total do mês na categoria. Ex.:
@@ -1473,11 +1473,11 @@ def attachment_kind(path: Path) -> str:
 MAX_ATTACHMENTS_PER_TURN = 3
 
 
-def media_turn_text(kind: str, path: Path, caption: str, origin: str) -> str:
+def media_turn_text(kind: str, path: Path, caption: str) -> str:
     """The prompt the consultant actually receives for an attachment."""
     caption_line = f'Legenda do cliente: "{caption}"' if caption else "Sem legenda."
     return (
-        f"[ARQUIVO RECEBIDO — {kind}] O cliente enviou um arquivo {origin}, "
+        f"[ARQUIVO RECEBIDO — {kind}] O cliente enviou um arquivo pelo site, "
         f"salvo em: {path}\n{caption_line}\n"
         f"{attachment_marker([path])}\n"
         "Siga suas ordens permanentes: cupom/nota → registre o gasto; "
@@ -1490,12 +1490,12 @@ def media_turn_text(kind: str, path: Path, caption: str, origin: str) -> str:
     )
 
 
-def _media_group_turn_text(paths: list[Path], caption: str, origin: str) -> str:
+def _media_group_turn_text(paths: list[Path], caption: str) -> str:
     caption_line = f'Legenda do cliente: "{caption}"' if caption else "Sem legenda."
     listing = "\n".join(f"{i}. {attachment_kind(p)}: {p}" for i, p in enumerate(paths, 1))
     return (
         f"[ARQUIVOS RECEBIDOS — {len(paths)}] O cliente enviou {len(paths)} "
-        f"arquivos {origin}, numa única mensagem:\n{listing}\n{caption_line}\n"
+        f"arquivos pelo site, numa única mensagem:\n{listing}\n{caption_line}\n"
         f"{attachment_marker(paths)}\n"
         "Trate-os como um CONJUNTO — podem ser páginas ou fotos do mesmo "
         "cupom/extrato. Siga suas ordens permanentes: cupom/nota → registre o "
@@ -1660,18 +1660,17 @@ def _display_name(path: Path) -> str:
     return path.name.split("_", 1)[-1]
 
 
-def start_attachments_turn(paths: list[Path], caption: str, channel: ChatChannel) -> None:
+def start_attachments_turn(paths: list[Path], caption: str) -> None:
     """Queue ONE turn about up to MAX_ATTACHMENTS_PER_TURN uploaded files."""
     if not paths:
         raise ChatUnavailableError("Nenhum arquivo recebido.")
     if len(paths) > MAX_ATTACHMENTS_PER_TURN:
         raise ChatUnavailableError(f"No máximo {MAX_ATTACHMENTS_PER_TURN} arquivos por mensagem.")
-    origin = "pelo Telegram" if channel is ChatChannel.TELEGRAM else "pelo site"
     if len(paths) == 1:
-        prompt = media_turn_text(attachment_kind(paths[0]), paths[0], caption, origin)
+        prompt = media_turn_text(attachment_kind(paths[0]), paths[0], caption)
     else:
-        prompt = _media_group_turn_text(paths, caption, origin)
+        prompt = _media_group_turn_text(paths, caption)
     display = (
         "📎 " + " · ".join(_display_name(p) for p in paths) + (f"\n{caption}" if caption else "")
     )
-    start_turn(prompt, channel, display=display)
+    start_turn(prompt, ChatChannel.WEB, display=display)
