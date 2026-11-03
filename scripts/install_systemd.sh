@@ -19,7 +19,8 @@ PREFIX="investimentos"
 # ~/.local/node/bin covers hosts where Node was installed from the tarball
 # instead of a package manager (e.g. the Raspberry Pi); harmless when absent.
 PATH_LINE="PATH=${HOME}/.local/node/bin:${HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin"
-FRONTEND_PORT="${FRONTEND_PORT:-3000}"
+# 3001: on the Pi (the only production host) 3000 belongs to the house site.
+FRONTEND_PORT="${FRONTEND_PORT:-3001}"
 
 if [[ "${1:-}" == "--uninstall" ]]; then
   systemctl --user disable --now "${PREFIX}-backend.service" "${PREFIX}-bot.service" \
