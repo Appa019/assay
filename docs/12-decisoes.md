@@ -409,6 +409,14 @@ agora). Quando for mexer: ou `delete_asset` vira exclusivamente correção de
 cadastro errado — registrando um `Trade` de estorno — ou some, e a saída de
 posição passa só por `sell_asset`.
 
+### A42 · Backup do SQLite caía para `cp` e perdia o que estava no WAL
+Achado na revisão da reorganização do Pi (2026-11-02). `backup_db.sh` usava o
+CLI `sqlite3` e, sem ele, fazia `cp` do `.db`. O banco roda em WAL: o commit
+fica no `-wal` até o checkpoint, então a cópia saía sem os lançamentos recentes
+(no teste, sem a própria tabela). O CLI não vem no desktop e não há prova de
+que esteja no Pi. Agora o script usa a API de backup online do `sqlite3` pelo
+Python do `.venv`, que sempre existe, e o fallback sumiu.
+
 ### D33 · Mandato mais defensivo: RF 50% · Ações 35% · Crypto 15%
 Em 2026-09-05 o cliente fixou **renda fixa em 50%** e deixou o resto a critério
 técnico. O alvo sai de 35/40/25 para **50/35/15**: o dry powder deixa de ser o
