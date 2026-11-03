@@ -409,6 +409,10 @@ agora). Quando for mexer: ou `delete_asset` vira exclusivamente correção de
 cadastro errado — registrando um `Trade` de estorno — ou some, e a saída de
 posição passa só por `sell_asset`.
 
+**Corrigido em 2026-11-03 (`e80f185`).** Excluir só desfaz um cadastro das
+últimas 24 h e leva junto o `Trade` de compra; lote mais velho responde 409
+("use Vender"). Ver A50.
+
 ### A42 · Backup do SQLite caía para `cp` e perdia o que estava no WAL
 Achado na revisão da reorganização do Pi (2026-11-02). `backup_db.sh` usava o
 CLI `sqlite3` e, sem ele, fazia `cp` do `.db`. O banco roda em WAL: o commit
@@ -442,6 +446,92 @@ sem fuso na escrita e devolve com fuso na leitura. O app inteiro grava datetime
 ingênuo, então qualquer instalação nova (CI, ou o venv novo da migração do Pi)
 quebraria as escritas em produção. Não era o fuso do runner. `requirements.txt`
 tem teto `<0.0.45`; só suba depois de migrar o app para datetime com fuso.
+
+### A46 · Os testes escreviam em `storage/` e podiam sair para a rede
+Revisão final pré-Pi (2026-11-03). O `check.sh` rodava limpo, mas criava
+`storage/classifier_workspace` na pasta de produção: um teste usava o
+workspace real do classificador. O `conftest.py` agora bloqueia socket e DNS
+e falha a sessão se aparecer qualquer entrada nova em `storage/`. Provado: o
+teste antigo com a guarda nova dá exit 1.
+
+### A47 · Script sem bit de execução no repositório
+O repo tem `core.fileMode=false`, então os `.sh` entravam como 644. O
+`pi-backup` do pi-ops só chama `backup.sh` se for executável: o backup do app
+não rodaria e nada avisaria. O bit é gravado com `update-index --chmod=+x` e
+um teste confere.
+
+### A48 · `health.sh` só tinha 0 e 1
+Job com falha passava como ok; `claude` ausente derrubava o deploy inteiro.
+Os dois viraram aviso (exit 2), como pede o contrato do pi-ops, e o
+`deploy.sh` aceita 2 sem rollback. O rollback também reinstala dependência
+quando o `requirements.txt` ou o lockfile mudaram entre as versões.
+
+### A49 · `backup.sh` copiava o `.env` e abria o banco em escrita
+O `.env` é segredo e o pi-ops já o guarda em `segredos/` (cifrado); uma
+cópia em claro no backup era uma a mais. O banco agora abre `mode=ro`: sem
+banco, o script falha em vez de criar um vazio. Com `DIR` relativo o `tar`
+quebrava depois do `cd storage`; o caminho vira absoluto antes.
+
+### A50 · Venda e edição no app escreviam um ledger falso
+A venda do app não mandava corpo: todo lote fechava inteiro pelo último preço
+marcado (até 6 h de atraso), e P&L realizado, hit rate e IR saíam errados. O
+diálogo pede preço e quantidade executados (venda parcial funciona). O PATCH
+deixou de aceitar `quantity`/`avg_price`, que mudavam posição sem `Trade`. Os
+campos numéricos guardavam número no estado e reescreviam o que se digitava:
+"0,5" virava 5, "38.50" virava 3850. Agora guardam o texto e convertem no envio.
+
+### A51 · Esperar o lock global contava como falha
+O `resume_pending` roda a cada 15 min. Com a semanal (~90 min) segurando o
+lock global, cada passe somava em `run_attempts` e o aporte era abandonado em
+~75 min sem ter falhado. Lock ocupado agora levanta `RunBusyError`, que, como
+`LimitError`, não anda para o teto. No modo fail-fast o horário de reset
+anunciado deixou de esticar a espera (o passe ficava horas segurando o lock).
+O turno corretivo do fechamento (D18) também passou a pegar o lock global.
+
+### A52 · Reinício matava mensagem do consultor que esperava o limite
+`reconcile_orphan_turns` media toda linha RUNNING contra o orçamento de
+transiente (3), mas `attempts` também conta esperas de limite (24): uma
+mensagem que já tinha esperado o limite três vezes morria num deploy. O tipo
+e o orçamento de limite sobrevivem ao restart. A semente da sessão nova
+incluía a mensagem atual duas vezes e as da fila antes da vez; agora só entram
+trocas concluídas.
+
+### A53 · Escrita vinda de outro site
+Sem login, a tailnet é a única porta, mas qualquer página aberta no celular
+com a VPN ligada podia mandar POST para cá (fetch `no-cors` ou formulário
+pulam o CORS): disparar o comitê ou cadastrar um push alheio. O middleware
+`refuse_cross_site_writes` recusa com 403 escrita marcada `cross-site` ou
+`same-site` em `Sec-Fetch-Site`. Medido num navegador real atrás do rewrite do
+Next: o fetch do próprio app chega `same-origin`. O curl do consultor e os
+scripts não mandam o cabeçalho e passam.
+
+### A54 · Anexo com legenda curta ia para o modelo de consulta
+O roteador procurava "📎" para tirar anexo do tier `lookup`, mas recebe o
+prompt montado, que leva `[[ANEXOS:...]]`; o clipe só existe no texto de
+exibição. "quanto tenho na carteira?" com uma foto ia para o sonnet sem ver a
+imagem. A guarda casa o marcador real, com teste sobre ele.
+
+### A55 · Dois uploads com o mesmo nome e estado JSON truncável
+Dois arquivos "IMG_0001.jpg" no mesmo segundo viravam um só no inbox; o nome
+leva microssegundos e abre com `xb`. Os arquivos de estado (sessão do chat,
+insights, avisos de destrave, alertas de preço) eram escritos direto: uma
+queda no meio deixava JSON cortado, o leitor tolerante zerava as flags e os
+avisos antigos voltavam. Todos passam por `app/core/json_state` (tmp + replace).
+
+### D48 · Contrato do pi-ops: o que o app assume
+- **Token do Claude**: as units leem `~/.config/claude-code/oauth.env`
+  (`EnvironmentFile=-`, opcional). Variável de ambiente vence o `.env`, então
+  o token do pi-ops ganha de um resto antigo no `.env`.
+- **Bind**: backend e frontend (inclusive `pnpm dev`/`start`) só em
+  127.0.0.1; quem publica é o `tailscale serve`.
+- **Primeiro boot depois de dias desligado**: só os timers com
+  `Persistent=true` recuperam, e cada um roda UMA vez (preços, snapshot,
+  alertas, mensal, insights, digest, backup). Nenhum deles chama o Claude. Os
+  três que chamam (agendado, maturidade, semanal) têm `Persistent=false` e
+  esperam a próxima madrugada. O `resume` roda a cada 15 min de qualquer jeito
+  e só gasta Claude se houver análise interrompida.
+- **Contraste**: `--success`, `--warning` e `--danger` foram escurecidos para
+  passar 4,5:1 como texto sobre `--bg-secondary` e sobre o próprio `-light`.
 
 ### D33 · Mandato mais defensivo: RF 50% · Ações 35% · Crypto 15%
 Em 2026-09-05 o cliente fixou **renda fixa em 50%** e deixou o resto a critério

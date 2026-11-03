@@ -1,8 +1,40 @@
 # 13 · Estado atual
 
-> **Fotografia de 2026-11-02.** Este é o documento que envelhece —
+> **Fotografia de 2026-11-03.** Este é o documento que envelhece —
 > atualize-o quando mudar algo estrutural. Os outros 11 descrevem como o
 > sistema funciona; este descreve como ele está **agora**.
+
+## 2026-11-03 — revisão final antes de religar o Pi
+
+Contrato `deploy/pi/` conferido item a item contra o pi-ops: scripts
+executáveis, `health.sh` com 0/1/2, `backup.sh` só leitura e sem `.env`,
+restauração testada seguindo o README (dump idêntico, 500 linhas gravadas sob
+escrita viva), guarda do HD simulada com e sem o ponto de montagem. Correções
+que mudam comportamento (detalhe em A46–A55 e D48):
+
+- **Ledger**: venda pelo app pede preço e quantidade executados; excluir lote
+  só nas primeiras 24 h; edição não mexe mais em quantidade/preço médio.
+- **Retomadas**: esperar o lock global ou o limite não conta tentativa
+  (`RunBusyError`); mensagem do consultor esperando o limite sobrevive a
+  restart.
+- **Segurança**: POST marcado como de outro site leva 403.
+- **Front no iPhone**: diálogos centrados, cabeçalho do consultor livre dos
+  botões flutuantes, excluir com dois toques, link para Ajustes no sino,
+  cores de status com contraste 4,5:1, movimento reduzido respeitado.
+- **Config**: `CHAT_MODEL`/`CHAT_EFFORT` saíram (sem uso); `.env.example`
+  cobre toda variável lida por `Settings`.
+
+Em aberto, esperando decisão do Pedro:
+1. `investimentos-resume` roda a cada 15 min o dia todo; uma análise
+   interrompida pode ser retomada de tarde, contra a regra da madrugada.
+   Restringir a janela atrasa o aporte em até um dia.
+2. IR de cripto: `tax_service` compensa prejuízo de cripto com ganho futuro,
+   como faz com ações. Pela regra da Receita até nossa última verificação,
+   cripto é ganho de capital por alienação, sem compensação. Confirmar com o
+   contador antes de mudar.
+3. Código legado (`_LEGACY_CHAT_MEMORY_SEEDS`, `PromptKey.RESEARCH`,
+   `ChatChannel.TELEGRAM`, `CashflowSource.BOT`): sai depois de uma contagem
+   no banco do Pi confirmar que nenhuma linha usa.
 
 ## 2026-11-02 — bot removido, contrato de deploy e limpeza do repo
 
