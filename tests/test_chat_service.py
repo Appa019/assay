@@ -474,7 +474,7 @@ def test_attachment_group_becomes_one_turn(
     def fake_start(prompt: str, channel, *, display=None) -> None:  # noqa: ANN001
         captured.update(prompt=prompt, display=display)
 
-    monkeypatch.setattr(chat_service, "start_turn", fake_start)
+    monkeypatch.setattr(chat_service, "enqueue", fake_start)
     front = tmp_path / "20260806T1_frente.jpg"
     back = tmp_path / "20260806T1_verso.jpg"
     front.write_bytes(b"x")

@@ -158,10 +158,11 @@ _LOOKUP_RE = re.compile(
 )
 
 # An attachment (photo of a receipt, a statement, a portfolio print) carries
-# content the router cannot see. Booking one is still fast — haiku reads a
-# receipt fine — but it is never a "lookup": measured against real history,
-# every LOOKUP match was an image whose caption happened to say "carteira".
-_ATTACHMENT_MARK = "📎"
+# content the router cannot see, so it is never a "lookup": measured against
+# real history, every LOOKUP match was an image whose caption happened to say
+# "carteira". The router gets the built prompt, which carries this marker
+# (chat_service.attachment_marker), not the "📎" the transcript displays.
+_ATTACHMENT_MARK = "[[ANEXOS:"
 
 # A booking is one short sentence. Anything longer is carrying extra intent.
 _LEDGER_MAX_CHARS = 120

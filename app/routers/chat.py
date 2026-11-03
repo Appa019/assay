@@ -37,7 +37,7 @@ async def send_message(payload: ChatSend) -> ChatState:
     only made the client hold the thought and retype it later.
     """
     try:
-        chat_service.start_turn(payload.text, ChatChannel.WEB)
+        chat_service.enqueue(payload.text, ChatChannel.WEB)
     except chat_service.ChatUnavailableError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return _state()

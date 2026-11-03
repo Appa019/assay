@@ -5,10 +5,12 @@ fast path narrow — every case that is not provably a booking must land on the
 big model, even when it looks small.
 """
 
+from pathlib import Path
+
 import pytest
 
 from app.config import settings
-from app.services import model_router
+from app.services import chat_service, model_router
 
 
 def _tier(text: str) -> model_router.Tier:
@@ -169,9 +171,8 @@ def test_an_attachment_never_takes_the_lookup_tier() -> None:
     """Measured on real history: every LOOKUP hit was a photo whose caption
     mentioned "carteira"/"fatura". The router cannot see the image, so it must
     not price the turn as if it were a balance read."""
-    assert _tier("📎 IMG_1365.png\nEssa é minha carteira completa de cripto") is (
-        model_router.Tier.DEEP
-    )
+    marker = chat_service.attachment_marker([Path("inbox/IMG_1365.png")])
+    assert _tier(f"Quanto tenho na carteira? {marker}") is model_router.Tier.DEEP
 
 
 # --- credit card ---------------------------------------------------------------

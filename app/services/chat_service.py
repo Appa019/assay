@@ -13,9 +13,10 @@ committee's ``agent_workspace``:
   merged with the chat agent's own ``.mcp.agent.json``.
 
 The session id + turn count persist in ``session.json``, so the conversation
-survives backend restarts. After ``chat_max_turns`` turns the session is
-rotated (fresh session, memory carries the context) to keep latency and cost
-bounded. A cross-process file lock serializes turns; the caller queues.
+survives backend restarts. The session rotates (fresh session, memory carries
+the context) when its context, turn count or idle pause crosses its limit, to
+keep latency and cost bounded. Callers ``enqueue``; one worker drains the
+durable queue in order, under a cross-process file lock.
 """
 
 import hashlib
@@ -924,9 +925,6 @@ def run_chat_turn(text: str) -> tuple[str, model_router.Route, StepResult]:
         raise ChatUnavailableError("Mensagem vazia.")
 
     workspace = _ensure_chat_workspace()
-    # Triage BEFORE taking the lock: its subprocess can take several seconds,
-    # and holding the lock through it needlessly extends the window in which
-    # every other message gets a ChatBusyError.
     # Same chained session either way — only the model answering it changes.
     picked = model_router.route(text)
     if not analysis_runner._try_acquire_lock_file(_chat_lock_path()):
@@ -1225,10 +1223,6 @@ def enqueue(
     start_queue_worker()
     _QUEUE_WAKE.set()
     return job_id
-
-
-# The name every caller already uses; queuing IS how a turn starts now.
-start_turn = enqueue
 
 
 def start_queue_worker() -> None:
@@ -1685,4 +1679,4 @@ def start_attachments_turn(paths: list[Path], caption: str) -> None:
     display = (
         "📎 " + " · ".join(_display_name(p) for p in paths) + (f"\n{caption}" if caption else "")
     )
-    start_turn(prompt, ChatChannel.WEB, display=display)
+    enqueue(prompt, ChatChannel.WEB, display=display)
