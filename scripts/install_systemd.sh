@@ -57,6 +57,9 @@ if [ "${GUARD_PATH}" = "${DATA_DIR}" ]; then
   echo "AVISO: sem portfolio.db, as units conferem só a pasta ${DATA_DIR}." >&2
   echo "       Rode este instalador de novo depois do primeiro boot do backend." >&2
 fi
+# The Claude token shared with the other Pi apps lives here (pi-ops creates it);
+# "-" = optional, so the desktop and an old .env that still carries it keep working.
+TOKEN_LINE="EnvironmentFile=-%h/.config/claude-code/oauth.env"
 GUARD_LINE="ExecStartPre=/bin/sh -c 'test -e \"${GUARD_PATH}\" || { echo \"${GUARD_PATH} ausente: o HD está montado?\" >&2; exit 1; }'"
 
 long_service() { # long_service <name> <description> <command> [extra [Service] line]
@@ -71,6 +74,7 @@ StartLimitIntervalSec=0
 WorkingDirectory=${PROJECT_ROOT}
 Environment=${PATH_LINE}
 Environment=PYTHONUNBUFFERED=1
+${TOKEN_LINE}
 ${GUARD_LINE}
 ExecStart=$3${extra}
 Restart=always
@@ -91,6 +95,7 @@ Type=oneshot
 WorkingDirectory=${PROJECT_ROOT}
 Environment=${PATH_LINE}
 Environment=PYTHONUNBUFFERED=1
+${TOKEN_LINE}
 ${GUARD_LINE}
 ExecStart=$3
 UNIT

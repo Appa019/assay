@@ -70,10 +70,10 @@ O `fit-meal-worker` hoje **copia** esse token do nosso `.env` na instalação.
 
 **Token compartilhado (combinado com `pi-fit`):** o token passa a morar em
 `~/.config/claude-code/oauth.env` (chmod 600, gerido pelo `pi-ops`, no backup
-de segredos) e entra por `EnvironmentFile=` nas units. Funciona sem mudar
-código: `_agent_subprocess_env()` herda o ambiente do processo e só sobrescreve
-se `settings.claude_code_oauth_token` vier preenchido — então a linha **sai** do
-nosso `.env` (se ficar, ela ganha e a cópia volta a divergir).
+de segredos) e entra por `EnvironmentFile=-` em todas as units (feito no
+`install_systemd.sh`; o `-` deixa a unit subir sem o arquivo). Variável de
+ambiente vence o `.env` no pydantic, então o `oauth.env` ganha; mesmo assim a
+linha **sai** do nosso `.env` na migração, para não haver duas cópias.
 
 **Furo de backup hoje:** o `pi-backup` de 19/10 leva só
 `dumps/portfolio_20261019.db.gz` + o `.env`. **Memória do consultor, memória e
