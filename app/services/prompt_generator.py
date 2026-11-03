@@ -68,7 +68,7 @@ _PROMPT_DEFINITIONS = [
         "description": (
             "Memo completo por ação selecionada: investment thesis, valuation triangulada "
             "(múltiplos + Reverse DCF + DCF 3-estágios + CCA + consenso), forense "
-            "(Piotroski/Altman/Beneish/Sloan/Dechow), Capital Allocation, técnica institucional, "
+            "(Piotroski/Altman/Beneish/Sloan), Capital Allocation, técnica institucional, "
             "factor exposure, bull/base/bear e sizing."
         ),
     },
@@ -89,7 +89,7 @@ _PROMPT_DEFINITIONS = [
         "template": "05_decision_orders.j2",
         "title": "Reunião nº 5 — Risco, Sentimento e Ordens Finais",
         "description": (
-            "CIO + CRO + Sentiment + Trader validam a shortlist contra risco (VaR/CVaR/EVT), "
+            "CIO + CRO + Sentiment + Trader validam a shortlist contra risco (VaR/CVaR), "
             "stress 8 cenários, sentimento e imposto; materializam o CDB e geram a folha de ordens "
             "executiva (ticker, qtd, preço-alvo, stop, targets, algoritmo) pronta para operar."
         ),
