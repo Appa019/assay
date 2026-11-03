@@ -11,6 +11,7 @@ import {
   FileText,
   MessagesSquare,
   Receipt,
+  Settings,
   Settings2,
   X,
 } from "lucide-react";
@@ -237,6 +238,15 @@ export const NotificationsBell = ({
                   </ul>
                 )}
               </div>
+              <Link
+                href="/configuracoes"
+                onClick={() => setOpen(false)}
+                className="box-content flex items-center gap-2 px-5 min-h-12 pb-[env(safe-area-inset-bottom)] border-t text-[13px] font-medium shrink-0"
+                style={{ borderColor: "var(--border)", color: "var(--accent)" }}
+              >
+                <Settings size={15} />
+                Ajustes: avisos no celular e cartões
+              </Link>
             </motion.aside>
           </>
         )}

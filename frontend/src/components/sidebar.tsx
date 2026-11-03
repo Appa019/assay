@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Settings } from "lucide-react";
 import { NAV_ITEMS, isCurrentPath } from "@/lib/nav";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { PrivacyToggle } from "@/components/privacy-toggle";
@@ -60,6 +61,15 @@ export const Sidebar = () => {
 
       {/* Pushed to the bottom: it is a place to check, not a destination. */}
       <div className="mt-auto pt-8">
+        <Link
+          href="/configuracoes"
+          aria-current={isCurrentPath(pathname, "/configuracoes") ? "page" : undefined}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          <Settings size={17} strokeWidth={1.8} />
+          Ajustes
+        </Link>
         <PrivacyToggle variant="sidebar" />
         <NotificationsBell variant="sidebar" />
       </div>
