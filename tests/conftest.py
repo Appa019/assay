@@ -1,14 +1,26 @@
+import os
+import tempfile
 from collections.abc import Iterator
 from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-import pytest
-from sqlalchemy.pool import StaticPool
-from sqlmodel import Session, SQLModel, create_engine
+# Before any app import: the module-level engine must never be the real
+# storage/portfolio.db. The Pi runs this suite inside the production folder
+# (deploy/pi/check.sh), and code paths the fixtures don't patch, like the push
+# sent when a chat turn finishes, would read the client's real subscriptions
+# and buzz his phone.
+os.environ["SQLITE_PATH"] = str(Path(tempfile.mkdtemp(prefix="assay-tests-")) / "test.db")
 
-from app import models  # noqa: F401 — register all tables on the metadata
-from app.models.asset import Asset, AssetClass
+import pytest  # noqa: E402
+from sqlalchemy.pool import StaticPool  # noqa: E402
+from sqlmodel import Session, SQLModel, create_engine  # noqa: E402
+
+from app import models  # noqa: E402, F401 — register all tables on the metadata
+from app.core import database  # noqa: E402
+from app.models.asset import Asset, AssetClass  # noqa: E402
+
+assert "assay-tests-" in str(database.DATABASE_URL), database.DATABASE_URL
 
 
 @pytest.fixture()

@@ -417,6 +417,17 @@ fica no `-wal` até o checkpoint, então a cópia saía sem os lançamentos rece
 que esteja no Pi. Agora o script usa a API de backup online do `sqlite3` pelo
 Python do `.venv`, que sempre existe, e o fallback sumiu.
 
+### A43 · A suíte de testes abria o banco real
+Achado ao montar o `deploy/pi/check.sh`, que roda o pytest dentro da pasta de
+produção do Pi (2026-11-02). As fixtures trocam o engine dos serviços que o
+teste usa, mas não o módulo-nível de `app.core.database`. Em
+`test_chat_api.py` e `test_chat_service.py`, o turno concluído chama
+`webpush_service.notify`, que abre `storage/portfolio.db`. No desktop isso só
+criava um arquivo vazio. No Pi leria as inscrições reais e mandaria push de
+teste para o celular do cliente, e apagaria a inscrição que respondesse
+404/410. O `conftest.py` agora aponta `SQLITE_PATH` para um arquivo temporário
+antes de qualquer import do app e confere isso com um `assert`.
+
 ### D33 · Mandato mais defensivo: RF 50% · Ações 35% · Crypto 15%
 Em 2026-09-05 o cliente fixou **renda fixa em 50%** e deixou o resto a critério
 técnico. O alvo sai de 35/40/25 para **50/35/15**: o dry powder deixa de ser o
