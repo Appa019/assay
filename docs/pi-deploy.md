@@ -1,6 +1,6 @@
 # Pi deploy — investimentos (Assay)
 
-Plano da reorganização do Pi (`~/<docs-do-pi>/reorganizacao.md`), já com
+Plano da reorganização do Pi (nas docs do Pi, fora do repo), já com
 as respostas do Pedro (P1–P6) e os achados do `/review-all`. Fonte: backup de
 19/10 (`pi-backup-20261019-033233.tar.gz`) + este repo. Nada foi executado no
 Pi: ele está offline desde ~20/10.

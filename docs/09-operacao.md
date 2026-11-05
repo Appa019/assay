@@ -9,7 +9,7 @@
 
 | Item | Valor |
 |---|---|
-| Host | `raspberrypi` · `<lan-ip>` · usuário `<usuario>` |
+| Host | Raspberry Pi 4 na LAN de casa (alias SSH `pi`; IP e usuário em `CLAUDE.local.md`, fora do git) |
 | Acesso remoto | `https://<host-do-pi>.<tailnet>.ts.net` — **VPN Tailscale privada**, nada exposto na internet. Só aparelhos logados na conta do Pedro enxergam |
 | Backend | uvicorn em `127.0.0.1:8000` |
 | Frontend | Next em `127.0.0.1:3001` (a 3000 é do painel de casa) |
@@ -19,7 +19,7 @@
 **Bind SEMPRE em `127.0.0.1`.** A LAN é compartilhada com o prédio inteiro;
 `0.0.0.0` entrega as finanças do cliente aos vizinhos.
 
-Detalhes de rede, SSH, firewall e túnel: `~/<docs-do-pi>/acesso-raspberry-pi.md` (fora do repo; docs do Pi).
+Detalhes de rede, SSH, firewall e túnel: nas docs do Pi, fora do repo (caminho em `CLAUDE.local.md`).
 
 ## Comandos no Pi
 
@@ -191,7 +191,7 @@ cat storage/agent_workspace/MEMORY.md                  # o que o agente sabe
 |---|---|
 | Chrome não tem build ARM64 | `_playwright_mcp_args()` cai para Chromium do sistema |
 | Porta 3000 é do painel de casa | frontend na 3001 (`FRONTEND_PORT=3001`) |
-| Firewall `panel_guard` filtra 443/3000/3443/8123 por MAC; tráfego de VPN não tem cabeçalho ethernet | regra `iifname "tailscale0" accept` na chain `input` (vive em `~/<repo-automacao>/infra/panel-guard.nft`) |
+| Firewall `panel_guard` filtra 443/3000/3443/8123 por MAC; tráfego de VPN não tem cabeçalho ethernet | regra `iifname "tailscale0" accept` na chain `input` (vive no repo de automação residencial do Pi) |
 | `rewrites` do Next é assado no build | setar `BACKEND_ORIGIN` antes do `pnpm build` |
 | `pnpm start` desperdiça ~110 MB | unit chama `node_modules/.bin/next` direto |
 | NTFS não preserva bit `+x` | `install.sh` recusa rodar em fuseblk/ntfs |

@@ -103,7 +103,7 @@ Documentos que **já existiam** e continuam valendo (não os duplique):
 - **`CLAUDE.md`** (raiz) — contrato sempre carregado. Regras operacionais.
 - **`PRODUCT.md`** (raiz, em inglês) — registro de produto, usuário, anti-referências.
 - **`DESIGN.md`** (raiz, em inglês) — sistema visual: cor, tipo, motion, mobile.
-- SSH, firewall, portas e rede do Pi: `~/<docs-do-pi>/acesso-raspberry-pi.md` (fora do repo; docs do Pi).
+- SSH, firewall, portas e rede do Pi: nas docs do Pi, fora do repo (caminho em `CLAUDE.local.md`).
 - **`README.md`** (raiz) — apresentação pública do repositório. ⚠️ parcialmente
   desatualizado (é anterior às finanças pessoais); veja `13-estado-atual.md`.
 

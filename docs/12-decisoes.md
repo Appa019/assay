@@ -285,10 +285,10 @@ Totais do mês continuam somando tudo (o extrato não mente); o recorte vem em
 ### D29 · CDB é instrumento FIXO: Bradesco, 100% do CDI, liquidez diária
 Até 2026-08-10 o mandato dizia "Renda Fixa = 100% CDB, preferir ≥100% do CDI" e
 deixava emissor, prazo e taxa a critério do comitê. O resultado apareceu na
-folha do aporte real: dos 4 CDBs, dois eram de PRAZO (Daycoval 113%,
+folha de um aporte real: dos 4 CDBs, dois eram de PRAZO (Daycoval 113%,
 BTG 112%), que travam o dinheiro por ~2 anos e matam o dry powder. O cliente
 fechou a regra: **um único instrumento, CDB do Bradesco a 100% do CDI com
-liquidez diária** — o banco onde ele já opera (Bradesco), resgate no
+liquidez diária** — o banco onde ele já opera, resgate no
 mesmo dia, sem caçar taxa. A decisão do comitê passa a ser só **QUANTO**, nunca
 QUAL.
 

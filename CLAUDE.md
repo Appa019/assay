@@ -13,7 +13,8 @@
 > ## ⚠️ ONDE ISTO RODA (leia antes de qualquer coisa)
 >
 > **O RASPBERRY PI É A ÚNICA MÁQUINA DE PRODUÇÃO.** Desde 2026-07-28 o app roda
-> exclusivamente no Pi 4 (`pi`, `~/investimentos_manual`),
+> exclusivamente no Pi 4 (alias SSH `pi`, `~/investimentos_manual`; IP e usuário
+> reais em `CLAUDE.local.md`, fora do git),
 > sob systemd, 24/7. O desktop é só onde se ESCREVE código.
 >
 > - **Acesso**: `https://<host-do-pi>.<tailnet>.ts.net` — VPN Tailscale privada,
@@ -35,8 +36,8 @@
 >   vivo no Pi para sempre (foi assim que specs consumidos e o ícone
 >   pré-rebrand sobreviveram lá).
 >   O `.env` e o banco do Pi são a fonte da verdade e NÃO são sobrescritos.
-> - **Detalhes de máquina, firewall e rede**: `~/<docs-do-pi>/acesso-raspberry-pi.md`
->   e `raspberry-pi.md` (docs do Pi, fora deste repo).
+> - **Detalhes de máquina, firewall e rede**: nas docs do Pi, fora deste repo
+>   (caminhos em `CLAUDE.local.md`).
 
 Gestão de aportes (AD-HOC, sem ciclo fixo) com comitê multipersona de IA padrão
 **Goldman Sachs GIR + Morgan Stanley GIC + Bridgewater + AQR**. A cada aporte o
@@ -491,7 +492,7 @@ rsync -a --delete --exclude '.venv' --exclude 'node_modules' --exclude '.next' \
   Bradesco 100% CDI liquidez diária (sem outros emissores, sem CDB de prazo),
   Ações = só equities da B3, Crypto = agressivo. SEM FII/ETF/BDR,
   Tesouro, LCI/LCA, debêntures, fundos ou internacional direto.
-- **Broker B3 preferido**: a corretora do banco para ações e CDB.
+- **Broker B3 preferido**: a corretora do mesmo banco do CDB, para ações e CDB.
 - **Crypto**: comitê é agnóstico (escolhe por liquidez/segurança). Usuário
   decide exchange:
   - BTC/ETH/majors: Mercado Bitcoin, Binance BR, Bitso, Coinext
@@ -614,7 +615,7 @@ long-only de varejo e a quantidade é recalculada pelo `order_sizing`.
 - **Firewall `panel_guard`** filtra 443/3000/3443/8123 por MAC. Tráfego de VPN
   não tem cabeçalho ethernet, então `ether saddr` nunca casa. A regra
   `iifname "tailscale0" accept` na chain `input` é o que faz o acesso remoto
-  funcionar — vive em `~/<repo-automacao>/infra/panel-guard.nft`.
+  funcionar — vive no repo de automação residencial do Pi.
 - **`rewrites` do Next é assado no BUILD**, não lido no start: `BACKEND_ORIGIN`
   tem que estar setado na hora do `pnpm build`.
 - **RAM é o recurso escasso** (3,7 GB com Home Assistant + 5 containers usando

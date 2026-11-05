@@ -96,7 +96,7 @@ Estas são para você, Claude, não para o comitê. **Os prompts são agnóstico
 plataforma de propósito** — corretora e exchange são decisão do usuário na hora
 de executar a folha de ordens.
 
-- Corretora B3 preferida: a corretora do banco, para ações e CDB.
+- Corretora B3 preferida: a do mesmo banco do CDB, para ações e CDB.
 - Crypto majors (BTC/ETH): Mercado Bitcoin, Binance BR, Bitso, Coinext.
 - Alts de menor liquidez: Binance BR.
 - DeFi yield (USDC/USDT/USDe): wallet própria (MetaMask) + Aave / Pendle /

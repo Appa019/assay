@@ -48,3 +48,6 @@ coverage/
 
 # subagent-driven-development scratch (ledger, briefs, review packages)
 .superpowers/
+
+# Machine-specific notes (hosts, IPs): never commit
+CLAUDE.local.md
