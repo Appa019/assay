@@ -9,6 +9,7 @@
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-local-003B57?logo=sqlite&logoColor=white)
 ![Local-first](https://img.shields.io/badge/100%25-local%20%C2%B7%20sem%20nuvem-2ea44f)
+[![CI](https://github.com/Appa019/assay/actions/workflows/ci.yml/badge.svg)](https://github.com/Appa019/assay/actions/workflows/ci.yml)
 
 </div>
 
@@ -21,10 +22,53 @@ só registra o que comprou.
 O universo é restrito a **três classes**: CDB, ações da B3 e crypto. Tudo roda
 local (FastAPI + SQLite + Next.js); nada de nuvem, login ou banco externo.
 
+> **In English.** Assay is a personal-finance app with an AI investment
+> committee. You enter how much you want to invest; a headless Claude Code agent
+> runs five chained research stages (macro, selection, equity due diligence,
+> crypto due diligence, final committee) with live web and market-data tools,
+> and returns an order sheet with ticker, quantity and limit price. It also
+> tracks spending, cards and taxes. FastAPI + SQLite + Next.js, self-hosted on a
+> Raspberry Pi behind Tailscale. Code comments are in English; prompts and docs
+> are in Portuguese.
+
+---
+
+## Destaques de engenharia
+
+- **Uma sessão encadeada.** As cinco etapas rodam na mesma sessão do `claude`
+  headless, via `--resume`: cada etapa herda o contexto e o JSON da anterior
+  (`analysis_runner.run_chain`).
+- **Retomada.** O `session_id` fica salvo no aporte e cada resposta é gravada ao
+  concluir. Se o processo cai, a execução seguinte volta da primeira etapa
+  pendente, na mesma sessão; se bate o limite de uso, espera o reset e repete a
+  etapa. Um lock por aporte (arquivo com PID) impede rodar em dobro, e um timer
+  de madrugada retoma o que ficou pela metade.
+- **MCPs montados a cada execução.** Uma base fixa (ferramentas de runtime,
+  dados de mercado sem chave e provedores pagos que só ligam se a chave estiver
+  no `.env`) somada a um `.mcp.agent.json` que o próprio agente edita.
+  `--strict-mcp-config` impede que entrem Gmail, Calendar ou Drive.
+- **Saída conferida por código.** O fechamento termina num bloco de máquina; o
+  backend confere a soma das ordens contra o valor do aporte (tolerância de 2%)
+  e, se não bater, dá uma única chance de correção na mesma sessão. A
+  quantidade da boleta sai da cotação atual (`order_sizing`), não de um número
+  que o modelo lembrou.
+- **Modelo escolhido sem chamar modelo.** No chat, regras determinísticas
+  mandam lançamento de gasto para haiku, consulta factual para sonnet e o resto
+  para opus (`model_router.py`). Uma triagem feita pelo haiku foi medida em
+  5,6 s por mensagem no Pi e removida.
+- **Testes e registro de decisões.** 415 testes de backend (pytest); o CI roda
+  ruff, pytest, lint, type-check e build do frontend. As decisões de
+  arquitetura ficam registradas com o motivo em
+  [`docs/12-decisoes.md`](docs/12-decisoes.md) (D1 a D53).
+
+---
+
 ---
 
 ## Índice
 
+- [Destaques de engenharia](#destaques-de-engenharia)
+- [Arquitetura](#arquitetura)
 - [Como funciona](#como-funciona)
 - [Mandato de ativos](#mandato-de-ativos)
 - [Quick start](#quick-start)
@@ -36,7 +80,32 @@ local (FastAPI + SQLite + Next.js); nada de nuvem, login ou banco externo.
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Comandos úteis](#comandos-úteis)
 - [Requisitos](#requisitos)
+- [Isolamento e riscos](#isolamento-e-riscos)
 - [Aviso](#aviso)
+
+---
+
+## Arquitetura
+
+```mermaid
+flowchart LR
+    U["Celular / desktop<br/>na tailnet"] --> TS["tailscale serve<br/>HTTPS"]
+    subgraph Pi["Raspberry Pi · systemd --user"]
+        TS --> FE["Next.js 16<br/>127.0.0.1:3001"]
+        FE -->|"/api (rewrite)"| BE["FastAPI<br/>127.0.0.1:8000"]
+        BE --> DB[("SQLite")]
+        BE -->|subprocess| CL["claude headless<br/>Opus · --resume"]
+        CL --> MCP["MCPs<br/>yahoo-finance · coingecko ·<br/>defillama · exa · playwright…"]
+        T["timers systemd<br/>scripts/*.py"] --> DB
+        T --> CL
+    end
+    BE -.->|Web Push| U
+```
+
+Os 11 timers cobrem aporte agendado, maturidade dos lotes, revisão semanal,
+retomada, preços, snapshot, alertas, insights, resumo semanal, relatório mensal
+e backup. Detalhe de pastas,
+processos e serviços em [`docs/02-arquitetura.md`](docs/02-arquitetura.md).
 
 ---
 
@@ -89,11 +158,9 @@ ETFs (GOLD11/BOVA11/IVVB11), BDRs, ouro, ativos internacionais diretos.
 ## Quick start
 
 ```bash
-./install.sh    # primeira vez: cria venv, instala deps, cria atalho no Desktop
+./install.sh    # primeira vez: cria o venv e instala as dependências
 ./start.sh      # sobe backend + frontend e abre o navegador
 ```
-
-Ou clique no atalho **Investimentos Manual** no Desktop.
 
 Isso é ambiente de desenvolvimento. Produção roda no Raspberry Pi, sob systemd
 (2 serviços + 11 timers): ver [`docs/pi-deploy.md`](docs/pi-deploy.md) e
@@ -289,6 +356,30 @@ sqlite3 storage/portfolio.db
 - **Claude Code CLI** autenticado (o agente roda o `claude` headless)
 - Acesso à internet (BCB, Yahoo Finance, CoinGecko)
 - Filesystem **ext4** — NTFS via ntfs-3g não preserva bits de execução e quebra o venv/Node
+
+---
+
+## Isolamento e riscos
+
+O agente roda com `--dangerously-skip-permissions` e `--add-dir $HOME`: lê e
+escreve tudo o que o usuário do Pi alcança, inclusive o `.env` e o banco. Isso
+é deliberado, para ele pesquisar e criar as próprias ferramentas sem pedir
+licença a cada passo, e por isso o limite fica fora do agente:
+
+- **Fora do computador pessoal.** Roda num Raspberry Pi, não na máquina de uso
+  diário.
+- **Nada exposto.** Backend e frontend escutam só em `127.0.0.1`; quem publica é
+  o `tailscale serve`, numa rede privada. O app não tem login porque a rede é a
+  fronteira.
+- **Sem acesso a dinheiro.** O app não fala com corretora nem guarda credencial
+  de corretora: entrega uma folha de ordens, e quem compra e vende é o dono.
+- **Ambiente filtrado.** O subprocesso do `claude` não herda credenciais alheias
+  (`AWS_*`, `GCP_*`, `AZURE_*`, `OPENAI_*`, tokens do GitHub e senha do Gmail
+  ficam de fora); recebe só as chaves dos provedores de dados e o token do
+  próprio Claude. O `.mcp.json` gerado usa `${VAR}`, sem segredo gravado.
+
+O risco que sobra: um prompt injection vindo de uma página pesquisada pode agir
+com os poderes do usuário do Pi. Por isso a contenção mora nas camadas acima.
 
 ---
 
